@@ -9,8 +9,14 @@ from mcp.types import ToolAnnotations
 
 from mtg_mcp.config import Settings
 from mtg_mcp.logging import configure_logging
+from mtg_mcp.providers.edhrec import edhrec_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
+
+# Mount EDHREC behind feature flag — undocumented endpoints, may break
+_settings = Settings()
+if _settings.enable_edhrec:
+    mcp.mount(edhrec_mcp, namespace="edhrec")
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
