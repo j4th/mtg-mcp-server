@@ -86,44 +86,18 @@ mise manages tool versions and task aliases. One `mise install` gets a new contr
 python = "3.12"
 uv = "latest"
 ruff = "latest"
-"pipx:ty" = "latest"
+ty = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 
 [tasks.setup]
 description = "Install dependencies and create venv"
 run = "uv sync"
-
-[tasks.check]
-description = "Full quality gate"
-depends = ["lint", "typecheck", "test"]
-
-[tasks.test]
-description = "Run tests with coverage"
-run = "uv run pytest --cov --cov-report=term-missing"
-
-[tasks.lint]
-description = "Lint and format check"
-run = ["uv run ruff check .", "uv run ruff format --check ."]
-
-[tasks.typecheck]
-description = "Type check with ty"
-run = "ty check"
-
-[tasks.dev]
-description = "Launch MCP Inspector"
-run = "uv run fastmcp dev src/mtg_mcp/server.py"
-
-[tasks.serve]
-description = "Run server via stdio"
-run = "uv run python -m mtg_mcp.server"
-
-[tasks.fix]
-description = "Auto-fix lint and format issues"
-run = ["uv run ruff check --fix .", "uv run ruff format ."]
-
-[tasks.fixtures]
-description = "Capture fresh fixtures from live APIs"
-run = "uv run python scripts/capture_fixtures.py"
 ```
+
+See `mise.toml` for the full task list. Key tasks: `check` (full gate), `test`, `lint`, `fix`, `typecheck`, `dev`, `serve`.
 
 ---
 

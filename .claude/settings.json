@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path' | { read -r f; if echo \"$f\" | grep -qE '(^|/)\\.env$'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Do not edit .env directly. Use .env.example instead.\"}}'; fi; }"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path' | { read -r f; [ -n \"$f\" ] && ruff format --quiet \"$f\"; } 2>/dev/null || true",
+            "statusMessage": "Formatting..."
+          }
+        ]
+      }
+    ]
+  }
+}

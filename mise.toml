@@ -1,0 +1,98 @@
+[tools]
+python = "3.12"
+uv = "latest"
+ruff = "latest"
+ty = "latest"
+
+[env]
+# Auto-create .venv using uv, activate on cd
+_.python.venv = { path = ".venv", create = true }
+# Ensure uv uses mise's managed Python, not system or self-managed
+UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
+
+# --- Setup ---
+
+[tasks.setup]
+description = "Install dependencies and create venv"
+run = "uv sync"
+
+[tasks.setup-dev]
+description = "Full dev setup: install deps + pre-commit hooks"
+depends = ["setup"]
+run = "echo 'Dev environment ready. Run: mise run check'"
+
+# --- Quality Gate ---
+
+[tasks.check]
+description = "Full quality gate: lint + typecheck + test"
+depends = ["lint", "typecheck", "test"]
+
+# --- Testing ---
+
+[tasks.test]
+description = "Run tests with coverage"
+run = "uv run pytest --cov --cov-report=term-missing"
+
+[tasks."test:unit"]
+description = "Run unit tests only"
+run = "uv run pytest tests/services tests/providers -v"
+
+[tasks."test:integration"]
+description = "Run integration tests only"
+run = "uv run pytest tests/integration -v"
+
+[tasks."test:watch"]
+description = "Re-run tests on file changes"
+run = "uv run pytest --cov -x --ff -q"
+
+# --- Linting & Formatting ---
+
+[tasks.lint]
+description = "Lint and format check (no changes)"
+run = [
+    "uv run ruff check .",
+    "uv run ruff format --check .",
+]
+
+[tasks.fix]
+description = "Auto-fix lint and format issues"
+run = [
+    "uv run ruff check --fix .",
+    "uv run ruff format .",
+]
+
+# --- Type Checking ---
+
+[tasks.typecheck]
+description = "Type check with ty"
+run = "ty check"
+
+# --- Server ---
+
+[tasks.dev]
+description = "Launch MCP Inspector for interactive testing"
+run = "uv run fastmcp dev src/mtg_mcp/server.py"
+
+[tasks.serve]
+description = "Run server via stdio transport"
+run = "uv run python -m mtg_mcp.server"
+
+[tasks."serve:http"]
+description = "Run server via streamable HTTP transport"
+run = "uv run python -m mtg_mcp.server http"
+
+# --- Fixtures ---
+
+[tasks.fixtures]
+description = "Capture fresh fixtures from live APIs"
+run = "uv run python scripts/capture_fixtures.py"
+
+# --- Utilities ---
+
+[tasks.clean]
+description = "Remove build artifacts and caches"
+run = [
+    "rm -rf .pytest_cache .ruff_cache htmlcov .coverage",
+    "find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true",
+    "find . -type d -name '*.egg-info' -exec rm -rf {} + 2>/dev/null || true",
+]
