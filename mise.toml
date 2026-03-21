@@ -71,7 +71,7 @@ run = "ty check"
 
 [tasks.dev]
 description = "Launch MCP Inspector for interactive testing"
-run = "uv run fastmcp dev src/mtg_mcp/server.py"
+run = "uv run fastmcp dev inspector src/mtg_mcp/server.py"
 
 [tasks.serve]
 description = "Run server via stdio transport"
