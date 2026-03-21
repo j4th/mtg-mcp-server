@@ -1,0 +1,874 @@
+{
+  "count": null,
+  "next": null,
+  "previous": null,
+  "results": {
+    "identity": "BGU",
+    "included": [],
+    "includedByChangingCommanders": [],
+    "almostIncluded": [
+      {
+        "id": "513-5034--46",
+        "of": [
+          {
+            "id": 26516
+          }
+        ],
+        "uses": [
+          {
+            "card": {
+              "id": 513,
+              "name": "Hullbreaker Horror",
+              "spoiler": false,
+              "oracleId": "d4a84e78-d9b9-4c67-8a4b-4329e65f0f15",
+              "typeLine": "Creature \u2014 Kraken Horror",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/1/3/137acb70-a1fd-4ea9-a5d9-f4b438eb5e82.png?1736467749",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/1/3/137acb70-a1fd-4ea9-a5d9-f4b438eb5e82.jpg?1736467749",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/1/3/137acb70-a1fd-4ea9-a5d9-f4b438eb5e82.jpg?1736467749",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/1/3/137acb70-a1fd-4ea9-a5d9-f4b438eb5e82.jpg?1736467749",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/1/3/137acb70-a1fd-4ea9-a5d9-f4b438eb5e82.jpg?1736467749"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          },
+          {
+            "card": {
+              "id": 5034,
+              "name": "Sol Ring",
+              "spoiler": false,
+              "oracleId": "6ad8011d-3471-4369-9d68-b264cc027487",
+              "typeLine": "Artifact",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.png?1771424544",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "notes": "",
+        "prices": {
+          "tcgplayer": "6.64",
+          "cardmarket": "2.89",
+          "cardkingdom": "10.28"
+        },
+        "status": "OK",
+        "spoiler": false,
+        "identity": "U",
+        "includes": [
+          {
+            "id": 26301
+          },
+          {
+            "id": 26516
+          }
+        ],
+        "produces": [
+          {
+            "feature": {
+              "id": 11,
+              "name": "Infinite colorless mana",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 17,
+              "name": "Infinite storm count",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          }
+        ],
+        "requires": [
+          {
+            "quantity": 1,
+            "template": {
+              "id": 46,
+              "name": "Permanent that can be cast using {C}",
+              "scryfallApi": "https://api.scryfall.com/cards/search?q=%28mv%3C%3D1+%28mana%3D%7B0%7D+or+mana%3D%7B1%7D+or+mana%3D%7BC%7D%29+is%3Apermanent%29+legal%3Acommander",
+              "scryfallQuery": "mv<=1 (mana={0} or mana={1} or mana={C}) is:permanent"
+            },
+            "zoneLocations": [
+              "H"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "legalities": {
+          "brawl": false,
+          "predh": false,
+          "legacy": false,
+          "modern": false,
+          "pauper": false,
+          "pioneer": false,
+          "vintage": true,
+          "standard": false,
+          "commander": true,
+          "premodern": false,
+          "oathbreaker": false,
+          "pauperCommander": false,
+          "pauperCommanderMain": false
+        },
+        "popularity": 291792,
+        "bracketTag": "E",
+        "description": "Activate Sol Ring by tapping it, adding {C} {C}.\nCast the permanent that can be cast using {C} by paying its mana cost.\nHullbreaker Horror triggers, returning Sol Ring from the battlefield to your hand.\nCast Sol Ring by paying {1}. \nHullbreaker Horror triggers, returning the permanent cast in step 2 from the battlefield to your hand.\nRepeat.\nIf the permanent can be cast by paying {0}, this combo nets infinite colorless mana.",
+        "manaNeeded": "",
+        "variantCount": 1,
+        "manaValueNeeded": 0,
+        "easyPrerequisites": "",
+        "notablePrerequisites": ""
+      },
+      {
+        "id": "542-5034",
+        "of": [
+          {
+            "id": 1895
+          }
+        ],
+        "uses": [
+          {
+            "card": {
+              "id": 542,
+              "name": "Tidespout Tyrant",
+              "spoiler": false,
+              "oracleId": "331b44e4-cf08-44f4-8afd-a7374e5dc5ed",
+              "typeLine": "Creature \u2014 Djinn",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/d/b/db68f47b-f49a-4978-acdd-453ecfb948da.png?1758104156",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/d/b/db68f47b-f49a-4978-acdd-453ecfb948da.jpg?1758104156",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/d/b/db68f47b-f49a-4978-acdd-453ecfb948da.jpg?1758104156",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/d/b/db68f47b-f49a-4978-acdd-453ecfb948da.jpg?1758104156",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/d/b/db68f47b-f49a-4978-acdd-453ecfb948da.jpg?1758104156"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          },
+          {
+            "card": {
+              "id": 5034,
+              "name": "Sol Ring",
+              "spoiler": false,
+              "oracleId": "6ad8011d-3471-4369-9d68-b264cc027487",
+              "typeLine": "Artifact",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.png?1771424544",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "H"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "notes": "",
+        "prices": {
+          "tcgplayer": "2.78",
+          "cardmarket": "1.59",
+          "cardkingdom": "4.28"
+        },
+        "status": "OK",
+        "spoiler": false,
+        "identity": "U",
+        "includes": [
+          {
+            "id": 26301
+          },
+          {
+            "id": 29370
+          },
+          {
+            "id": 1895
+          }
+        ],
+        "produces": [
+          {
+            "feature": {
+              "id": 11,
+              "name": "Infinite colorless mana",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 17,
+              "name": "Infinite storm count",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          }
+        ],
+        "requires": [],
+        "legalities": {
+          "brawl": false,
+          "predh": true,
+          "legacy": false,
+          "modern": false,
+          "pauper": false,
+          "pioneer": false,
+          "vintage": true,
+          "standard": false,
+          "commander": true,
+          "premodern": false,
+          "oathbreaker": false,
+          "pauperCommander": false,
+          "pauperCommanderMain": false
+        },
+        "popularity": 33365,
+        "bracketTag": "S",
+        "description": "Cast Sol Ring by paying its mana cost.\nTidespout Tyrant triggers, returning a nontoken permanent that can be cast using {C} from the battlefield to your hand.\nActivate Sol Ring by tapping it, adding {C}{C}.\nCast the nontoken permanent returned in step 2 by paying its mana cost.\nTidespout Tyrant triggers, returning Sol Ring from the battlefield to your hand.\nRepeat.",
+        "manaNeeded": "{1}",
+        "variantCount": 6,
+        "manaValueNeeded": 1,
+        "easyPrerequisites": "",
+        "notablePrerequisites": "You control a nontoken permanent that can be cast using {C}."
+      },
+      {
+        "id": "628-5256--5",
+        "of": [
+          {
+            "id": 12951
+          }
+        ],
+        "uses": [
+          {
+            "card": {
+              "id": 628,
+              "name": "Mikaeus, the Unhallowed",
+              "spoiler": false,
+              "oracleId": "5d27c63e-d1ef-48af-b51d-01ebc6daeac9",
+              "typeLine": "Legendary Creature \u2014 Zombie Cleric",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/b/c/bc1f42a2-fe11-45da-9552-069803b4068a.png?1689997308",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/b/c/bc1f42a2-fe11-45da-9552-069803b4068a.jpg?1689997308",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/b/c/bc1f42a2-fe11-45da-9552-069803b4068a.jpg?1689997308",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/b/c/bc1f42a2-fe11-45da-9552-069803b4068a.jpg?1689997308",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/b/c/bc1f42a2-fe11-45da-9552-069803b4068a.jpg?1689997308"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          },
+          {
+            "card": {
+              "id": 5256,
+              "name": "Altar of Dementia",
+              "spoiler": false,
+              "oracleId": "d64e9152-ef24-4394-aeb0-9c3befc56549",
+              "typeLine": "Artifact",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/1/6/169356e0-46dc-4096-8e66-36726454f104.png?1562202433",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "notes": "",
+        "prices": {
+          "tcgplayer": "47.04",
+          "cardmarket": "28.11",
+          "cardkingdom": "52.98"
+        },
+        "status": "OK",
+        "spoiler": false,
+        "identity": "B",
+        "includes": [
+          {
+            "id": 26310
+          },
+          {
+            "id": 12951
+          },
+          {
+            "id": 30965
+          },
+          {
+            "id": 31074
+          }
+        ],
+        "produces": [
+          {
+            "feature": {
+              "id": 3,
+              "name": "Infinite LTB",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 4,
+              "name": "Infinite ETB",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 6,
+              "name": "Infinite sacrifice triggers",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 7,
+              "name": "Infinite death triggers",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 9,
+              "name": "Infinite mill",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 10,
+              "name": "Infinite self-mill",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          }
+        ],
+        "requires": [
+          {
+            "quantity": 1,
+            "template": {
+              "id": 5,
+              "name": "Persist Creature",
+              "scryfallApi": "https://api.scryfall.com/cards/search?q=%28keyword%3Apersist+t%3Acreature%29+legal%3Acommander",
+              "scryfallQuery": "keyword:persist t:creature"
+            },
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "legalities": {
+          "brawl": false,
+          "predh": false,
+          "legacy": true,
+          "modern": true,
+          "pauper": false,
+          "pioneer": false,
+          "vintage": true,
+          "standard": false,
+          "commander": true,
+          "premodern": false,
+          "oathbreaker": true,
+          "pauperCommander": false,
+          "pauperCommanderMain": false
+        },
+        "popularity": 17795,
+        "bracketTag": "E",
+        "description": "Activate Altar of Dementia by sacrificing the persist creature.\nWhen the persist creature dies, its persist ability triggers if it didn't have a -1/-1 counter on it, and its undying ability triggers if it didn't have a +1/+1 counter on it.\nResolve the persist trigger, if applicable, returning the creature from your graveyard to the battlefield with a -1/-1 counter on it.\nResolve the undying trigger, if applicable, returning the creature from your graveyard to the battlefield with a +1/+1 counter on it.\nResolve the Altar of Dementia ability.\nRepeat.",
+        "manaNeeded": "",
+        "variantCount": 15,
+        "manaValueNeeded": 0,
+        "easyPrerequisites": "",
+        "notablePrerequisites": ""
+      }
+    ],
+    "almostIncludedByAddingColors": [
+      {
+        "id": "2018-5256--73",
+        "of": [
+          {
+            "id": 5355
+          }
+        ],
+        "uses": [
+          {
+            "card": {
+              "id": 2018,
+              "name": "Luminous Broodmoth",
+              "spoiler": false,
+              "oracleId": "28c7c816-07e7-42fb-923c-bf149ba28b38",
+              "typeLine": "Creature \u2014 Insect",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/b/b/bb65df55-d6a6-4a57-a903-e5eb17637982.png?1591230310",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/b/b/bb65df55-d6a6-4a57-a903-e5eb17637982.jpg?1591230310",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/b/b/bb65df55-d6a6-4a57-a903-e5eb17637982.jpg?1591230310",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/b/b/bb65df55-d6a6-4a57-a903-e5eb17637982.jpg?1591230310",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/b/b/bb65df55-d6a6-4a57-a903-e5eb17637982.jpg?1591230310"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          },
+          {
+            "card": {
+              "id": 5256,
+              "name": "Altar of Dementia",
+              "spoiler": false,
+              "oracleId": "d64e9152-ef24-4394-aeb0-9c3befc56549",
+              "typeLine": "Artifact",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/1/6/169356e0-46dc-4096-8e66-36726454f104.png?1562202433",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "notes": "You must choose a persist or undying creature that does not have flying - otherwise the Luminous Broodmoth triggers do not occur.",
+        "prices": {
+          "tcgplayer": "17.90",
+          "cardmarket": "10.24",
+          "cardkingdom": "21.28"
+        },
+        "status": "OK",
+        "spoiler": false,
+        "identity": "W",
+        "includes": [
+          {
+            "id": 26310
+          },
+          {
+            "id": 5355
+          },
+          {
+            "id": 30965
+          },
+          {
+            "id": 31074
+          }
+        ],
+        "produces": [
+          {
+            "feature": {
+              "id": 3,
+              "name": "Infinite LTB",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 4,
+              "name": "Infinite ETB",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 6,
+              "name": "Infinite sacrifice triggers",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 7,
+              "name": "Infinite death triggers",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 9,
+              "name": "Infinite mill",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 10,
+              "name": "Infinite self-mill",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          }
+        ],
+        "requires": [
+          {
+            "quantity": 1,
+            "template": {
+              "id": 73,
+              "name": "Creature with Persist or Undying",
+              "scryfallApi": "https://api.scryfall.com/cards/search?q=%28t%3Acreature+%28keyword%3Apersist+or+keyword%3Aundying%29%29+legal%3Acommander",
+              "scryfallQuery": "t:creature (keyword:persist or keyword:undying)"
+            },
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "legalities": {
+          "brawl": true,
+          "predh": false,
+          "legacy": true,
+          "modern": true,
+          "pauper": false,
+          "pioneer": false,
+          "vintage": true,
+          "standard": false,
+          "commander": true,
+          "premodern": false,
+          "oathbreaker": true,
+          "pauperCommander": false,
+          "pauperCommanderMain": false
+        },
+        "popularity": 9091,
+        "bracketTag": "E",
+        "description": "Activate Altar of Dementia by sacrificing the persist or undying creature.\nWhen the creature dies, its persist or undying ability triggers if it doesn't have a -1/-1 counter or +1/+1 counter on it respectively, and Luminous Broodmoth triggers if the creature didn't have flying.\nResolve the persist or undying trigger, if applicable, returning the creature from your graveyard to the battlefield with either a -1/-1 counter or a +1/+1 counter on it.\nResolve the Luminous Broodmoth trigger, if applicable, returning the creature from your graveyard to the battlefield with a flying counter on it if the creature is still in your graveyard.\nResolve the Altar of Dementia ability.\nRepeat.",
+        "manaNeeded": "",
+        "variantCount": 13,
+        "manaValueNeeded": 0,
+        "easyPrerequisites": "",
+        "notablePrerequisites": ""
+      },
+      {
+        "id": "5256-6431--5",
+        "of": [
+          {
+            "id": 29493
+          }
+        ],
+        "uses": [
+          {
+            "card": {
+              "id": 6431,
+              "name": "Celes, Rune Knight",
+              "spoiler": false,
+              "oracleId": "aea8345a-191d-4c62-8d15-a716a9934b66",
+              "typeLine": "Legendary Creature \u2014 Human Wizard Knight",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/3/0/30584c53-533b-4dc7-b07c-8600164a99b3.png?1752052917",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/3/0/30584c53-533b-4dc7-b07c-8600164a99b3.jpg?1752052917",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/3/0/30584c53-533b-4dc7-b07c-8600164a99b3.jpg?1752052917",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/3/0/30584c53-533b-4dc7-b07c-8600164a99b3.jpg?1752052917",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/3/0/30584c53-533b-4dc7-b07c-8600164a99b3.jpg?1752052917"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          },
+          {
+            "card": {
+              "id": 5256,
+              "name": "Altar of Dementia",
+              "spoiler": false,
+              "oracleId": "d64e9152-ef24-4394-aeb0-9c3befc56549",
+              "typeLine": "Artifact",
+              "imageUriBackPng": null,
+              "imageUriFrontPng": "https://cards.scryfall.io/png/front/1/6/169356e0-46dc-4096-8e66-36726454f104.png?1562202433",
+              "imageUriBackLarge": null,
+              "imageUriBackSmall": null,
+              "imageUriBackNormal": null,
+              "imageUriFrontLarge": "https://cards.scryfall.io/large/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "imageUriFrontSmall": "https://cards.scryfall.io/small/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "layoutRotationFront": null,
+              "imageUriFrontNormal": "https://cards.scryfall.io/normal/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433",
+              "imageUriBackArtCrop": null,
+              "imageUriFrontArtCrop": "https://cards.scryfall.io/art_crop/front/1/6/169356e0-46dc-4096-8e66-36726454f104.jpg?1562202433"
+            },
+            "quantity": 1,
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": ""
+          }
+        ],
+        "notes": "",
+        "prices": {
+          "tcgplayer": "17.56",
+          "cardmarket": "10.02",
+          "cardkingdom": "20.98"
+        },
+        "status": "OK",
+        "spoiler": false,
+        "identity": "RWB",
+        "includes": [
+          {
+            "id": 26310
+          },
+          {
+            "id": 26672
+          },
+          {
+            "id": 29493
+          },
+          {
+            "id": 30965
+          },
+          {
+            "id": 31074
+          }
+        ],
+        "produces": [
+          {
+            "feature": {
+              "id": 3,
+              "name": "Infinite LTB",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 4,
+              "name": "Infinite ETB",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 6,
+              "name": "Infinite sacrifice triggers",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 7,
+              "name": "Infinite death triggers",
+              "status": "H",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 9,
+              "name": "Infinite mill",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 10,
+              "name": "Infinite self-mill",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          },
+          {
+            "feature": {
+              "id": 115,
+              "name": "Infinite +1/+1 counters on creatures you control",
+              "status": "S",
+              "uncountable": true
+            },
+            "quantity": 1
+          }
+        ],
+        "requires": [
+          {
+            "quantity": 1,
+            "template": {
+              "id": 5,
+              "name": "Persist Creature",
+              "scryfallApi": "https://api.scryfall.com/cards/search?q=%28keyword%3Apersist+t%3Acreature%29+legal%3Acommander",
+              "scryfallQuery": "keyword:persist t:creature"
+            },
+            "zoneLocations": [
+              "B"
+            ],
+            "exileCardState": "",
+            "mustBeCommander": false,
+            "libraryCardState": "",
+            "graveyardCardState": "",
+            "battlefieldCardState": "without a -1/-1 counter on it"
+          }
+        ],
+        "legalities": {
+          "brawl": true,
+          "predh": false,
+          "legacy": true,
+          "modern": false,
+          "pauper": false,
+          "pioneer": false,
+          "vintage": true,
+          "standard": false,
+          "commander": true,
+          "premodern": false,
+          "oathbreaker": true,
+          "pauperCommander": false,
+          "pauperCommanderMain": false
+        },
+        "popularity": 4785,
+        "bracketTag": "E",
+        "description": "Activate Altar of Dementia by sacrificing the persist creature.\nWhen the persist creature dies, its persist ability triggers, returning it from your graveyard to the battlefield with a -1/-1 counter on it.\nWhen the persist creature enters the battlefield, Celes's second ability triggers, putting a +1/+1 counter on each creature you control.\nResolve the Altar of Dementia ability.\nRepeat.",
+        "manaNeeded": "",
+        "variantCount": 15,
+        "manaValueNeeded": 0,
+        "easyPrerequisites": "",
+        "notablePrerequisites": ""
+      }
+    ],
+    "almostIncludedByChangingCommanders": [],
+    "almostIncludedByAddingColorsAndChangingCommanders": []
+  }
+}

@@ -9,8 +9,21 @@ from mcp.types import ToolAnnotations
 
 from mtg_mcp.config import Settings
 from mtg_mcp.logging import configure_logging
+from mtg_mcp.providers.edhrec import edhrec_mcp
+from mtg_mcp.providers.scryfall import scryfall_mcp
+from mtg_mcp.providers.seventeen_lands import draft_mcp
+from mtg_mcp.providers.spellbook import spellbook_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
+
+mcp.mount(scryfall_mcp, namespace="scryfall")
+mcp.mount(spellbook_mcp, namespace="spellbook")
+
+_settings = Settings()
+if _settings.enable_17lands:
+    mcp.mount(draft_mcp, namespace="draft")
+if _settings.enable_edhrec:
+    mcp.mount(edhrec_mcp, namespace="edhrec")
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
@@ -21,15 +34,14 @@ async def ping() -> str:
 
 def main() -> None:  # pragma: no cover
     """Entry point: load settings, configure logging, start transport."""
-    settings = Settings()
-    configure_logging(settings.log_level)
+    configure_logging(_settings.log_level)
 
-    transport = settings.transport
+    transport = _settings.transport
     if len(sys.argv) > 1:
         transport = sys.argv[1]
 
     if transport == "http":
-        mcp.run(transport="streamable-http", host="127.0.0.1", port=settings.http_port)
+        mcp.run(transport="streamable-http", host="127.0.0.1", port=_settings.http_port)
     else:
         mcp.run(transport="stdio")
 
