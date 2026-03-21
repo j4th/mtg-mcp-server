@@ -1,0 +1,131 @@
+[project]
+name = "mtg-mcp"
+version = "0.1.0"
+description = "Unified MCP server providing Magic: The Gathering data to AI assistants"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=3.1.0",
+    "httpx>=0.28",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "tenacity>=9.0",
+    "structlog>=24.0",
+]
+
+[project.scripts]
+mtg-mcp = "mtg_mcp.server:main"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
+
+# ---------------------------------------------------------------------------
+# Dependency groups (PEP 735) — managed by uv, NOT pip
+# ---------------------------------------------------------------------------
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "respx>=0.22",
+]
+
+# ---------------------------------------------------------------------------
+# uv
+# ---------------------------------------------------------------------------
+
+[tool.uv]
+# Sync dev group by default
+default-groups = ["dev"]
+
+# ---------------------------------------------------------------------------
+# Ruff — linting & formatting
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # Pyflakes
+    "I",     # isort — import sorting
+    "UP",    # pyupgrade — modernize syntax for 3.12+
+    "B",     # flake8-bugbear — common pitfalls
+    "SIM",   # flake8-simplify — simplifiable constructs
+    "TCH",   # flake8-type-checking — guard typing-only imports
+    "RUF",   # Ruff-specific rules
+    "ASYNC", # flake8-async — async/await correctness
+    "PT",    # flake8-pytest-style — pytest best practices
+    "LOG",   # flake8-logging — logging best practices
+]
+ignore = [
+    "E501",   # line length — handled by formatter
+    "UP007",  # Use X | Y syntax — ty doesn't always agree with ruff here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "B011",  # assert False is fine in tests
+    "B017",  # pytest.raises(Exception) is fine in tests
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mtg_mcp"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# ---------------------------------------------------------------------------
+# ty — type checking
+# ---------------------------------------------------------------------------
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+# Only check our source; skip venv, build artifacts, etc.
+include = ["src/"]
+
+[tool.ty.rules]
+# Strict — catch missing imports and attributes early
+possibly-missing-import = "error"
+possibly-missing-attribute = "warn"
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "error",                           # treat warnings as errors by default
+    "ignore::DeprecationWarning",      # except deprecation warnings from deps
+]
+markers = [
+    "integration: marks tests requiring full orchestrator (deselect with '-m \"not integration\"')",
+]
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+
+[tool.coverage.run]
+source = ["mtg_mcp"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@overload",
+    "raise NotImplementedError",
+]
