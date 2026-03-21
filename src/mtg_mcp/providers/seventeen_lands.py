@@ -60,10 +60,14 @@ async def card_ratings(
     lines = [f"Card ratings for {set_code} ({event_type}) — {len(ratings)} cards:"]
     lines.append("")
     for card in ratings:
-        gih_wr = f"{card.ever_drawn_win_rate:.1%}" if card.ever_drawn_win_rate else "N/A"
-        alsa = f"{card.avg_seen:.1f}" if card.avg_seen else "N/A"
+        gih_wr = (
+            f"{card.ever_drawn_win_rate:.1%}" if card.ever_drawn_win_rate is not None else "N/A"
+        )
+        alsa = f"{card.avg_seen:.1f}" if card.avg_seen is not None else "N/A"
         iwd = (
-            f"{card.drawn_improvement_win_rate:+.1%}" if card.drawn_improvement_win_rate else "N/A"
+            f"{card.drawn_improvement_win_rate:+.1%}"
+            if card.drawn_improvement_win_rate is not None
+            else "N/A"
         )
         games = f"{card.game_count:,}"
         lines.append(
