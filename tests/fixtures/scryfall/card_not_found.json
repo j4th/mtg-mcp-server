@@ -1,0 +1,6 @@
+{
+    "object": "error",
+    "code": "not_found",
+    "status": 404,
+    "details": "No cards found matching \u201cXyzzy the Nonexistent\u201d"
+}

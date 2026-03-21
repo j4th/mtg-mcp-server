@@ -1,0 +1,62 @@
+{
+    "object": "list",
+    "has_more": false,
+    "data": [
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "For example, you may cast an artifact creature spell as your artifact spell and cast another artifact creature spell as your creature spell."
+        },
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "If you play a card from your graveyard and then have a new Muldrotha come under your control in the same turn, you may play another land or spell of that type from your graveyard that turn."
+        },
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "Use the type of the card as it's played or cast to determine which permanent type to count it as. For example, if you cast a creature spell from your graveyard, you can cast a card with bestow as an enchantment spell."
+        },
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "If multiple effects allow you to play a card from your graveyard, you must announce which permission you're using as you begin to play the card."
+        },
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "You must pay the costs to cast a spell this way. If it has an alternative cost, you may cast it for that cost instead."
+        },
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "Once you begin to cast a spell, losing control of Muldrotha won't affect the spell."
+        },
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "You must follow the normal timing permissions and restrictions of the cards you play from your graveyard. For example, you can't use Muldrotha to play a land if you don't have an available land play or to cast a planeswalker spell during your end step."
+        },
+        {
+            "object": "ruling",
+            "oracle_id": "e4625704-1d52-44e4-804f-2f45644d76ac",
+            "source": "wotc",
+            "published_at": "2020-11-10",
+            "comment": "If a permanent card is put into your graveyard during your main phase and the stack is empty, you have a chance to cast it before any player may attempt to remove that card from your graveyard."
+        }
+    ]
+}
