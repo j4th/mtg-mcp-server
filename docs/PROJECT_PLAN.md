@@ -2,7 +2,7 @@
 
 This is the ordered build plan. Each phase produces a working, testable increment. Do not skip phases or build ahead.
 
-## Phase 0: Project Scaffold
+## Phase 0: Project Scaffold [COMPLETE]
 
 **Goal:** Empty project that builds, lints, type-checks, and runs an empty test suite.
 
@@ -45,9 +45,11 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 **Done when:** All commands pass. The MCP server starts via stdio and responds to tools/list with the `ping` tool.
 
+**Completed:** Phase 0 was done as project initialization before Phase 1 began.
+
 ---
 
-## Phase 1: Scryfall Service + Server
+## Phase 1: Scryfall Service + Server [COMPLETE]
 
 **Goal:** Working Scryfall backend with real card search, lookup, and pricing tools.
 
@@ -93,10 +95,11 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 ### 1b: Server Layer
 
 6. Create `src/mtg_mcp/providers/scryfall.py`:
-   - Lifespan: create `ScryfallClient` once at startup via `@lifespan` decorator, yield in context dict
+   - Lifespan: create `ScryfallClient` once at startup via `@lifespan` decorator, store in module-level `_client`
+   - Construct client with `Settings().scryfall_base_url` so env overrides work
    - `scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)`
-   - Dependency: `get_client(ctx: Context) -> ScryfallClient` reads from `ctx.lifespan_context`
-   - Tools (each receives client via `Depends(get_client)`):
+   - Helper: `_get_client()` returns `_client` or raises `RuntimeError`
+   - Tools (each calls `_get_client()` at the start):
      - `search_cards(query: str, page: int = 1) -> str` — Scryfall search syntax, returns formatted results
      - `card_details(name: str) -> str` — Exact card lookup, returns full details
      - `card_price(name: str) -> str` — Price lookup (USD, EUR, foil)
@@ -132,9 +135,18 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 **Done when:** You can search for cards and get real data back through the MCP protocol.
 
+**Completed:** Scryfall service (4 methods), provider (4 tools), 14 tests. Established the module-level client pattern (not `Depends()` DI) after discovering `lifespan_context` doesn't propagate through `mount()`.
+
+**Key learnings from Phase 1:**
+- `Depends(get_client)` + `ctx.lifespan_context` breaks when sub-server is mounted — use module-level `_client` set by `@lifespan`
+- `from __future__ import annotations` breaks FastMCP's auto-detection of `Context` parameters
+- `Client.call_tool()` returns `CallToolResult` — access via `.content[0].text`, not subscriptable
+- For error tests, use `raise_on_error=False` on `call_tool()`
+- All `raise ToolError(...)` inside except blocks need `from exc` (B904 lint rule)
+
 ---
 
-## Phase 2: Parallel Backend Build (Spellbook + 17Lands + EDHREC)
+## Phase 2: Parallel Backend Build (Spellbook + 17Lands + EDHREC) [COMPLETE]
 
 **Goal:** All three remaining backends built simultaneously by parallel agents, following the pattern established in Phase 1.
 
@@ -222,9 +234,17 @@ Each agent follows the same sequence independently:
 
 **Done when:** All three backends are mounted. Consumer sees `scryfall_*`, `spellbook_*`, `draft_*`, and `edhrec_*` tools.
 
+**Completed:** All 3 agents ran in parallel worktrees, merged back to main. Post-merge cleanup deduplicated `TOOL_ANNOTATIONS`, extracted helpers, pre-compiled regexes, removed dead `ComboSearchResult` model, wired `Settings` into all provider lifespans, and fixed truthiness checks on optional float fields. Final state: 104 tests, 88% coverage, 13 tools.
+
+**Key learnings from Phase 2:**
+- Worktree agents work well for independent backends — merge conflicts in `types.py`/`server.py` are straightforward (additive)
+- Provider lifespans must construct clients from `Settings()` so env var overrides work
+- Optional numeric fields (win rates, ranks) need `is not None`, not truthiness — `0.0` is valid data
+- Shared constants (`TOOL_ANNOTATIONS`) belong in `providers/__init__.py` but must NOT import provider sub-modules (circular import risk)
+
 ---
 
-## Phase 3: Workflow Tools
+## Phase 3: Workflow Tools [NOT STARTED]
 
 **Goal:** Composed workflow tools that cross-reference multiple backends.
 

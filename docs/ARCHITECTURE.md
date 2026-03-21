@@ -213,59 +213,61 @@ Mounting is dynamic — the parent forwards requests and reflects changes in the
 ### Provider Sub-Server with Lifespan-Managed Clients
 
 Service clients are expensive to create (httpx connection pools, rate limiters). Use FastMCP's
-lifespan to create them once at startup and `Depends()` to inject them into tools. This keeps
-tools thin and avoids per-call overhead.
+lifespan to create them once at startup. Store in a module-level variable and access via a
+`_get_client()` helper.
+
+> **Note:** `Depends()` / `ctx.lifespan_context` does NOT work when sub-servers are mounted on
+> a parent — the lifespan context doesn't propagate through `mount()`. This is a known
+> limitation of FastMCP 3.1.x. The module-level client pattern is the established workaround.
 
 ```python
 # src/mtg_mcp/providers/scryfall.py
-from fastmcp import FastMCP, Context
+from fastmcp import FastMCP
 from fastmcp.server.lifespan import lifespan
-from fastmcp.dependencies import Depends
-from mcp.types import ToolAnnotations
+from mtg_mcp.config import Settings
+from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.scryfall import ScryfallClient
 
+_client: ScryfallClient | None = None
+
 @lifespan
-async def scryfall_lifespan(server):
-    async with ScryfallClient() as client:
-        yield {"scryfall_client": client}
+async def scryfall_lifespan(server: FastMCP):
+    global _client
+    settings = Settings()
+    client = ScryfallClient(base_url=settings.scryfall_base_url)
+    async with client:
+        _client = client
+        yield {}
+    _client = None
 
 scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)
 
-def get_client(ctx: Context) -> ScryfallClient:
-    return ctx.lifespan_context["scryfall_client"]
+def _get_client() -> ScryfallClient:
+    if _client is None:
+        raise RuntimeError("ScryfallClient not initialized — server lifespan not running")
+    return _client
 
-@scryfall_mcp.tool(
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
-)
-async def search_cards(
-    query: str,
-    limit: int = 20,
-    client: ScryfallClient = Depends(get_client),
-) -> list[dict]:
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
+async def search_cards(query: str, page: int = 1) -> str:
     """Search for Magic cards using Scryfall syntax."""
-    return await client.search(query, limit=limit)
+    client = _get_client()
+    result = await client.search_cards(query, page=page)
+    ...
 ```
 
 ### Tool Annotations
 
-Use `ToolAnnotations` from `mcp.types` to provide metadata hints to clients. All our tools
-are read-only and idempotent (they query external APIs, never mutate state).
+All tools share a single `TOOL_ANNOTATIONS` constant from `mtg_mcp.providers`:
 
 ```python
+# src/mtg_mcp/providers/__init__.py
 from mcp.types import ToolAnnotations
 
-@scryfall_mcp.tool(
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
-)
-async def card_price(name: str, client: ScryfallClient = Depends(get_client)) -> dict: ...
-
-@draft_mcp.tool(
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
-)
-async def card_rating(
-    card_name: str, set_code: str, client: SeventeenLandsClient = Depends(get_client)
-) -> dict: ...
+TOOL_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
 ```
+
+All tools are read-only and idempotent (they query external APIs, never mutate state).
+Each provider imports and uses this constant rather than defining its own.
 
 ### Resources
 
@@ -313,6 +315,9 @@ if __name__ == "__main__":
 FastMCP servers are tested using `fastmcp.Client` with the server instance as the transport.
 This creates an in-memory connection — no network, no stdio.
 
+`Client.call_tool()` returns a `CallToolResult` — use `.content[0].text` to access the response
+string. For testing error responses, pass `raise_on_error=False`.
+
 ```python
 # tests/providers/test_scryfall_provider.py
 import pytest
@@ -326,7 +331,13 @@ async def client():
 
 async def test_search_cards(client):
     result = await client.call_tool("search_cards", {"query": "t:creature id:sultai"})
-    assert result is not None
+    text = result.content[0].text
+    assert "Found" in text
+
+async def test_card_not_found(client):
+    result = await client.call_tool("card_details", {"name": "Nonexistent"}, raise_on_error=False)
+    assert result.is_error
+    assert "not found" in result.content[0].text.lower()
 ```
 
 ---
@@ -357,16 +368,17 @@ All API clients inherit from BaseClient:
 ```python
 from fastmcp.exceptions import ToolError
 
-@scryfall_mcp.tool(...)
-async def card_details(name: str, client: ScryfallClient = Depends(get_client)) -> str:
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
+async def card_details(name: str) -> str:
     """Get full details for a card by exact name."""
+    client = _get_client()
     try:
         card = await client.get_card_by_name(name)
-        return card.format_details()
-    except CardNotFoundError:
-        raise ToolError(f"Card not found: '{name}'. Check spelling or try a fuzzy search.")
-    except ScryfallError as e:
-        raise ToolError(f"Scryfall API error: {e}")
+        ...
+    except CardNotFoundError as exc:
+        raise ToolError(f"Card not found: '{name}'. Check spelling or try fuzzy=true.") from exc
+    except ScryfallError as exc:
+        raise ToolError(f"Scryfall API error: {exc}") from exc
 ```
 
 ---
@@ -440,7 +452,9 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | HTTP mocking | respx | Decorator-based, clean API for async httpx mocking |
 | Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_` | FastMCP mount namespacing |
 | Workflow tools | No namespace prefix | Clean names: `commander_overview`, `evaluate_upgrade` |
-| Client lifecycle | Lifespan + Depends() DI | Shared httpx pool per provider; avoids per-call overhead |
+| Client lifecycle | Lifespan + module-level `_client` | `Depends()`/`lifespan_context` breaks through `mount()` — module-level is the workaround |
+| Settings wiring | `Settings()` in each lifespan | Base URLs are configurable via `MTG_MCP_*` env vars, not hardcoded |
+| Shared annotations | `TOOL_ANNOTATIONS` in `providers/__init__.py` | DRY — single constant shared by all provider tools |
 | Error responses | ToolError (fastmcp.exceptions) | Cleaner than manual is_error; FastMCP handles conversion |
 | Tool metadata | ToolAnnotations (mcp.types) | Standard MCP annotations; tags param not supported |
 | EDHREC | Behind feature flag | Fragile scraping; disable if breaking |

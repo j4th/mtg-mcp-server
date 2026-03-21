@@ -17,7 +17,7 @@ mise run check          # Lint + format + typecheck + test (the full gate)
 mise run test           # pytest with coverage
 mise run lint           # ruff check + ruff format --check
 mise run typecheck      # ty check
-mise run dev            # fastmcp dev src/mtg_mcp/server.py (MCP Inspector)
+mise run dev            # fastmcp dev inspector (MCP Inspector on :6274)
 mise run serve          # Run server via stdio
 mise run fix            # Auto-fix lint and format issues
 ```
@@ -44,15 +44,25 @@ See @docs/ARCHITECTURE.md for full details.
 ## Gotchas
 
 - FastMCP 3.x import: `from fastmcp import FastMCP` (NOT `from mcp.server.fastmcp`).
-- Tool annotations: `from mcp.types import ToolAnnotations`, not `tags={}` (tags is not a supported parameter).
-- Error responses: raise `ToolError` from `fastmcp.exceptions`, don't manually construct `is_error` responses.
-- Service clients: managed via lifespan + `Depends()` injection, not instantiated per tool call.
+- FastMCP 3.x CLI: `fastmcp dev inspector <file>` (NOT `fastmcp dev <file>` — the `inspector` subcommand is required).
+- Tool annotations: use shared `TOOL_ANNOTATIONS` from `mtg_mcp.providers` (NOT inline `ToolAnnotations()` per tool).
+- Error responses: raise `ToolError` from `fastmcp.exceptions`, don't manually construct `is_error` responses. Always use `from exc` in except blocks (B904).
+- Service clients: managed via lifespan + module-level `_client` variable (NOT `Depends()`/`ctx.lifespan_context` — these don't propagate through `mount()`).
+- Service clients are constructed with `Settings()` in the lifespan so `MTG_MCP_*_BASE_URL` env vars are honored.
 - Pydantic v2: `.model_validate()`, not `.parse_obj()`.
 - Scryfall requires `User-Agent` and `Accept` headers on every request.
 - 17Lands rate-limits aggressively. 1 req/sec max. Cache everything.
+- Optional numeric fields: use `is not None` checks, not truthiness — `0` and `0.0` are valid values.
 - Don't use `Any` type — use `Unknown` or proper types.
 - Don't build workflow tools before their backend services work.
 - When compacting, preserve the list of which services/providers are implemented vs stubbed.
+
+## Implementation Status
+
+- **Phase 0** (scaffold): Complete
+- **Phase 1** (Scryfall): Complete — 4 tools, 8 service tests, 6 provider tests
+- **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools, 104 total tests, 88% coverage
+- **Phase 3** (Workflow tools): Not started
 
 ## Environment
 
