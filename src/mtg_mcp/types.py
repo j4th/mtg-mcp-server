@@ -131,3 +131,42 @@ class BracketEstimate(BaseModel):
     lock_combos: list[str] = Field(default_factory=list, alias="lockCombos")
 
     model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# 17Lands
+# ---------------------------------------------------------------------------
+
+
+class DraftCardRating(BaseModel):
+    """Card performance data from 17Lands draft tracking."""
+
+    name: str
+    color: str
+    rarity: str
+    seen_count: int = 0
+    avg_seen: float | None = None
+    pick_count: int = 0
+    avg_pick: float | None = None
+    game_count: int = 0
+    play_rate: float | None = None
+    win_rate: float | None = None
+    opening_hand_win_rate: float | None = None
+    drawn_win_rate: float | None = None
+    ever_drawn_win_rate: float | None = None
+    never_drawn_win_rate: float | None = None
+    drawn_improvement_win_rate: float | None = None
+
+
+class ArchetypeRating(BaseModel):
+    """Color pair/archetype win rate data from 17Lands."""
+
+    is_summary: bool = False
+    color_name: str
+    wins: int = 0
+    games: int = 0
+
+    @property
+    def win_rate(self) -> float | None:
+        """Derive win rate from wins/games."""
+        return self.wins / self.games if self.games > 0 else None
