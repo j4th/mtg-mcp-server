@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from fastmcp import Context, FastMCP
-from fastmcp.dependencies import CurrentContext, Depends
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 from mcp.types import ToolAnnotations
@@ -12,37 +11,45 @@ from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, Scryfal
 
 _ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
 
+_client: ScryfallClient | None = None
+
 
 @lifespan
 async def scryfall_lifespan(server: FastMCP):
-    async with ScryfallClient() as client:
-        yield {"scryfall_client": client}
+    global _client
+    client = ScryfallClient()
+    async with client:
+        _client = client
+        yield {}
+    _client = None
 
 
 scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)
 
 
-def get_client(ctx: Context = CurrentContext()) -> ScryfallClient:
-    return ctx.lifespan_context["scryfall_client"]
+def _get_client() -> ScryfallClient:
+    if _client is None:
+        raise RuntimeError("ScryfallClient not initialized — server lifespan not running")
+    return _client
 
 
 @scryfall_mcp.tool(annotations=_ANNOTATIONS)
 async def search_cards(
     query: str,
     page: int = 1,
-    client: ScryfallClient = Depends(get_client),
 ) -> str:
     """Search for Magic cards using Scryfall syntax.
 
     Examples: "f:commander id:sultai t:creature", "o:destroy t:instant cmc<=3"
     See https://scryfall.com/docs/syntax for full syntax reference.
     """
+    client = _get_client()
     try:
         result = await client.search_cards(query, page=page)
-    except CardNotFoundError:
-        raise ToolError(f"No cards found for query: '{query}'. Check your search syntax.")
+    except CardNotFoundError as exc:
+        raise ToolError(f"No cards found for query: '{query}'. Check your search syntax.") from exc
     except ScryfallError as exc:
-        raise ToolError(f"Scryfall API error: {exc}")
+        raise ToolError(f"Scryfall API error: {exc}") from exc
 
     lines = [f"Found {result.total_cards} cards (showing {len(result.data)}, page {page}):"]
     for card in result.data:
@@ -57,15 +64,15 @@ async def search_cards(
 async def card_details(
     name: str,
     fuzzy: bool = False,
-    client: ScryfallClient = Depends(get_client),
 ) -> str:
     """Get full details for a Magic card by exact or fuzzy name."""
+    client = _get_client()
     try:
         card = await client.get_card_by_name(name, fuzzy=fuzzy)
-    except CardNotFoundError:
-        raise ToolError(f"Card not found: '{name}'. Check spelling or try fuzzy=true.")
+    except CardNotFoundError as exc:
+        raise ToolError(f"Card not found: '{name}'. Check spelling or try fuzzy=true.") from exc
     except ScryfallError as exc:
-        raise ToolError(f"Scryfall API error: {exc}")
+        raise ToolError(f"Scryfall API error: {exc}") from exc
 
     lines = [
         f"**{card.name}** {card.mana_cost or ''}",
@@ -90,15 +97,15 @@ async def card_details(
 @scryfall_mcp.tool(annotations=_ANNOTATIONS)
 async def card_price(
     name: str,
-    client: ScryfallClient = Depends(get_client),
 ) -> str:
     """Get current prices for a Magic card. Prices update once per day."""
+    client = _get_client()
     try:
         card = await client.get_card_by_name(name)
-    except CardNotFoundError:
-        raise ToolError(f"Card not found: '{name}'. Check spelling.")
+    except CardNotFoundError as exc:
+        raise ToolError(f"Card not found: '{name}'. Check spelling.") from exc
     except ScryfallError as exc:
-        raise ToolError(f"Scryfall API error: {exc}")
+        raise ToolError(f"Scryfall API error: {exc}") from exc
 
     lines = [f"**{card.name}** — Prices"]
     if card.prices.usd:
@@ -115,16 +122,16 @@ async def card_price(
 @scryfall_mcp.tool(annotations=_ANNOTATIONS)
 async def card_rulings(
     name: str,
-    client: ScryfallClient = Depends(get_client),
 ) -> str:
     """Get official rulings and clarifications for a Magic card."""
+    client = _get_client()
     try:
         card = await client.get_card_by_name(name)
         rulings = await client.get_rulings(card.id)
-    except CardNotFoundError:
-        raise ToolError(f"Card not found: '{name}'. Check spelling.")
+    except CardNotFoundError as exc:
+        raise ToolError(f"Card not found: '{name}'. Check spelling.") from exc
     except ScryfallError as exc:
-        raise ToolError(f"Scryfall API error: {exc}")
+        raise ToolError(f"Scryfall API error: {exc}") from exc
 
     if not rulings:
         return f"**{card.name}** — No rulings available."
