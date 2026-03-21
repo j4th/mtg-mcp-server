@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
-from mcp.types import ToolAnnotations
 
+from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
     SpellbookError,
 )
 
-_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
+if TYPE_CHECKING:
+    from mtg_mcp.types import Combo
+
+_ZONE_NAMES = {
+    "B": "Battlefield",
+    "H": "Hand",
+    "G": "Graveyard",
+    "E": "Exile",
+    "L": "Library",
+    "C": "Command Zone",
+}
 
 _client: SpellbookClient | None = None
 
@@ -37,7 +49,7 @@ def _get_client() -> SpellbookClient:
     return _client
 
 
-@spellbook_mcp.tool(annotations=_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def find_combos(
     card_name: str,
     color_identity: str | None = None,
@@ -59,17 +71,15 @@ async def find_combos(
 
     lines = [f"Found {len(combos)} combo(s) involving {card_name}:"]
     for combo in combos:
-        card_names = ", ".join(c.name for c in combo.cards)
-        results = ", ".join(p.feature_name for p in combo.produces)
-        lines.append(f"\n  [{combo.id}] {card_names}")
-        lines.append(f"    Produces: {results}")
+        lines.append("")
+        lines.extend(_format_combo_summary(combo))
         if combo.bracket_tag:
             lines.append(f"    Bracket: {combo.bracket_tag}")
         lines.append(f"    Popularity: {combo.popularity}")
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def combo_details(
     combo_id: str,
 ) -> str:
@@ -110,7 +120,7 @@ async def combo_details(
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def find_decklist_combos(
     commanders: list[str],
     decklist: list[str],
@@ -131,25 +141,19 @@ async def find_decklist_combos(
     if result.included:
         lines.append(f"\n**Included combos ({len(result.included)}):**")
         for combo in result.included:
-            card_names = ", ".join(c.name for c in combo.cards)
-            results = ", ".join(p.feature_name for p in combo.produces)
-            lines.append(f"  [{combo.id}] {card_names}")
-            lines.append(f"    Produces: {results}")
+            lines.extend(_format_combo_summary(combo))
     else:
         lines.append("\nNo fully included combos found.")
 
     if result.almost_included:
         lines.append(f"\n**Almost included combos ({len(result.almost_included)}):**")
         for combo in result.almost_included:
-            card_names = ", ".join(c.name for c in combo.cards)
-            results = ", ".join(p.feature_name for p in combo.produces)
-            lines.append(f"  [{combo.id}] {card_names}")
-            lines.append(f"    Produces: {results}")
+            lines.extend(_format_combo_summary(combo))
 
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def estimate_bracket(
     commanders: list[str],
     decklist: list[str],
@@ -191,12 +195,11 @@ async def estimate_bracket(
 
 def _zone_name(code: str) -> str:
     """Map single-letter zone codes to human-readable names."""
-    zones = {
-        "B": "Battlefield",
-        "H": "Hand",
-        "G": "Graveyard",
-        "E": "Exile",
-        "L": "Library",
-        "C": "Command Zone",
-    }
-    return zones.get(code, code)
+    return _ZONE_NAMES.get(code, code)
+
+
+def _format_combo_summary(combo: Combo) -> list[str]:
+    """Format a combo as two indented summary lines: card list and produced results."""
+    card_names = ", ".join(c.name for c in combo.cards) or "(no cards listed)"
+    results = ", ".join(p.feature_name for p in combo.produces) or "(no results listed)"
+    return [f"  [{combo.id}] {card_names}", f"    Produces: {results}"]

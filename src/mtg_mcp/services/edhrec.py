@@ -13,6 +13,10 @@ from typing import TYPE_CHECKING
 from mtg_mcp.services.base import BaseClient, ServiceError
 from mtg_mcp.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
 
+_RE_SPECIAL_CHARS = re.compile(r"[,.'\"!?:;()]+")
+_RE_WHITESPACE = re.compile(r"\s+")
+_RE_MULTI_HYPHEN = re.compile(r"-+")
+
 if TYPE_CHECKING:
     # httpx.Response.json() returns Any; we alias for clarity in parsing helpers.
     from typing import Any as JSONData
@@ -52,15 +56,10 @@ class EDHRECClient(BaseClient):
         periods, and other special characters. Collapse multiple hyphens.
         """
         slug = name.lower()
-        # Remove special characters (commas, apostrophes, periods, etc.)
-        slug = re.sub(r"[,.'\"!?:;()]+", "", slug)
-        # Replace whitespace with hyphens
-        slug = re.sub(r"\s+", "-", slug)
-        # Collapse multiple hyphens
-        slug = re.sub(r"-+", "-", slug)
-        # Strip leading/trailing hyphens
-        slug = slug.strip("-")
-        return slug
+        slug = _RE_SPECIAL_CHARS.sub("", slug)
+        slug = _RE_WHITESPACE.sub("-", slug)
+        slug = _RE_MULTI_HYPHEN.sub("-", slug)
+        return slug.strip("-")
 
     async def commander_top_cards(
         self, commander_name: str, category: str | None = None

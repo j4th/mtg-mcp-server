@@ -5,11 +5,9 @@ from __future__ import annotations
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
-from mcp.types import ToolAnnotations
 
+from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
-
-_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
 
 _client: ScryfallClient | None = None
 
@@ -33,7 +31,7 @@ def _get_client() -> ScryfallClient:
     return _client
 
 
-@scryfall_mcp.tool(annotations=_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def search_cards(
     query: str,
     page: int = 1,
@@ -60,7 +58,7 @@ async def search_cards(
     return "\n".join(lines)
 
 
-@scryfall_mcp.tool(annotations=_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def card_details(
     name: str,
     fuzzy: bool = False,
@@ -94,7 +92,7 @@ async def card_details(
     return "\n".join(lines)
 
 
-@scryfall_mcp.tool(annotations=_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def card_price(
     name: str,
 ) -> str:
@@ -119,7 +117,7 @@ async def card_price(
     return "\n".join(lines)
 
 
-@scryfall_mcp.tool(annotations=_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def card_rulings(
     name: str,
 ) -> str:

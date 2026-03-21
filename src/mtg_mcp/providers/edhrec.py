@@ -8,11 +8,9 @@ from __future__ import annotations
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
-from mcp.types import ToolAnnotations
 
+from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
-
-_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
 
 _client: EDHRECClient | None = None
 
@@ -36,7 +34,7 @@ def _get_client() -> EDHRECClient:
     return _client
 
 
-@edhrec_mcp.tool(annotations=_ANNOTATIONS)
+@edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def commander_staples(
     commander_name: str,
     category: str | None = None,
@@ -79,7 +77,7 @@ async def commander_staples(
     return "\n".join(lines)
 
 
-@edhrec_mcp.tool(annotations=_ANNOTATIONS)
+@edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def card_synergy(
     card_name: str,
     commander_name: str,

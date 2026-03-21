@@ -106,13 +106,6 @@ class Combo(BaseModel):
     prices: dict[str, str] = Field(default_factory=dict)
 
 
-class ComboSearchResult(BaseModel):
-    """Paginated list of combos from a search."""
-
-    count: int | None = None
-    results: list[Combo] = Field(default_factory=list)
-
-
 class DecklistCombos(BaseModel):
     """Result of /find-my-combos — combos found in a decklist."""
 

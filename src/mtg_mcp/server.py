@@ -34,15 +34,14 @@ async def ping() -> str:
 
 def main() -> None:  # pragma: no cover
     """Entry point: load settings, configure logging, start transport."""
-    settings = Settings()
-    configure_logging(settings.log_level)
+    configure_logging(_settings.log_level)
 
-    transport = settings.transport
+    transport = _settings.transport
     if len(sys.argv) > 1:
         transport = sys.argv[1]
 
     if transport == "http":
-        mcp.run(transport="streamable-http", host="127.0.0.1", port=settings.http_port)
+        mcp.run(transport="streamable-http", host="127.0.0.1", port=_settings.http_port)
     else:
         mcp.run(transport="stdio")
 
