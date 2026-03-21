@@ -1,0 +1,123 @@
+{
+    "object": "card",
+    "id": "14dbce79-1fcc-4cc9-bf38-7729e44a411e",
+    "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+    "multiverse_ids": [],
+    "resource_id": "78615E079AE4D710966259688C67503AFFA191339A33D86818A48E91B9685C2E",
+    "mtgo_id": 147451,
+    "tcgplayer_id": 679619,
+    "cardmarket_id": 873528,
+    "name": "Sol Ring",
+    "lang": "en",
+    "released_at": "2026-03-06",
+    "uri": "https://api.scryfall.com/cards/14dbce79-1fcc-4cc9-bf38-7729e44a411e",
+    "scryfall_uri": "https://scryfall.com/card/tmc/59/sol-ring?utm_source=api",
+    "layout": "normal",
+    "highres_image": true,
+    "image_status": "highres_scan",
+    "image_uris": {
+        "small": "https://cards.scryfall.io/small/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+        "normal": "https://cards.scryfall.io/normal/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+        "large": "https://cards.scryfall.io/large/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+        "png": "https://cards.scryfall.io/png/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.png?1771424544",
+        "art_crop": "https://cards.scryfall.io/art_crop/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544",
+        "border_crop": "https://cards.scryfall.io/border_crop/front/1/4/14dbce79-1fcc-4cc9-bf38-7729e44a411e.jpg?1771424544"
+    },
+    "mana_cost": "{1}",
+    "cmc": 1.0,
+    "type_line": "Artifact",
+    "oracle_text": "{T}: Add {C}{C}.",
+    "colors": [],
+    "color_identity": [],
+    "keywords": [],
+    "produced_mana": [
+        "C"
+    ],
+    "legalities": {
+        "standard": "not_legal",
+        "future": "not_legal",
+        "historic": "not_legal",
+        "timeless": "not_legal",
+        "gladiator": "not_legal",
+        "pioneer": "not_legal",
+        "modern": "not_legal",
+        "legacy": "banned",
+        "pauper": "not_legal",
+        "vintage": "restricted",
+        "penny": "not_legal",
+        "commander": "legal",
+        "oathbreaker": "banned",
+        "standardbrawl": "not_legal",
+        "brawl": "not_legal",
+        "alchemy": "not_legal",
+        "paupercommander": "not_legal",
+        "duel": "banned",
+        "oldschool": "not_legal",
+        "premodern": "not_legal",
+        "predh": "legal"
+    },
+    "games": [
+        "paper",
+        "mtgo"
+    ],
+    "reserved": false,
+    "game_changer": false,
+    "foil": true,
+    "nonfoil": true,
+    "finishes": [
+        "nonfoil",
+        "foil"
+    ],
+    "oversized": false,
+    "promo": false,
+    "reprint": true,
+    "variation": false,
+    "set_id": "178a07bb-cd54-4443-8b62-675e0c52cfe3",
+    "set": "tmc",
+    "set_name": "Teenage Mutant Ninja Turtles Eternal",
+    "set_type": "eternal",
+    "set_uri": "https://api.scryfall.com/sets/178a07bb-cd54-4443-8b62-675e0c52cfe3",
+    "set_search_uri": "https://api.scryfall.com/cards/search?order=set&q=e%3Atmc&unique=prints",
+    "scryfall_set_uri": "https://scryfall.com/sets/tmc?utm_source=api",
+    "rulings_uri": "https://api.scryfall.com/cards/14dbce79-1fcc-4cc9-bf38-7729e44a411e/rulings",
+    "prints_search_uri": "https://api.scryfall.com/cards/search?order=released&q=oracleid%3A6ad8011d-3471-4369-9d68-b264cc027487&unique=prints",
+    "collector_number": "59",
+    "digital": false,
+    "rarity": "uncommon",
+    "flavor_text": "Antonio's accommodated every request, asked no questions, and stayed open late. Truly a light in the darkness.",
+    "card_back_id": "0aeebaf5-8c7d-4636-9e82-8c27447861f7",
+    "artist": "Daniel Romanovsky",
+    "artist_ids": [
+        "878a38c8-617b-4c02-9b93-719c19413490"
+    ],
+    "illustration_id": "eed5fac6-c8fc-4b19-a591-facf11f00bcc",
+    "border_color": "black",
+    "frame": "2015",
+    "full_art": false,
+    "textless": false,
+    "booster": false,
+    "story_spotlight": false,
+    "promo_types": [
+        "surgefoil",
+        "universesbeyond"
+    ],
+    "edhrec_rank": 1,
+    "prices": {
+        "usd": "1.38",
+        "usd_foil": "1.32",
+        "usd_etched": null,
+        "eur": "0.94",
+        "eur_foil": "3.95",
+        "tix": "0.02"
+    },
+    "related_uris": {
+        "tcgplayer_infinite_articles": "https://partner.tcgplayer.com/c/4931599/1830156/21018?subId1=api&trafcat=tcgplayer.com%2Fsearch%2Farticles&u=https%3A%2F%2Fwww.tcgplayer.com%2Fsearch%2Farticles%3FproductLineName%3Dmagic%26q%3DSol%2BRing",
+        "tcgplayer_infinite_decks": "https://partner.tcgplayer.com/c/4931599/1830156/21018?subId1=api&trafcat=tcgplayer.com%2Fsearch%2Fdecks&u=https%3A%2F%2Fwww.tcgplayer.com%2Fsearch%2Fdecks%3FproductLineName%3Dmagic%26q%3DSol%2BRing",
+        "edhrec": "https://edhrec.com/route/?cc=Sol+Ring"
+    },
+    "purchase_uris": {
+        "tcgplayer": "https://partner.tcgplayer.com/c/4931599/1830156/21018?subId1=api&u=https%3A%2F%2Fwww.tcgplayer.com%2Fproduct%2F679619%3Fpage%3D1",
+        "cardmarket": "https://www.cardmarket.com/en/Magic/Products?idProduct=873528&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+        "cardhoarder": "https://www.cardhoarder.com/cards/147451?affiliate_id=scryfall&ref=card-profile&utm_campaign=affiliate&utm_medium=card&utm_source=scryfall"
+    }
+}

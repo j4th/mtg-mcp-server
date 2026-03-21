@@ -9,8 +9,11 @@ from mcp.types import ToolAnnotations
 
 from mtg_mcp.config import Settings
 from mtg_mcp.logging import configure_logging
+from mtg_mcp.providers.scryfall import scryfall_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
+
+mcp.mount(scryfall_mcp, namespace="scryfall")
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
