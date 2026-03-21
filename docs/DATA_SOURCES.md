@@ -16,8 +16,8 @@ These have official or well-documented REST APIs with clear access patterns.
 | **Access method** | REST API. GET for searches/lookups, POST for batch collection lookups (up to 75 cards). Paginated responses with `has_more` + `next_page`. | REST API (Django REST Framework). GET with query string using Spellbook search syntax. POST for bracket estimation. Paginated. |
 | **Rate limit** | 50-100ms between requests (~10/sec). HTTP 429 on exceed. | Undocumented. ~2-5 req/sec is safe. Backoff on 429. |
 | **Caching** | Prices update once daily. Card data changes infrequently. Cache cards 24h, searches 1h, sets 7d. | Combos update infrequently. Cache 24h. |
-| **Docs** | https://scryfall.com/docs/api | Swagger at backend URL. Source: https://github.com/SpaceCowMedia/commander-spellbook-backend |
-| **Key endpoints** | `/cards/search?q=`, `/cards/named?exact=`, `/cards/{id}/rulings`, `/cards/collection` (POST), `/sets`, `/sets/{code}`, `/bulk-data` | `/api/variants/?q=` (combo search), `/api/variants/{id}/` (combo detail), `/estimate-bracket` (POST) |
+| **Docs** | https://scryfall.com/docs/api | Swagger at `/schema/swagger/`. Source: https://github.com/SpaceCowMedia/commander-spellbook-backend |
+| **Key endpoints** | `/cards/search?q=`, `/cards/named?exact=`, `/cards/{id}/rulings`, `/cards/collection` (POST), `/sets`, `/sets/{code}`, `/bulk-data` | `/variants/?q=` (combo search), `/variants/{id}/` (combo detail), `/find-my-combos` (POST), `/estimate-bracket` (POST) |
 | **Existing MCP servers** | Multiple (pato/mtg-mcp, artillect/mtg-mcp-servers, ericraio/mtg-mcp) — all basic Scryfall wrappers | None found |
 | **Client libraries** | Numerous. We build our own with httpx. | `commander-spellbook` npm package. `pyedhrec` includes some. We build our own. |
 | **Notes** | The foundation everything else builds on. Card identity resolution for all other services. Cannot paywall access to Scryfall data per ToS. | Open source (MIT). Powers EDHREC's combo feature. Bracket labels map to 1-4 scale. |

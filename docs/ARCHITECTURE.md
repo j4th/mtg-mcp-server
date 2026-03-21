@@ -308,6 +308,27 @@ if __name__ == "__main__":
         mcp.run(transport="stdio")
 ```
 
+### Testing
+
+FastMCP servers are tested using `fastmcp.Client` with the server instance as the transport.
+This creates an in-memory connection — no network, no stdio.
+
+```python
+# tests/providers/test_scryfall_provider.py
+import pytest
+from fastmcp import Client
+from mtg_mcp.providers.scryfall import scryfall_mcp
+
+@pytest.fixture
+async def client():
+    async with Client(transport=scryfall_mcp) as c:
+        yield c
+
+async def test_search_cards(client):
+    result = await client.call_tool("search_cards", {"query": "t:creature id:sultai"})
+    assert result is not None
+```
+
 ---
 
 ## 7. Service Layer Design
@@ -396,7 +417,7 @@ See @docs/PROJECT_PLAN.md for the phased implementation sequence.
 1. **Capture fixture**: Hit the real API once, save JSON to `tests/fixtures/`
 2. **Write failing service test**: Against fixture using respx
 3. **Implement service method**: Make test pass
-4. **Write failing provider test**: MCP tool registration and invocation
+4. **Write failing provider test**: MCP tool registration and invocation (use `fastmcp.Client(transport=server)`, not `test_client()`)
 5. **Implement provider tool**: Register with FastMCP, call the service
 6. **Smoke test**: `mise run dev` → MCP Inspector → invoke tool
 
@@ -424,3 +445,49 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Tool metadata | ToolAnnotations (mcp.types) | Standard MCP annotations; tags param not supported |
 | EDHREC | Behind feature flag | Fragile scraping; disable if breaking |
 | 17Lands | Aggressive caching | Rate limited; cache 1-6 hours |
+| Multi-agent execution | Parallel worktree agents | Independent backends (Spellbook, 17Lands, EDHREC) follow same pattern — build simultaneously after Phase 1 establishes the template |
+
+---
+
+## 12. Multi-Agent Development Strategy
+
+The architecture's independent backend design enables parallel development via multi-agent teams. Each backend (service + provider + tests) shares no state with others beyond `types.py` model definitions and `server.py` mount statements.
+
+### Parallelization Map
+
+```
+Phase 0 (scaffold) — serial
+    │
+Phase 1 (Scryfall) — serial, establishes the pattern
+    │
+    ├── Agent A: Spellbook service + provider ──┐
+    ├── Agent B: 17Lands service + provider     ├── Phase 2 (parallel)
+    └── Agent C: EDHREC service + provider ─────┘
+                                                  │
+    ┌─────────────────────────────────────────────┘
+    ├── Agent A: commander_overview + evaluate_upgrade ──┐
+    ├── Agent B: draft_pack_pick                         ├── Phase 3 (parallel)
+    └── Agent C: suggest_cuts                      ──────┘
+```
+
+### Execution Pattern
+
+Each parallel agent works in a **git worktree** for isolation:
+1. Create worktree from main branch
+2. Implement service → provider → tests following Phase 1's pattern
+3. Run quality gates (`mise run check`) in the worktree
+4. Merge back to main, resolving any conflicts in shared files
+
+### Shared File Coordination
+
+Files touched by multiple agents:
+- **`types.py`**: Each agent adds Pydantic models for their service. Merge conflicts are additive and straightforward.
+- **`server.py`**: Each agent adds a `mount()` call. One-line additions, trivial to merge.
+- **`conftest.py`**: Shared fixtures. Agents should add fixtures under clearly named sections.
+
+Files that are agent-exclusive (no conflicts):
+- `services/{backend}.py` — one per agent
+- `providers/{backend}.py` — one per agent
+- `tests/services/test_{backend}.py` — one per agent
+- `tests/providers/test_{backend}_provider.py` — one per agent
+- `tests/fixtures/{backend}/` — one directory per agent

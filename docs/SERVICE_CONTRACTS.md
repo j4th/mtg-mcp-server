@@ -108,71 +108,107 @@ Key fields we care about (subset of full response):
 |-------|-------|
 | Base URL | `https://backend.commanderspellbook.com` |
 | Auth | None (public API) |
-| Rate limit | Reasonable use (no documented limit) |
-| Documentation | https://backend.commanderspellbook.com/api/docs (Swagger) |
+| Rate limit | No documented limit. Community practice: ~2-5 req/sec is safe. Backoff on 429. |
+| Documentation | https://backend.commanderspellbook.com/schema/swagger/ (Swagger), `/schema/` (raw OpenAPI), `/schema/redoc/` (ReDoc) |
 | Source | https://github.com/SpaceCowMedia/commander-spellbook-backend |
 
 ### Key Endpoints
 
-**GET `/api/variants/`** — Search combos
+**GET `/variants/`** — Search combos
 ```
 ?q=card:"Muldrotha" coloridentity:sultai
 ```
 Search syntax: https://commanderspellbook.com/syntax-guide/
+The `q` parameter supports aliases for common filters: `card:` or `cards:`, `coloridentity:` or `color`, `ci`, `id`, etc.
+Pagination uses `limit` and `offset` (not `page`). Also supports `ordering` and `groupByCombo`.
+Additional useful query params: `commander:`, `bracket:`, `popularity:`, `legal:`.
 Returns: Paginated list of combo variants.
 
-**POST `/api/estimate-bracket/`** — Bracket estimation
+**GET `/variants/{id}/`** — Combo detail by ID
+Returns: Single combo variant object.
+
+**POST `/estimate-bracket`** — Bracket estimation
 ```json
 {
-  "commanders": ["Muldrotha, the Gravetide"],
-  "main": ["Sol Ring", "Spore Frog", ...]
+  "commanders": [{"card": "Muldrotha, the Gravetide", "quantity": 1}],
+  "main": [{"card": "Sol Ring", "quantity": 1}, {"card": "Spore Frog", "quantity": 1}]
 }
 ```
-Returns: Bracket-relevant combo information.
+Also accepts plain-text decklist format with `// Commander` section headers.
+Returns: Bracket-relevant combo information with fields: `bracketTag`, `bannedCards`, `gameChangerCards`, `massLandDenialCards`, `massLandDenialTemplates`, `massLandDenialCombos`, `extraTurnCards`, `extraTurnTemplates`, `extraTurnsCombos`, `lockCombos`, `controlAllOpponentsCombos`, `controlSomeOpponentsCombos`, `skipTurnsCombos`, `twoCardCombos`.
+
+**POST `/find-my-combos`** — Find combos in a decklist
+Same request body format as `/estimate-bracket`. Returns combos categorized as `included`, `almostIncluded`, `almostIncludedByAddingColors`. Very useful for workflow tools like `suggest_cuts` and `evaluate_upgrade`.
 
 ### Response Shape (Combo Variant)
 
 ```json
 {
-  "id": "2120-5329",
-  "uses": [
-    {
-      "card": {
-        "name": "Muldrotha, the Gravetide",
-        "oracleId": "uuid"
-      },
-      "zoneLocations": ["COMMAND_ZONE"],
-      "battlefieldCardState": ""
-    }
-  ],
-  "requires": [
-    {
-      "template": {
-        "name": "A permanent card in your graveyard"
-      }
-    }
-  ],
-  "produces": [
-    { "name": "Infinite ETB triggers" }
-  ],
-  "of": {
-    "id": "2120",
-    "prerequisites": ["All permanents on the battlefield"],
-    "steps": ["Cast X from graveyard..."],
-    "results": ["Infinite ETB triggers"]
-  }
+  "id": "1414-2730-5131-5256",
+  "status": "OK",
+  "uses": [{
+    "card": {
+      "id": 5131,
+      "name": "Muldrotha, the Gravetide",
+      "oracleId": "uuid",
+      "typeLine": "Legendary Creature — Elemental Avatar",
+      "spoiler": false
+    },
+    "quantity": 1,
+    "zoneLocations": ["C"],
+    "battlefieldCardState": "",
+    "exileCardState": "",
+    "libraryCardState": "",
+    "graveyardCardState": "",
+    "mustBeCommander": true
+  }],
+  "requires": [{
+    "template": {
+      "id": 123,
+      "name": "A permanent card in your graveyard",
+      "scryfallQuery": "...",
+      "scryfallApi": "..."
+    },
+    "quantity": 1,
+    "zoneLocations": ["G"]
+  }],
+  "produces": [{
+    "feature": {
+      "id": 7,
+      "name": "Infinite death triggers",
+      "uncountable": true
+    },
+    "quantity": 1
+  }],
+  "of": [{"id": 1167}],
+  "identity": "BGU",
+  "manaNeeded": "",
+  "manaValueNeeded": 0,
+  "easyPrerequisites": "All permanents on the battlefield.",
+  "notablePrerequisites": "",
+  "description": "Step-by-step combo description...",
+  "notes": "",
+  "popularity": 3382,
+  "bracketTag": "E",
+  "legalities": {"commander": true},
+  "prices": {
+    "tcgplayer": "63.22",
+    "cardmarket": "31.17",
+    "cardkingdom": "63.26"
+  },
+  "variantCount": 1
 }
 ```
 
+Notes:
+- `zoneLocations` uses single-letter codes: B=Battlefield, H=Hand, G=Graveyard, E=Exile, L=Library, C=Command Zone
+- `bracketTag` is a single letter (e.g., "E"), not human-readable labels
+- `of` contains only combo IDs — prerequisites, steps, and results are flattened into `easyPrerequisites`, `notablePrerequisites`, and `description`
+- `produces` wraps each result in a `{"feature": {...}, "quantity": N}` object
+
 ### Bracket Mapping
 
-Spellbook categorizes combos into thematic buckets that map to brackets:
-- Ruthless → Bracket 4
-- Spicy → Bracket 3
-- Powerful → Bracket 3
-- Oddball → Bracket 2
-- Precon Appropriate → Bracket 2
-- Casual → Bracket 1
+Bracket tags in the API use single-letter codes (e.g., "E") rather than human-readable labels. The old documentation referenced labels like "Ruthless", "Spicy", "Powerful", etc., but these are not what the API actually returns. The mapping from single-letter codes to bracket numbers (1-4) will need to be reverse-engineered when we implement Phase 2.
 
 ---
 
@@ -194,14 +230,17 @@ Spellbook categorizes combos into thematic buckets that map to brackets:
 
 **GET `/card_ratings/data`** — Card performance data
 ```
-?expansion=LRW&format=PremierDraft&start_date=2026-01-20&end_date=2026-03-20
+?expansion=LRW&event_type=PremierDraft&start_date=2026-01-20&end_date=2026-03-20
 ```
+The canonical parameter name is `event_type`. The legacy alias `format` also works for this endpoint.
+`start_date` and `end_date` are optional but affect which fields are populated (e.g., `avg_pick` may be null without an explicit date range).
 Returns: Array of card rating objects.
 
 **GET `/color_ratings/data`** — Archetype win rates
 ```
-?expansion=LRW&format=PremierDraft
+?expansion=MKM&event_type=PremierDraft&start_date=2024-02-06&end_date=2024-04-06
 ```
+**Important:** This endpoint REQUIRES `start_date` and `end_date` parameters (returns HTTP 400 without them). This endpoint uses `event_type` NOT `format` as the parameter name.
 Returns: Array of color pair performance data.
 
 ### Response Shape (Card Rating)
@@ -211,11 +250,18 @@ Returns: Array of color pair performance data.
   "name": "Nameless Inversion",
   "color": "B",
   "rarity": "common",
+  "mtga_id": 12345,
+  "url": "https://cards.scryfall.io/normal/front/...",
+  "url_back": "",
+  "types": ["Tribal", "Instant"],
+  "layout": "standard",
   "seen_count": 12500,
   "avg_seen": 4.2,
   "pick_count": 8300,
   "avg_pick": 2.1,
   "game_count": 15000,
+  "pool_count": 5000,
+  "play_rate": 0.85,
   "win_rate": 0.572,
   "opening_hand_game_count": 3200,
   "opening_hand_win_rate": 0.591,
@@ -229,11 +275,27 @@ Returns: Array of color pair performance data.
 }
 ```
 
+Note: `avg_pick` may be null when `start_date`/`end_date` are not provided. `play_rate` may also be null.
+
 Key metrics:
 - **GIH WR** (Games in Hand Win Rate / `ever_drawn_win_rate`): Best single metric for card quality
 - **ALSA** (Average Last Seen At / `avg_seen`): How late a card wheels — signal for openness
 - **OH WR** (`opening_hand_win_rate`): How good is this card early?
 - **IWD** (`drawn_improvement_win_rate`): Win rate boost when drawn vs not drawn
+
+### Response Shape (Color Rating)
+
+```json
+{
+  "is_summary": false,
+  "color_name": "Azorius (WU)",
+  "short_name": "WU",
+  "wins": 38191,
+  "games": 68100
+}
+```
+
+Note: Win rate must be derived as `wins / games`. The array includes mono-color, two-color, three-color, four-color, five-color, and splash variants, plus summary rows (where `is_summary=true`).
 
 ### Caveats
 - Cards with <500 samples won't have win rate data

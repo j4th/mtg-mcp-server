@@ -8,21 +8,9 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 ### Steps
 
-1. Initialize the project:
-   ```bash
-   mkdir mtg-mcp && cd mtg-mcp
-   uv init --lib --name mtg-mcp
-   ```
+1. Project initialization is already done — `pyproject.toml` and `mise.toml` are configured. Phase 0 starts at creating the directory structure and source modules.
 
-2. Configure `pyproject.toml`:
-   - Package name: `mtg-mcp`
-   - Python: `>=3.12`
-   - Entry point: `[project.scripts] mtg-mcp = "mtg_mcp.main:cli"`
-   - Dependencies: `fastmcp>=3.1.0`, `httpx>=0.28`, `pydantic>=2.0`, `pydantic-settings>=2.0`, `tenacity>=9.0`, `structlog>=24.0`
-   - Dev dependencies: `pytest>=8.0`, `pytest-asyncio>=0.24`, `respx>=0.22`, `pytest-cov>=6.0`, `ruff`, `ty`
-   - Ruff config: `line-length = 100`, `target-version = "py312"`, select = `["E", "F", "I", "UP", "B", "SIM", "TCH", "RUF"]`
-   - ty config: add `[tool.ty]` section per ty docs (may need `pyproject.toml` or `ty.toml`)
-   - pytest config: `asyncio_mode = "auto"`, `testpaths = ["tests"]`
+2. Already configured. See `pyproject.toml` for current settings.
 
 3. Create the directory structure per ARCHITECTURE.md (all `__init__.py` files, empty modules).
 
@@ -32,18 +20,18 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 5. Create `src/mtg_mcp/config.py`:
    - `Settings` class via pydantic-settings
-   - Fields: `scryfall_base_url`, `spellbook_base_url`, `seventeen_lands_base_url`, `log_level`, `transport` (enum: stdio/http), `http_port`
+   - Fields: `scryfall_base_url`, `spellbook_base_url`, `seventeen_lands_base_url`, `edhrec_base_url`, `log_level`, `transport` (enum: stdio/http), `http_port`, `enable_edhrec: bool`, `enable_17lands: bool`, `cache_ttl_seconds: int`
    - Load from env vars with `MTG_MCP_` prefix and/or `.env` file
 
-6. Create `src/mtg_mcp/main.py`:
-   - Build the orchestrator: `mtg = FastMCP("MTG")`
+6. Create `src/mtg_mcp/server.py`:
+   - Build the orchestrator: `mcp = FastMCP("MTG")`
    - No backends mounted yet
    - Register a single `ping` tool that returns `"pong"` (smoke test)
-   - CLI entry point: parse `--transport` flag, run stdio or HTTP accordingly
+   - Entry point: `mtg_mcp.server:main`. Parse `--transport` flag, run stdio or HTTP accordingly
 
 7. Create `tests/conftest.py` with basic fixtures.
 
-8. Create `tests/unit/test_smoke.py`:
+8. Create `tests/test_smoke.py`:
    - Test that the server can be instantiated
    - Test that the `ping` tool is registered
 
@@ -53,7 +41,6 @@ This is the ordered build plan. Each phase produces a working, testable incremen
    uv run ruff format --check src/ tests/
    uv run ty check src/
    uv run pytest --cov
-   uv run mtg-mcp --help        # CLI works
    ```
 
 **Done when:** All commands pass. The MCP server starts via stdio and responds to tools/list with the `ping` tool.
@@ -96,7 +83,7 @@ This is the ordered build plan. Each phase produces a working, testable incremen
      - `async def get_rulings(scryfall_id: str) -> list[Ruling]`
    - Custom exceptions: `CardNotFoundError`, `ScryfallError`
 
-5. Write tests in `tests/unit/services/test_scryfall.py`:
+5. Write tests in `tests/services/test_scryfall.py`:
    - Test `get_card_by_name` returns a Card model from fixture
    - Test `get_card_by_name` raises `CardNotFoundError` on 404 fixture
    - Test `search_cards` returns `CardSearchResult` with pagination
@@ -107,7 +94,7 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 6. Create `src/mtg_mcp/providers/scryfall.py`:
    - Lifespan: create `ScryfallClient` once at startup via `@lifespan` decorator, yield in context dict
-   - `scryfall_server = FastMCP("Scryfall", lifespan=scryfall_lifespan)`
+   - `scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)`
    - Dependency: `get_client(ctx: Context) -> ScryfallClient` reads from `ctx.lifespan_context`
    - Tools (each receives client via `Depends(get_client)`):
      - `search_cards(query: str, page: int = 1) -> str` — Scryfall search syntax, returns formatted results
@@ -117,108 +104,101 @@ This is the ordered build plan. Each phase produces a working, testable incremen
    - Annotations: all tools get `ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)`
    - Error handling: catch service exceptions → raise `ToolError` from `fastmcp.exceptions` with actionable messages
 
-7. Write tests in `tests/unit/providers/test_scryfall_provider.py`:
-   - Use FastMCP's test client (`async with scryfall_server.test_client() as client:`)
+7. Write tests in `tests/providers/test_scryfall_provider.py`:
+   - Use `fastmcp.Client` with the server as transport:
+   ```python
+   from fastmcp import Client
+   async with Client(transport=scryfall_mcp) as client:
+       result = await client.call_tool("search_cards", {"query": "..."})
+   ```
    - Test each tool returns expected content
    - Test error tool responses for missing cards
 
 ### 1c: Mount on Orchestrator
 
-8. Update `src/mtg_mcp/main.py`:
-   - Mount `scryfall_server` with `namespace="scryfall"`
+8. Update `src/mtg_mcp/server.py`:
+   - Mount `scryfall_mcp` with `namespace="scryfall"`
    - Remove the `ping` tool (or keep as health check)
 
-9. Integration test: `tests/integration/test_orchestrator.py`:
+9. Integration test: `tests/test_orchestrator.py`:
    - Instantiate the full orchestrator
    - Verify `scryfall_search_cards` appears in tools/list
    - Call `scryfall_card_details` with mocked HTTP → get card data back
 
 10. Manual smoke test:
     ```bash
-    uv run mtg-mcp  # start stdio
-    # Use MCP Inspector: npx @modelcontextprotocol/inspector
+    mise run dev  # MCP Inspector
     ```
 
 **Done when:** You can search for cards and get real data back through the MCP protocol.
 
 ---
 
-## Phase 2: Commander Spellbook Service + Server
+## Phase 2: Parallel Backend Build (Spellbook + 17Lands + EDHREC)
 
-**Goal:** Combo search and bracket estimation working as a second mounted backend.
+**Goal:** All three remaining backends built simultaneously by parallel agents, following the pattern established in Phase 1.
 
-### Steps
+**Prerequisites:** Phase 1 complete. The service→provider→mount pattern is proven and can be replicated.
+
+**Parallel execution plan:**
+
+| Agent | Backend | Namespace | Endpoints |
+|-------|---------|-----------|-----------|
+| Agent A | Commander Spellbook | `spellbook` | `/variants/`, `/find-my-combos`, `/estimate-bracket` |
+| Agent B | 17Lands | `draft` | `/card_ratings/data`, `/color_ratings/data` |
+| Agent C | EDHREC | `edhrec` | `/pages/commanders/{slug}.json`, `/pages/cards/{slug}.json` |
+
+Each agent follows the same sequence independently:
+1. Capture fixtures from live API → `tests/fixtures/{service}/`
+2. Add Pydantic models to `types.py` (coordinate to avoid conflicts — each agent adds its own models)
+3. Create service client in `services/{service}.py` (TDD: test first, implement second)
+4. Create provider in `providers/{service}.py` with lifespan + tools
+5. Write provider tests in `tests/providers/test_{service}_provider.py`
+6. Mount on orchestrator in `server.py` with namespace
+
+### Agent A: Spellbook
 
 1. Research the Spellbook API:
    - Base URL: `https://backend.commanderspellbook.com`
-   - Key endpoints: `/variants/` (combo search), `/estimate-bracket/`
+   - Swagger docs: `/schema/swagger/`
+   - Key endpoints: `/variants/` (combo search, uses `limit`/`offset` pagination), `/find-my-combos` (decklist combo analysis), `/estimate-bracket` (bracket estimation)
+   - Response uses camelCase, zone codes are single letters (B/H/G/E/L/C), bracket tags are single letters
    - Capture fixtures for Muldrotha combos, Gitrog combos
 
 2. Create `SpellbookClient` in `services/spellbook.py`:
    - `find_combos(card_name: str, color_identity: str | None) -> list[Combo]`
-   - `estimate_bracket(decklist: list[str]) -> BracketEstimate`
+   - `get_combo(combo_id: str) -> Combo`
+   - `find_decklist_combos(commanders: list[str], decklist: list[str]) -> DecklistCombos`
+   - `estimate_bracket(commanders: list[str], decklist: list[str]) -> BracketEstimate`
 
-3. Create `Combo` and `BracketEstimate` Pydantic models in `types.py`
+3. Create `Combo`, `DecklistCombos`, and `BracketEstimate` Pydantic models in `types.py`
 
-4. Create `spellbook_server` in `providers/spellbook.py`:
-   - Tools: `find_combos`, `combo_details`, `estimate_bracket`
+4. Create `spellbook_mcp` in `providers/spellbook.py`:
+   - Tools: `find_combos`, `combo_details`, `find_decklist_combos`, `estimate_bracket`
 
 5. Mount on orchestrator with `namespace="spellbook"`
 
-6. Write tests at every layer (service, server, integration)
+6. Write tests at every layer (service, provider, integration)
 
-**Done when:** Both backends are mounted. Consumer sees `scryfall_*` and `spellbook_*` tools.
-
----
-
-## Phase 3: First Workflow Tool
-
-**Goal:** A composed `commander_overview` tool that calls both Scryfall and Spellbook.
-
-### Steps
-
-1. Create `workflows/commander.py`:
-   - `commander_overview(commander_name: str)` calls:
-     - `ScryfallClient.get_card_by_name()` → card data
-     - `SpellbookClient.find_combos()` → combos for that commander
-   - Returns formatted markdown combining both
-   - Handles partial failure (Spellbook down → still return card data with note)
-
-2. Register on orchestrator in `main.py`
-
-3. Test: mock both services, verify composed response
-
-**Done when:** `commander_overview("Muldrotha, the Gravetide")` returns card info + combo list.
-
----
-
-## Phase 4: 17Lands Service + Server
-
-**Goal:** Draft card ratings and archetype stats.
-
-### Steps
+### Agent B: 17Lands
 
 1. Research the 17Lands API:
-   - Card ratings endpoint: `https://www.17lands.com/card_ratings/data?expansion=<SET>&format=<FORMAT>`
+   - Card ratings: `GET /card_ratings/data?expansion={SET}&event_type={FORMAT}`
+   - Color ratings: `GET /color_ratings/data?expansion={SET}&event_type={FORMAT}&start_date={DATE}&end_date={DATE}` (start_date and end_date are REQUIRED)
+   - Note: `event_type` is the correct parameter name (not `format`)
    - Capture fixtures for a recent set
 
 2. Create `SeventeenLandsClient`:
    - `card_ratings(set_code: str, format: str = "PremierDraft") -> list[DraftCardRating]`
-   - `color_ratings(set_code: str, format: str = "PremierDraft") -> list[ArchetypeRating]`
+   - `color_ratings(set_code: str, start_date: str, end_date: str, format: str = "PremierDraft") -> list[ArchetypeRating]`
 
 3. Create server, mount as `namespace="draft"`
 
 4. Write tests
 
-**Done when:** `draft_card_ratings` returns win rate data for any Standard-legal set.
-
----
-
-## Phase 5: EDHREC Service + Server
+### Agent C: EDHREC
 
 **Goal:** Commander staples and synergy scores. This is the scraping-based backend — expect fragility.
-
-### Steps
 
 1. Research EDHREC's internal JSON endpoints (pyedhrec uses these):
    - Commander page data: `https://json.edhrec.com/pages/commanders/<name>.json`
@@ -233,37 +213,50 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 4. Write tests (fixture-only — never hit EDHREC in tests)
 
-**Done when:** `edhrec_commander_staples("Muldrotha, the Gravetide")` returns top cards with inclusion rates.
+### Coordination notes for parallel agents
+
+- Each agent works in a git worktree to avoid conflicts
+- `types.py` additions: each agent adds models for their service only. Merge conflicts in this file are expected and straightforward to resolve.
+- `server.py` mount statements: each agent adds their mount line. Resolve on merge.
+- Integration tests may need adjustment after all three are merged.
+
+**Done when:** All three backends are mounted. Consumer sees `scryfall_*`, `spellbook_*`, `draft_*`, and `edhrec_*` tools.
 
 ---
 
-## Phase 6: Full Workflow Suite
+## Phase 3: Workflow Tools
 
-**Goal:** Composed tools that deliver real value by cross-referencing all backends.
+**Goal:** Composed workflow tools that cross-reference multiple backends.
 
-### Workflow tools to build
+**Prerequisites:** At minimum Scryfall + Spellbook backends working. Enhanced versions need all backends.
 
-1. **`commander_overview`** (Phase 3, now enhanced with EDHREC data):
-   - Card details (Scryfall) + top staples (EDHREC) + combos (Spellbook)
+**Parallel execution plan:**
 
-2. **`evaluate_upgrade`** (new):
-   - Input: card_name, commander_name
-   - Scryfall: what does the card do, what does it cost?
-   - EDHREC: what % of decks run it? What's the synergy score?
-   - Spellbook: does adding this card enable new combos?
-   - Output: structured recommendation
+Start `commander_overview` as soon as Spellbook is done (only needs Scryfall + Spellbook initially). Other workflows can start once their required backends are ready.
 
-3. **`draft_pack_pick`** (new):
-   - Input: list of card names (the pack), current_picks (what you've drafted so far), set_code
-   - 17Lands: GIHWR and ALSA for each card in the pack
-   - Scryfall: card details for context
-   - Output: ranked picks with data
+### Steps
 
-4. **`suggest_cuts`** (new):
-   - Input: decklist (card names), commander_name
-   - EDHREC: synergy scores for each card
-   - Spellbook: which cards are combo pieces?
-   - Output: ranked list of weakest cards to cut
+1. Create `workflows/commander.py`:
+   - `commander_overview(commander_name: str)` calls:
+     - `ScryfallClient.get_card_by_name()` → card data
+     - `SpellbookClient.find_combos()` → combos for that commander
+     - (If EDHREC available) `EDHRECClient.commander_top_cards()` → top staples
+   - Returns formatted markdown combining all available data
+   - Handles partial failure (any backend down → still return what you can with notes)
+
+2. Once all backends are ready, build remaining workflows in parallel:
+
+| Agent | Workflow | Backends Required |
+|-------|----------|-------------------|
+| Agent A | `evaluate_upgrade` | Scryfall + EDHREC + Spellbook |
+| Agent B | `draft_pack_pick` | 17Lands + Scryfall |
+| Agent C | `suggest_cuts` | EDHREC + Spellbook |
+
+3. Register all workflow tools on the workflow server, mount on orchestrator without namespace
+
+4. Test: mock all services, verify composed responses and partial failure handling
+
+**Done when:** All workflow tools return composed data from multiple backends with graceful partial failure handling.
 
 ---
 
