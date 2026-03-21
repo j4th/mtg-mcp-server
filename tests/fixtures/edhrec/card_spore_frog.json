@@ -1,0 +1,91 @@
+{
+  "header": "Spore Frog (Card)",
+  "description": "",
+  "creature": 31,
+  "instant": 9,
+  "sorcery": 8,
+  "artifact": 7,
+  "enchantment": 8,
+  "battle": 0,
+  "planeswalker": 1,
+  "land": 35,
+  "basic": 18,
+  "nonbasic": 17,
+  "similar": [
+    {
+      "color_identity": [
+        "W"
+      ],
+      "cmc": 1.0,
+      "id": "44e4f5e6",
+      "name": "Kami of False Hope",
+      "sanitized": "kami-of-false-hope",
+      "type": "Creature \u2014 Spirit",
+      "url": "/cards/kami-of-false-hope"
+    },
+    {
+      "color_identity": [
+        "G"
+      ],
+      "cmc": 1.0,
+      "id": "bbc3152e",
+      "name": "Fog",
+      "sanitized": "fog",
+      "type": "Instant",
+      "url": "/cards/fog"
+    }
+  ],
+  "panels": {
+    "links": [
+      {
+        "header": "View",
+        "items": [
+          {
+            "href": "/combos/spore-frog",
+            "value": "Combos"
+          }
+        ]
+      }
+    ]
+  },
+  "container": {
+    "breadcrumb": [
+      {
+        "/cards": "Cards"
+      },
+      {
+        "/cards/spore-frog": "Spore Frog"
+      }
+    ],
+    "json_dict": {
+      "cardlists": [
+        {
+          "header": "Top Commanders",
+          "tag": "topcommanders",
+          "cardviews": [
+            {
+              "id": "508b1442",
+              "name": "Meren of Clan Nel Toth",
+              "sanitized": "meren-of-clan-nel-toth",
+              "url": "/commanders/meren-of-clan-nel-toth",
+              "inclusion": 15137,
+              "label": "76.33% of 19831 decks\n15137 decks",
+              "num_decks": 15137,
+              "potential_decks": 19831
+            },
+            {
+              "id": "705b4d97",
+              "name": "Muldrotha, the Gravetide",
+              "sanitized": "muldrotha-the-gravetide",
+              "url": "/commanders/muldrotha-the-gravetide",
+              "inclusion": 13416,
+              "label": "60.08% of 22329 decks\n13416 decks",
+              "num_decks": 13416,
+              "potential_decks": 22329
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
