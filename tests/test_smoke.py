@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from mtg_mcp.config import Settings
-from mtg_mcp.logging import configure_logging
+from mtg_mcp.logging import configure_logging, get_logger
 from mtg_mcp.server import mcp
 
 if TYPE_CHECKING:
@@ -52,16 +52,22 @@ class TestConfig:
         assert settings.enable_17lands is True
         assert settings.cache_ttl_seconds == 3600
 
+    def test_config_reads_env_vars(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("MTG_MCP_LOG_LEVEL", "DEBUG")
+        monkeypatch.setenv("MTG_MCP_HTTP_PORT", "9000")
+        settings = Settings()
+        assert settings.log_level == "DEBUG"
+        assert settings.http_port == 9000
+
 
 class TestLogging:
     """Verify structlog configuration."""
 
-    def test_logging_configures_without_error(self):
-        configure_logging("INFO")
-
-    def test_logging_accepts_debug_level(self):
-        configure_logging("DEBUG")
-
     @pytest.mark.parametrize("level", ["INFO", "DEBUG", "WARNING", "ERROR"])
     def test_logging_accepts_all_levels(self, level: str):
         configure_logging(level)
+
+    def test_get_logger_returns_bound_logger(self):
+        configure_logging("INFO")
+        log = get_logger("test_service")
+        assert log is not None

@@ -7,6 +7,7 @@ rate limiting, retry logic, and observability.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from typing import TYPE_CHECKING
 
@@ -28,22 +29,33 @@ if TYPE_CHECKING:
 class ServiceError(Exception):
     """Base exception for service client errors."""
 
-    def __init__(self, message: str, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        retry_after: float | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.status_code = status_code
+        self.retry_after = retry_after
 
 
-def _is_retryable_status(exc: BaseException) -> bool:
-    """Return True if the exception represents a retryable HTTP error."""
-    return isinstance(exc, ServiceError) and exc.status_code in (429, 500, 502, 503, 504)
+def _is_retryable(exc: BaseException) -> bool:
+    """Return True if the exception represents a retryable error."""
+    if not isinstance(exc, ServiceError):
+        return False
+    if exc.status_code is None:
+        return True  # Network-level error (timeout, DNS, connection) — always retry
+    return exc.status_code in (429, 500, 502, 503, 504)
 
 
 def _wait_for_retry_after(retry_state: RetryCallState) -> float:
-    """Respect Retry-After header when present, otherwise use exponential backoff."""
+    """Use Retry-After header value when available, otherwise exponential backoff."""
     exc = retry_state.outcome.exception() if retry_state.outcome else None
+    if isinstance(exc, ServiceError) and exc.retry_after is not None:
+        return exc.retry_after
     if isinstance(exc, ServiceError) and exc.status_code == 429:
-        # Default to 1s backoff for 429s without Retry-After
         return 1.0
     return wait_exponential(multiplier=1, min=1, max=30)(retry_state)
 
@@ -87,49 +99,72 @@ class BaseClient:
 
     async def __aexit__(self, *exc: object) -> None:
         if self._client:
-            await self._client.aclose()
-            self._client = None
+            try:
+                await self._client.aclose()
+            except Exception:
+                self._log.warning("client_close_error")
+            finally:
+                self._client = None
 
     @retry(
-        retry=retry_if_exception(_is_retryable_status),
+        retry=retry_if_exception(_is_retryable),
         stop=stop_after_attempt(3),
         wait=_wait_for_retry_after,
         reraise=True,
     )
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         """Make an HTTP request with rate limiting, logging, and retry."""
-        assert self._client is not None, "Client not initialized — use 'async with'"
+        if self._client is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__} is not initialized. "
+                "Use it as an async context manager: 'async with Client() as client:'"
+            )
 
         async with self._semaphore:
             delay = 1.0 / self._rate_limit_rps
-            start = time.monotonic()
-            response = await self._client.request(method, path, **kwargs)
-            elapsed_ms = (time.monotonic() - start) * 1000
+            try:
+                start = time.monotonic()
+                response = await self._client.request(method, path, **kwargs)
+                elapsed_ms = (time.monotonic() - start) * 1000
 
-            self._log.debug(
-                "http_request",
-                method=method,
-                path=path,
-                status=response.status_code,
-                elapsed_ms=round(elapsed_ms, 1),
-            )
-
-            if response.status_code >= 400:
-                body = response.text[:500]
-                self._log.error(
-                    "http_error",
+                self._log.debug(
+                    "http_request",
                     method=method,
-                    path=path,
+                    url=f"{self._base_url}{path}",
                     status=response.status_code,
-                    body=body,
-                )
-                raise ServiceError(
-                    f"HTTP {response.status_code}: {body}",
-                    status_code=response.status_code,
+                    elapsed_ms=round(elapsed_ms, 1),
                 )
 
-            await asyncio.sleep(delay)
-            return response
+                if response.status_code >= 400:
+                    body = response.text[:500]
+                    retry_after = None
+                    if response.status_code == 429:
+                        raw = response.headers.get("Retry-After")
+                        if raw is not None:
+                            with contextlib.suppress(ValueError):
+                                retry_after = float(raw)
+                    self._log.error(
+                        "http_error",
+                        method=method,
+                        url=f"{self._base_url}{path}",
+                        status=response.status_code,
+                        body=body,
+                    )
+                    raise ServiceError(
+                        f"HTTP {response.status_code}: {body}",
+                        status_code=response.status_code,
+                        retry_after=retry_after,
+                    )
+
+                return response
+            except httpx.TimeoutException as exc:
+                self._log.error("http_timeout", method=method, url=f"{self._base_url}{path}")
+                raise ServiceError(f"Request timed out: {method} {path}", status_code=None) from exc
+            except httpx.ConnectError as exc:
+                self._log.error("http_connect_error", method=method, url=f"{self._base_url}{path}")
+                raise ServiceError(f"Connection failed: {method} {path}", status_code=None) from exc
+            finally:
+                await asyncio.sleep(delay)
 
     async def _get(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a GET request."""

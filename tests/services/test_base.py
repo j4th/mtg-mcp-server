@@ -25,6 +25,11 @@ class TestBaseClientLifecycle:
         assert client._client is None
         assert inner is not None
 
+    async def test_request_outside_context_raises_runtime_error(self):
+        client = BaseClient(base_url="https://example.com")
+        with pytest.raises(RuntimeError, match="not initialized"):
+            await client._get("/test")
+
 
 class TestBaseClientRequests:
     """Verify HTTP requests are made correctly."""
@@ -53,14 +58,14 @@ class TestBaseClientErrors:
     """Verify error handling for non-2xx responses."""
 
     @respx.mock
-    async def test_4xx_raises_service_error(self):
-        respx.get("https://example.com/missing").mock(
-            return_value=httpx.Response(404, text="Not Found")
-        )
+    async def test_4xx_raises_service_error_without_retry(self):
+        route = respx.get("https://example.com/missing")
+        route.mock(return_value=httpx.Response(404, text="Not Found"))
         async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
             with pytest.raises(ServiceError, match="404") as exc_info:
                 await client._get("/missing")
             assert exc_info.value.status_code == 404
+            assert route.call_count == 1  # Not retried
 
     @respx.mock
     async def test_5xx_raises_service_error(self):
@@ -70,6 +75,22 @@ class TestBaseClientErrors:
         async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
             with pytest.raises(ServiceError, match="500"):
                 await client._get("/error")
+
+    @respx.mock
+    async def test_timeout_raises_service_error(self):
+        respx.get("https://example.com/slow").mock(side_effect=httpx.ReadTimeout("timed out"))
+        async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
+            with pytest.raises(ServiceError, match="timed out"):
+                await client._get("/slow")
+
+    @respx.mock
+    async def test_connect_error_raises_service_error(self):
+        respx.get("https://example.com/down").mock(
+            side_effect=httpx.ConnectError("connection refused")
+        )
+        async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
+            with pytest.raises(ServiceError, match="Connection failed"):
+                await client._get("/down")
 
 
 class TestBaseClientRateLimiting:
@@ -81,6 +102,17 @@ class TestBaseClientRateLimiting:
         with patch("mtg_mcp.services.base.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             async with BaseClient(base_url="https://example.com", rate_limit_rps=10.0) as client:
                 await client._get("/data")
+                mock_sleep.assert_awaited_with(0.1)
+
+    @respx.mock
+    async def test_rate_limit_delay_enforced_on_error(self):
+        respx.get("https://example.com/fail").mock(
+            return_value=httpx.Response(404, text="Not Found")
+        )
+        with patch("mtg_mcp.services.base.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            async with BaseClient(base_url="https://example.com", rate_limit_rps=10.0) as client:
+                with pytest.raises(ServiceError):
+                    await client._get("/fail")
                 mock_sleep.assert_awaited_with(0.1)
 
 
@@ -98,6 +130,17 @@ class TestBaseClientRetry:
             response = await client._get("/rate-limited")
             assert response.status_code == 200
             assert route.call_count == 2
+
+    @respx.mock
+    async def test_retries_on_429_respects_retry_after_header(self):
+        route = respx.get("https://example.com/throttled")
+        route.side_effect = [
+            httpx.Response(429, text="Too Many Requests", headers={"Retry-After": "3"}),
+            httpx.Response(200, json={"ok": True}),
+        ]
+        async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
+            response = await client._get("/throttled")
+            assert response.status_code == 200
 
     @respx.mock
     async def test_retries_on_503_then_succeeds(self):
@@ -119,3 +162,15 @@ class TestBaseClientRetry:
         async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
             with pytest.raises(ServiceError, match="500"):
                 await client._get("/always-fail")
+
+    @respx.mock
+    async def test_retries_on_network_error_then_succeeds(self):
+        route = respx.get("https://example.com/flaky")
+        route.side_effect = [
+            httpx.ConnectError("connection refused"),
+            httpx.Response(200, json={"ok": True}),
+        ]
+        async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
+            response = await client._get("/flaky")
+            assert response.status_code == 200
+            assert route.call_count == 2
