@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
+from mtg_mcp.config import Settings
 from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
 
@@ -15,7 +16,8 @@ _client: ScryfallClient | None = None
 @lifespan
 async def scryfall_lifespan(server: FastMCP):
     global _client
-    client = ScryfallClient()
+    settings = Settings()
+    client = ScryfallClient(base_url=settings.scryfall_base_url)
     async with client:
         _client = client
         yield {}
@@ -85,7 +87,7 @@ async def card_details(
     lines.append(f"Set: {card.set_code.upper()} ({card.rarity})")
     if card.prices.usd:
         lines.append(f"Price: ${card.prices.usd} (foil: ${card.prices.usd_foil or 'N/A'})")
-    if card.edhrec_rank:
+    if card.edhrec_rank is not None:
         lines.append(f"EDHREC Rank: {card.edhrec_rank}")
     lines.append(f"Legalities: {_format_legalities(card.legalities)}")
     lines.append(f"Scryfall: {card.scryfall_uri}")

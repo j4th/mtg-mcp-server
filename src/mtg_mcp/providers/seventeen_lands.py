@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
+from mtg_mcp.config import Settings
 from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
 
@@ -15,7 +16,8 @@ _client: SeventeenLandsClient | None = None
 @lifespan
 async def draft_lifespan(server: FastMCP):
     global _client
-    client = SeventeenLandsClient()
+    settings = Settings()
+    client = SeventeenLandsClient(base_url=settings.seventeen_lands_base_url)
     async with client:
         _client = client
         yield {}

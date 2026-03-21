@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
+from mtg_mcp.config import Settings
 from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.spellbook import (
     ComboNotFoundError,
@@ -33,7 +34,8 @@ _client: SpellbookClient | None = None
 @lifespan
 async def spellbook_lifespan(server: FastMCP):
     global _client
-    client = SpellbookClient()
+    settings = Settings()
+    client = SpellbookClient(base_url=settings.spellbook_base_url)
     async with client:
         _client = client
         yield {}

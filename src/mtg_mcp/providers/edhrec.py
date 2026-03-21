@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
+from mtg_mcp.config import Settings
 from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
 
@@ -18,7 +19,8 @@ _client: EDHRECClient | None = None
 @lifespan
 async def edhrec_lifespan(server: FastMCP):
     global _client
-    client = EDHRECClient()
+    settings = Settings()
+    client = EDHRECClient(base_url=settings.edhrec_base_url)
     async with client:
         _client = client
         yield {}
