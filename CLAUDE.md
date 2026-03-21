@@ -7,6 +7,8 @@ Unified MCP server providing Magic: The Gathering data to AI assistants. Compose
 Python 3.12+ · FastMCP 3.1.x · httpx · Pydantic v2 · structlog
 Tooling: mise · uv · ruff · ty · pytest · respx
 
+Prerequisites: [mise](https://mise.jdx.dev) must be installed. Then `mise install` gets everything else.
+
 ## Commands
 
 ```bash
@@ -51,6 +53,10 @@ See @docs/ARCHITECTURE.md for full details.
 - Don't use `Any` type — use `Unknown` or proper types.
 - Don't build workflow tools before their backend services work.
 - When compacting, preserve the list of which services/providers are implemented vs stubbed.
+
+## Environment
+
+Copy `.env.example` to `.env` to configure. All values have sensible defaults — no credentials required (all APIs are public). See `MTG_MCP_` prefix for all env vars.
 
 ## Key References
 
