@@ -1,0 +1,203 @@
+{
+  "header": "Muldrotha, the Gravetide (Commander)",
+  "description": "",
+  "avg_price": 1356.0,
+  "creature": 30,
+  "instant": 6,
+  "sorcery": 6,
+  "artifact": 9,
+  "enchantment": 9,
+  "battle": 0,
+  "planeswalker": 2,
+  "land": 37,
+  "basic": 16,
+  "nonbasic": 21,
+  "deck_size": 87,
+  "num_decks_avg": 22329,
+  "total_card_count": 100,
+  "container": {
+    "json_dict": {
+      "cardlists": [
+        {
+          "header": "New Cards",
+          "tag": "newcards",
+          "cardviews": [
+            {
+              "id": "443b6f30",
+              "name": "Twilight Diviner",
+              "sanitized": "twilight-diviner",
+              "url": "/cards/twilight-diviner",
+              "synergy": 0.14,
+              "inclusion": 770,
+              "num_decks": 770,
+              "potential_decks": 4119
+            },
+            {
+              "id": "db9aa986",
+              "name": "Wistfulness",
+              "sanitized": "wistfulness",
+              "url": "/cards/wistfulness",
+              "synergy": 0.07,
+              "inclusion": 364,
+              "num_decks": 364,
+              "potential_decks": 4200
+            },
+            {
+              "id": "0b5e219b",
+              "name": "Sodden Verdure",
+              "sanitized": "sodden-verdure",
+              "url": "/cards/sodden-verdure",
+              "synergy": -0.01,
+              "inclusion": 188,
+              "num_decks": 188,
+              "potential_decks": 4200
+            }
+          ]
+        },
+        {
+          "header": "High Synergy Cards",
+          "tag": "highsynergycards",
+          "cardviews": [
+            {
+              "id": "6d42fd52",
+              "name": "Spore Frog",
+              "sanitized": "spore-frog",
+              "url": "/cards/spore-frog",
+              "synergy": 0.53,
+              "inclusion": 13416,
+              "num_decks": 13416,
+              "potential_decks": 22329
+            },
+            {
+              "id": "fd5592ab",
+              "name": "Seal of Primordium",
+              "sanitized": "seal-of-primordium",
+              "url": "/cards/seal-of-primordium",
+              "synergy": 0.45,
+              "inclusion": 11051,
+              "num_decks": 11051,
+              "potential_decks": 22329
+            },
+            {
+              "id": "98f3be88",
+              "name": "Kaya's Ghostform",
+              "sanitized": "kayas-ghostform",
+              "url": "/cards/kayas-ghostform",
+              "synergy": 0.43,
+              "inclusion": 10825,
+              "num_decks": 10825,
+              "potential_decks": 22329
+            }
+          ]
+        },
+        {
+          "header": "Top Cards",
+          "tag": "topcards",
+          "cardviews": [
+            {
+              "id": "39e83502",
+              "name": "Eternal Witness",
+              "sanitized": "eternal-witness",
+              "url": "/cards/eternal-witness",
+              "synergy": 0.27,
+              "inclusion": 11884,
+              "num_decks": 11884,
+              "potential_decks": 22329
+            },
+            {
+              "id": "1489943b",
+              "name": "Animate Dead",
+              "sanitized": "animate-dead",
+              "url": "/cards/animate-dead",
+              "synergy": 0.29,
+              "inclusion": 9380,
+              "num_decks": 9380,
+              "potential_decks": 22329
+            },
+            {
+              "id": "40489e28",
+              "name": "The Gitrog Monster",
+              "sanitized": "the-gitrog-monster",
+              "url": "/cards/the-gitrog-monster",
+              "synergy": 0.27,
+              "inclusion": 9299,
+              "num_decks": 9299,
+              "potential_decks": 22329
+            }
+          ]
+        },
+        {
+          "header": "Creatures",
+          "tag": "creatures",
+          "cardviews": [
+            {
+              "id": "6d42fd52",
+              "name": "Spore Frog",
+              "sanitized": "spore-frog",
+              "url": "/cards/spore-frog",
+              "synergy": 0.53,
+              "inclusion": 13416,
+              "num_decks": 13416,
+              "potential_decks": 22329
+            },
+            {
+              "id": "39e83502",
+              "name": "Eternal Witness",
+              "sanitized": "eternal-witness",
+              "url": "/cards/eternal-witness",
+              "synergy": 0.27,
+              "inclusion": 11884,
+              "num_decks": 11884,
+              "potential_decks": 22329
+            },
+            {
+              "id": "c5cece0b",
+              "name": "Sakura-Tribe Elder",
+              "sanitized": "sakura-tribe-elder",
+              "url": "/cards/sakura-tribe-elder",
+              "synergy": 0.19,
+              "inclusion": 12500,
+              "num_decks": 12500,
+              "potential_decks": 22329
+            }
+          ]
+        },
+        {
+          "header": "Enchantments",
+          "tag": "enchantments",
+          "cardviews": [
+            {
+              "id": "98f3be88",
+              "name": "Kaya's Ghostform",
+              "sanitized": "kayas-ghostform",
+              "url": "/cards/kayas-ghostform",
+              "synergy": 0.43,
+              "inclusion": 10825,
+              "num_decks": 10825,
+              "potential_decks": 22329
+            },
+            {
+              "id": "1489943b",
+              "name": "Animate Dead",
+              "sanitized": "animate-dead",
+              "url": "/cards/animate-dead",
+              "synergy": 0.29,
+              "inclusion": 9380,
+              "num_decks": 9380,
+              "potential_decks": 22329
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "mana_curve": {
+    "0": 1,
+    "1": 13,
+    "2": 19,
+    "3": 15,
+    "4": 7,
+    "5": 6,
+    "6": 1
+  }
+}
