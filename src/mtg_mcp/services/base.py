@@ -76,6 +76,8 @@ class BaseClient:
         user_agent: str = "mtg-mcp/0.1.0",
         timeout: float = 30.0,
     ) -> None:
+        if rate_limit_rps <= 0:
+            raise ValueError(f"rate_limit_rps must be positive, got {rate_limit_rps}")
         self._base_url = base_url
         self._rate_limit_rps = rate_limit_rps
         self._user_agent = user_agent
@@ -121,18 +123,18 @@ class BaseClient:
             )
 
         async with self._semaphore:
-            delay = 1.0 / self._rate_limit_rps
+            min_interval = 1.0 / self._rate_limit_rps
+            start = time.monotonic()
             try:
-                start = time.monotonic()
                 response = await self._client.request(method, path, **kwargs)
-                elapsed_ms = (time.monotonic() - start) * 1000
+                elapsed = time.monotonic() - start
 
                 self._log.debug(
                     "http_request",
                     method=method,
                     url=f"{self._base_url}{path}",
                     status=response.status_code,
-                    elapsed_ms=round(elapsed_ms, 1),
+                    elapsed_ms=round(elapsed * 1000, 1),
                 )
 
                 if response.status_code >= 400:
@@ -157,14 +159,20 @@ class BaseClient:
                     )
 
                 return response
-            except httpx.TimeoutException as exc:
-                self._log.error("http_timeout", method=method, url=f"{self._base_url}{path}")
-                raise ServiceError(f"Request timed out: {method} {path}", status_code=None) from exc
-            except httpx.ConnectError as exc:
-                self._log.error("http_connect_error", method=method, url=f"{self._base_url}{path}")
-                raise ServiceError(f"Connection failed: {method} {path}", status_code=None) from exc
+            except httpx.RequestError as exc:
+                self._log.error(
+                    "http_request_error",
+                    method=method,
+                    url=f"{self._base_url}{path}",
+                    error=type(exc).__name__,
+                )
+                raise ServiceError(
+                    f"Network error during {method} {path}: {exc}", status_code=None
+                ) from exc
             finally:
-                await asyncio.sleep(delay)
+                remaining = min_interval - (time.monotonic() - start)
+                if remaining > 0:
+                    await asyncio.sleep(remaining)
 
     async def _get(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a GET request."""

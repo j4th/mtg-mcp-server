@@ -71,3 +71,7 @@ class TestLogging:
         configure_logging("INFO")
         log = get_logger("test_service")
         assert log is not None
+
+    def test_invalid_log_level_raises_value_error(self):
+        with pytest.raises(ValueError, match="Invalid log level"):
+            configure_logging("VERBOSE")

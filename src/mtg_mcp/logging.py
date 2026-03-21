@@ -11,13 +11,23 @@ import sys
 
 import structlog
 
+_VALID_LEVELS = frozenset(logging.getLevelNamesMapping())
+
 
 def configure_logging(level: str = "INFO") -> None:
     """Configure structlog with JSON output to stderr.
 
     Args:
-        level: Log level name (DEBUG, INFO, WARNING, ERROR).
+        level: Log level name (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+
+    Raises:
+        ValueError: If level is not a recognized log level name.
     """
+    level_upper = level.upper()
+    if level_upper not in _VALID_LEVELS:
+        raise ValueError(
+            f"Invalid log level '{level}'. Must be one of: {', '.join(sorted(_VALID_LEVELS))}"
+        )
     structlog.configure(
         processors=[
             structlog.stdlib.add_log_level,
@@ -26,7 +36,7 @@ def configure_logging(level: str = "INFO") -> None:
         ],
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         wrapper_class=structlog.make_filtering_bound_logger(
-            logging.getLevelName(level.upper()),
+            logging.getLevelName(level_upper),
         ),
     )
 

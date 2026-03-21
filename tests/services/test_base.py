@@ -80,7 +80,7 @@ class TestBaseClientErrors:
     async def test_timeout_raises_service_error(self):
         respx.get("https://example.com/slow").mock(side_effect=httpx.ReadTimeout("timed out"))
         async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
-            with pytest.raises(ServiceError, match="timed out"):
+            with pytest.raises(ServiceError, match="Network error"):
                 await client._get("/slow")
 
     @respx.mock
@@ -89,8 +89,12 @@ class TestBaseClientErrors:
             side_effect=httpx.ConnectError("connection refused")
         )
         async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
-            with pytest.raises(ServiceError, match="Connection failed"):
+            with pytest.raises(ServiceError, match="Network error"):
                 await client._get("/down")
+
+    def test_zero_rate_limit_raises_value_error(self):
+        with pytest.raises(ValueError, match="positive"):
+            BaseClient(base_url="https://example.com", rate_limit_rps=0)
 
 
 class TestBaseClientRateLimiting:
@@ -102,7 +106,9 @@ class TestBaseClientRateLimiting:
         with patch("mtg_mcp.services.base.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             async with BaseClient(base_url="https://example.com", rate_limit_rps=10.0) as client:
                 await client._get("/data")
-                mock_sleep.assert_awaited_with(0.1)
+                mock_sleep.assert_awaited_once()
+                slept = mock_sleep.await_args[0][0]
+                assert 0 < slept <= 0.1
 
     @respx.mock
     async def test_rate_limit_delay_enforced_on_error(self):
@@ -113,7 +119,9 @@ class TestBaseClientRateLimiting:
             async with BaseClient(base_url="https://example.com", rate_limit_rps=10.0) as client:
                 with pytest.raises(ServiceError):
                     await client._get("/fail")
-                mock_sleep.assert_awaited_with(0.1)
+                mock_sleep.assert_awaited_once()
+                slept = mock_sleep.await_args[0][0]
+                assert 0 < slept <= 0.1
 
 
 class TestBaseClientRetry:
@@ -138,9 +146,10 @@ class TestBaseClientRetry:
             httpx.Response(429, text="Too Many Requests", headers={"Retry-After": "3"}),
             httpx.Response(200, json={"ok": True}),
         ]
-        async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
-            response = await client._get("/throttled")
-            assert response.status_code == 200
+        with patch("tenacity.asyncio._portable_async_sleep", new_callable=AsyncMock):
+            async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
+                response = await client._get("/throttled")
+                assert response.status_code == 200
 
     @respx.mock
     async def test_retries_on_503_then_succeeds(self):
