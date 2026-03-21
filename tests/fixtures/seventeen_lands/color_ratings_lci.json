@@ -1,0 +1,79 @@
+[
+  {
+    "is_summary": true,
+    "color_name": "Two-color",
+    "short_name": 2,
+    "wins": 445484,
+    "games": 791280
+  },
+  {
+    "is_summary": false,
+    "color_name": "Azorius (WU)",
+    "short_name": "WU",
+    "wins": 87307,
+    "games": 150735
+  },
+  {
+    "is_summary": false,
+    "color_name": "Dimir (UB)",
+    "short_name": "UB",
+    "wins": 39590,
+    "games": 73066
+  },
+  {
+    "is_summary": false,
+    "color_name": "Rakdos (BR)",
+    "short_name": "BR",
+    "wins": 20712,
+    "games": 39161
+  },
+  {
+    "is_summary": false,
+    "color_name": "Gruul (RG)",
+    "short_name": "RG",
+    "wins": 59526,
+    "games": 103708
+  },
+  {
+    "is_summary": false,
+    "color_name": "Selesnya (GW)",
+    "short_name": "WG",
+    "wins": 22036,
+    "games": 39419
+  },
+  {
+    "is_summary": false,
+    "color_name": "Orzhov (WB)",
+    "short_name": "WB",
+    "wins": 30192,
+    "games": 56533
+  },
+  {
+    "is_summary": false,
+    "color_name": "Golgari (BG)",
+    "short_name": "BG",
+    "wins": 31940,
+    "games": 58168
+  },
+  {
+    "is_summary": false,
+    "color_name": "Simic (GU)",
+    "short_name": "UG",
+    "wins": 14791,
+    "games": 27432
+  },
+  {
+    "is_summary": false,
+    "color_name": "Izzet (UR)",
+    "short_name": "UR",
+    "wins": 79123,
+    "games": 136483
+  },
+  {
+    "is_summary": false,
+    "color_name": "Boros (RW)",
+    "short_name": "WR",
+    "wins": 60267,
+    "games": 106575
+  }
+]
