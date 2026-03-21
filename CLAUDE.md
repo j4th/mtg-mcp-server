@@ -57,4 +57,5 @@ See @docs/ARCHITECTURE.md for full details.
 - @docs/ARCHITECTURE.md — Full architecture, stack decisions, FastMCP patterns, mise config
 - @docs/TOOL_DESIGN.md — Tool naming, inputs/outputs, prompts, resources
 - @docs/SERVICE_CONTRACTS.md — API endpoints, rate limits, response shapes, caching
+- @docs/DATA_SOURCES.md — All data sources evaluated, auth methods, stability, access patterns
 - @docs/PROJECT_PLAN.md — Phased implementation plan
