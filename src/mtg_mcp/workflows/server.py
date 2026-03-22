@@ -100,16 +100,11 @@ async def _progress(ctx: Context, step: int, total: int) -> None:
     await ctx.report_progress(progress=step, total=total)
 
 
-# ---------------------------------------------------------------------------
-# Existing tool registrations (with Context + tags)
-# ---------------------------------------------------------------------------
-
-
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
-async def commander_overview(commander_name: str, ctx: Context) -> str:
+async def commander_overview(commander_name: str) -> str:
     """Comprehensive commander profile combining data from all available sources.
 
-    Returns card details, top combos, EDHREC staples, and synergy data.
+    Returns card details, top combos, EDHREC staples, and synergy scores.
     Degrades gracefully if optional sources (EDHREC, Spellbook) are unavailable.
     """
     from mtg_mcp.workflows.commander import commander_overview as impl
@@ -130,7 +125,7 @@ async def commander_overview(commander_name: str, ctx: Context) -> str:
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
-async def evaluate_upgrade(card_name: str, commander_name: str, ctx: Context) -> str:
+async def evaluate_upgrade(card_name: str, commander_name: str) -> str:
     """Assess whether a card is worth adding to a specific commander deck.
 
     Returns card details, price, synergy score, and combos enabled for the caller to assess.
@@ -201,11 +196,6 @@ async def suggest_cuts(
         )
     except ServiceError as exc:
         raise ToolError(f"Service error: {exc}") from exc
-
-
-# ---------------------------------------------------------------------------
-# New workflow tool registrations (Phase 5)
-# ---------------------------------------------------------------------------
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
