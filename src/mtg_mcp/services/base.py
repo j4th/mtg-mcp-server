@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import httpx
 import structlog
@@ -88,7 +88,7 @@ class BaseClient:
             service=self.__class__.__name__,
         )
 
-    async def __aenter__(self) -> BaseClient:
+    async def __aenter__(self) -> Self:
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=self._timeout,

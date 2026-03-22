@@ -38,8 +38,22 @@ See @docs/ARCHITECTURE.md for full details.
 - Modern typing: `list[str]` not `List[str]`, `str | None` not `Optional[str]`. Zero ty errors.
 - structlog everywhere. Bound logger per service. Log to stderr (stdout is MCP transport in stdio mode).
 - Services raise typed exceptions. Provider tools catch them and raise `ToolError` (from `fastmcp.exceptions`) with actionable messages. FastMCP handles `is_error` automatically.
+- Workflows are pure async functions (no MCP imports). `workflows/server.py` wraps them as tools and converts exceptions to `ToolError`.
 - Workflows handle partial failures — if one backend is down, return what you can from the rest.
+- Workflow tests use `unittest.mock.AsyncMock` (not respx) since they test pure functions, not HTTP.
 - EDHREC is behind a feature flag (`MTG_MCP_ENABLE_EDHREC`). It scrapes undocumented endpoints and will break.
+
+## PR Review Workflow
+
+When PR review comments come in:
+
+1. Fetch comments via `gh api /repos/{owner}/{repo}/pulls/{number}/comments`
+2. Assess each — state what you'll fix or why you'll defer
+3. Reply to each via `gh api .../comments/{id}/replies` with the assessment
+4. Make all code fixes
+5. Run `mise run check`
+6. Commit referencing the PR, push
+7. Resolve threads via GraphQL `resolveReviewThread` mutation (get thread IDs from `repository.pullRequest.reviewThreads`)
 
 ## Gotchas
 
@@ -49,20 +63,21 @@ See @docs/ARCHITECTURE.md for full details.
 - Error responses: raise `ToolError` from `fastmcp.exceptions`, don't manually construct `is_error` responses. Always use `from exc` in except blocks (B904).
 - Service clients: managed via lifespan + module-level `_client` variable (NOT `Depends()`/`ctx.lifespan_context` — these don't propagate through `mount()`).
 - Service clients are constructed with `Settings()` in the lifespan so `MTG_MCP_*_BASE_URL` env vars are honored.
+- Workflow lifespan uses `AsyncExitStack` to manage multiple clients. Provider lifespans use `async with client:` directly.
+- `BaseClient.__aenter__` returns `Self` (not `BaseClient`) so type-checkers infer the correct subclass through `AsyncExitStack.enter_async_context()`.
 - Pydantic v2: `.model_validate()`, not `.parse_obj()`.
 - Scryfall requires `User-Agent` and `Accept` headers on every request.
 - 17Lands rate-limits aggressively. 1 req/sec max. Cache everything.
 - Optional numeric fields: use `is not None` checks, not truthiness — `0` and `0.0` are valid values.
 - Don't use `Any` type — use `Unknown` or proper types.
-- Don't build workflow tools before their backend services work.
 - When compacting, preserve the list of which services/providers are implemented vs stubbed.
 
 ## Implementation Status
 
 - **Phase 0** (scaffold): Complete
-- **Phase 1** (Scryfall): Complete — 4 tools, 8 service tests, 6 provider tests
-- **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools, 104 total tests, 88% coverage
-- **Phase 3** (Workflow tools): Not started
+- **Phase 1** (Scryfall): Complete — 4 tools (search_cards, card_details, card_price, card_rulings)
+- **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools across 3 backends
+- **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
 
 ## Environment
 

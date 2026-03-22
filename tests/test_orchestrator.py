@@ -118,6 +118,18 @@ class TestSeventeenLandsMounted:
         assert len(text) > 0
 
 
+class TestWorkflowsMounted:
+    """Verify workflow tools appear without namespace on the orchestrator."""
+
+    async def test_workflow_tools_appear(self, mcp_client: Client):
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        assert "commander_overview" in tool_names
+        assert "evaluate_upgrade" in tool_names
+        assert "draft_pack_pick" in tool_names
+        assert "suggest_cuts" in tool_names
+
+
 class TestEdhrecMounted:
     """Verify EDHREC tools appear with edhrec_ namespace on the orchestrator."""
 

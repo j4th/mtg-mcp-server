@@ -13,6 +13,7 @@ from mtg_mcp.providers.edhrec import edhrec_mcp
 from mtg_mcp.providers.scryfall import scryfall_mcp
 from mtg_mcp.providers.seventeen_lands import draft_mcp
 from mtg_mcp.providers.spellbook import spellbook_mcp
+from mtg_mcp.workflows.server import workflow_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
 
@@ -24,6 +25,8 @@ if _settings.enable_17lands:
     mcp.mount(draft_mcp, namespace="draft")
 if _settings.enable_edhrec:
     mcp.mount(edhrec_mcp, namespace="edhrec")
+
+mcp.mount(workflow_mcp)
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))

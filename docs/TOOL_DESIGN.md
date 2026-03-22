@@ -132,39 +132,50 @@ Get synergy data for a specific card with a specific commander.
 
 ## Workflow Tools (orchestrator, no namespace)
 
+Workflow tools compose data from multiple backends. They are implemented as pure async functions
+in `workflows/` modules and wrapped as MCP tools in `workflows/server.py`. All use
+`asyncio.gather(return_exceptions=True)` for concurrent backend calls with graceful partial failure.
+
 ### `commander_overview`
-**Phase 3+.** Comprehensive data for a commander from all available sources.
+Comprehensive data for a commander from all available sources.
 
 | Field | Detail |
 |-------|--------|
 | Input | `commander_name: str` |
-| Output | Combined: card details (Scryfall) + top 10 staples with synergy (EDHREC) + notable combos (Spellbook) + total deck count |
-| Backends | Scryfall + EDHREC + Spellbook |
-| Partial failure | Returns whatever data is available, notes which sources failed |
+| Output | Markdown with: card header (name, mana cost, type, text, color identity, P/T, rarity, EDHREC rank), top 5 combos (card lists + results), top 10 EDHREC staples (by inclusion, with synergy), Data Sources footer |
+| Backends | Scryfall (required) + Spellbook (optional) + EDHREC (optional) |
+| Partial failure | Scryfall failure propagates. Spellbook/EDHREC failures noted in output, available data still returned |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `evaluate_upgrade`
-**Phase 6.** Assess whether a card is worth adding to a specific commander deck.
+Assess whether a card is worth adding to a specific commander deck.
 
 | Field | Detail |
 |-------|--------|
 | Input | `card_name: str`, `commander_name: str` |
-| Output | Card details + price + synergy score + inclusion rate + new combos enabled + recommendation |
-| Backends | Scryfall + EDHREC + Spellbook |
+| Output | Markdown with: card details (name, mana cost, type, text, price, EDHREC rank), synergy section (score, inclusion rate, deck count), top 5 combos enabled, Data Sources footer |
+| Backends | Scryfall (required) + Spellbook (optional) + EDHREC (optional) |
+| Partial failure | Scryfall failure propagates. Spellbook/EDHREC failures noted in output |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `draft_pack_pick`
-**Phase 6.** Rank cards in a draft pack using 17Lands data.
+Rank cards in a draft pack using 17Lands data.
 
 | Field | Detail |
 |-------|--------|
-| Input | `pack: list[str]` (card names), `current_picks: list[str] = []`, `set_code: str` |
-| Output | Ranked cards with GIH WR, ALSA, color fit analysis, recommendation |
-| Backends | 17Lands + Scryfall |
+| Input | `pack: list[str]` (card names), `set_code: str`, `current_picks: list[str] | None = None` |
+| Output | Markdown table ranked by GIH WR descending, with: color, rarity, GIH WR (%), ALSA, IWD (+/-%), game count. Optional color fit analysis ([on-color]/[off-color]) when `current_picks` provided. "No data" section for unrecognized cards |
+| Backends | 17Lands only (already has name, color, rarity — no Scryfall needed) |
+| Error | Raises `ToolError` if 17Lands is disabled |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `suggest_cuts`
-**Phase 6.** Identify the weakest cards in a commander decklist.
+Identify the weakest cards to cut from a commander decklist.
 
 | Field | Detail |
 |-------|--------|
 | Input | `decklist: list[str]`, `commander_name: str`, `num_cuts: int = 5` |
-| Output | Ranked cut candidates with: synergy score, inclusion rate, whether it's a combo piece |
-| Backends | EDHREC + Spellbook |
+| Output | Markdown with: data source status, ranked cut candidates with reasoning (synergy/inclusion for EDHREC data, "PROTECTED — combo piece" for combo cards, "Low confidence — no data found" for unknown cards), failure notes |
+| Backends | Spellbook (optional) + EDHREC (optional) |
+| Scoring | Low synergy + low inclusion = more cuttable. Combo pieces protected (-2.0). No data = slight penalty (+0.5) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |

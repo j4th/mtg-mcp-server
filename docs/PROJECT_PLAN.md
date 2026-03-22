@@ -244,7 +244,7 @@ Each agent follows the same sequence independently:
 
 ---
 
-## Phase 3: Workflow Tools [NOT STARTED]
+## Phase 3: Workflow Tools [COMPLETE]
 
 **Goal:** Composed workflow tools that cross-reference multiple backends.
 
@@ -252,31 +252,32 @@ Each agent follows the same sequence independently:
 
 **Parallel execution plan:**
 
-Start `commander_overview` as soon as Spellbook is done (only needs Scryfall + Spellbook initially). Other workflows can start once their required backends are ready.
+All 4 workflows built simultaneously by 3 parallel agents in git worktrees, after a serial scaffold step.
 
 ### Steps
 
-1. Create `workflows/commander.py`:
-   - `commander_overview(commander_name: str)` calls:
-     - `ScryfallClient.get_card_by_name()` → card data
-     - `SpellbookClient.find_combos()` → combos for that commander
-     - (If EDHREC available) `EDHRECClient.commander_top_cards()` → top staples
-   - Returns formatted markdown combining all available data
-   - Handles partial failure (any backend down → still return what you can with notes)
+1. **Scaffold (serial):** Create `workflows/server.py` with `AsyncExitStack` lifespan managing up to 4 service clients (Scryfall, Spellbook, 17Lands, EDHREC) respecting feature flags. Mount on orchestrator without namespace. Register all 4 tool stubs that import from pure-function modules.
 
-2. Once all backends are ready, build remaining workflows in parallel:
+2. **Parallel implementation (3 agents in worktrees):**
 
-| Agent | Workflow | Backends Required |
-|-------|----------|-------------------|
-| Agent A | `evaluate_upgrade` | Scryfall + EDHREC + Spellbook |
-| Agent B | `draft_pack_pick` | 17Lands + Scryfall |
-| Agent C | `suggest_cuts` | EDHREC + Spellbook |
+| Agent | Workflow(s) | Files |
+|-------|-------------|-------|
+| Agent A | `commander_overview`, `evaluate_upgrade` | `workflows/commander.py`, `tests/workflows/test_commander.py` |
+| Agent B | `draft_pack_pick` | `workflows/draft.py`, `tests/workflows/test_draft.py` |
+| Agent C | `suggest_cuts` | `workflows/deck.py`, `tests/workflows/test_deck.py` |
 
-3. Register all workflow tools on the workflow server, mount on orchestrator without namespace
+3. **Merge and integration (serial):** Copy implementation files from worktrees (agents rewrote `server.py` for their own scope — scaffold's version kept). All tests pass after merge.
 
-4. Test: mock all services, verify composed responses and partial failure handling
+**Completed:** All planned workflow tools implemented, with all tests passing and coverage meeting or exceeding the project's quality targets across backend and workflow tools.
 
-**Done when:** All workflow tools return composed data from multiple backends with graceful partial failure handling.
+**Key learnings from Phase 3:**
+- Pure functions + wiring layer is the right pattern for workflows — pure functions take service clients as params, `server.py` wraps them as MCP tools. No circular imports, trivially unit-testable with `AsyncMock`.
+- Agents that modify shared files (`server.py`) need careful coordination — scaffold first (serial), then give agents exclusive files only. Cherry-pick implementations, not shared file rewrites.
+- `AsyncExitStack` is cleaner than nested `async with` for managing multiple clients in a single lifespan.
+- `BaseClient.__aenter__` must return `Self` (not `BaseClient`) for `AsyncExitStack.enter_async_context()` to infer the correct type.
+- `asyncio.gather(return_exceptions=True)` + `isinstance(result, BaseException)` is the pattern for concurrent optional backends — no try/except needed per task.
+- `draft_pack_pick` only needs 17Lands (not Scryfall) — 17Lands already has name, color, rarity, all win rate metrics.
+- Workflow tests use `unittest.mock.AsyncMock` instead of respx, since they test pure functions not HTTP calls.
 
 ---
 
