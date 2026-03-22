@@ -10,6 +10,7 @@ from mcp.types import ToolAnnotations
 from mtg_mcp.config import Settings
 from mtg_mcp.logging import configure_logging
 from mtg_mcp.providers.edhrec import edhrec_mcp
+from mtg_mcp.providers.mtgjson import mtgjson_mcp
 from mtg_mcp.providers.scryfall import scryfall_mcp
 from mtg_mcp.providers.seventeen_lands import draft_mcp
 from mtg_mcp.providers.spellbook import spellbook_mcp
@@ -25,6 +26,8 @@ if _settings.enable_17lands:
     mcp.mount(draft_mcp, namespace="draft")
 if _settings.enable_edhrec:
     mcp.mount(edhrec_mcp, namespace="edhrec")
+if _settings.enable_mtgjson:
+    mcp.mount(mtgjson_mcp, namespace="mtgjson")
 
 mcp.mount(workflow_mcp)
 

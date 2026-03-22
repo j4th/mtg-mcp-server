@@ -5,6 +5,7 @@ Models are added here as services are implemented:
 - Phase 2: Combo, DecklistCombos, BracketEstimate (Spellbook)
 - Phase 2: DraftCardRating, ArchetypeRating (17Lands)
 - Phase 2: EDHRECCard, EDHRECCardList, EDHRECCommanderData (EDHREC)
+- Phase 4: MTGJSONCard (MTGJSON bulk data)
 """
 
 from __future__ import annotations
@@ -196,3 +197,26 @@ class EDHRECCommanderData(BaseModel):
     commander_name: str
     cardlists: list[EDHRECCardList] = Field(default_factory=list)
     total_decks: int = 0
+
+
+# ---------------------------------------------------------------------------
+# MTGJSON
+# ---------------------------------------------------------------------------
+
+
+class MTGJSONCard(BaseModel):
+    """Card data from MTGJSON AtomicCards."""
+
+    name: str
+    mana_cost: str = ""
+    type_line: str = ""
+    oracle_text: str = ""
+    colors: list[str] = Field(default_factory=list)
+    color_identity: list[str] = Field(default_factory=list)
+    types: list[str] = Field(default_factory=list)
+    subtypes: list[str] = Field(default_factory=list)
+    supertypes: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    power: str | None = None
+    toughness: str | None = None
+    mana_value: float = 0.0

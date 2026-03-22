@@ -50,7 +50,8 @@ class TestConfig:
         assert settings.scryfall_base_url == "https://api.scryfall.com"
         assert settings.enable_edhrec is True
         assert settings.enable_17lands is True
-        assert settings.cache_ttl_seconds == 3600
+        assert settings.disable_cache is False
+        assert settings.enable_mtgjson is True
 
     def test_config_reads_env_vars(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("MTG_MCP_LOG_LEVEL", "DEBUG")

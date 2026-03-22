@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "tenacity>=9.0",
     "structlog>=24.0",
+    "cachetools>=6.0",
 ]
 
 [project.scripts]

@@ -1,6 +1,6 @@
 # MTG MCP Server — Caching Design
 
-> **Status:** Approved design, not yet implemented.
+> **Status:** Implementing (Phase 4).
 > **Date:** 2026-03-21
 
 ## Problem
@@ -163,3 +163,57 @@ Per-method TTLs are hardcoded as class-level constants (the table above), since 
 - **Cache invalidation API**: No manual invalidation needed. TTL handles freshness. If needed later, each `TTLCache` supports `.clear()`.
 - **Shared cache across services**: Each service owns its caches. No cross-service cache sharing.
 - **Adaptive TTLs**: 17Lands data updates more frequently during the first week of a new set (could justify 1h TTL) and stabilizes after (12-24h would be fine). The 4h floor is a pragmatic middle ground. Adaptive TTL is possible but not worth the complexity now.
+
+---
+
+## MTGJSON Bulk Card Cache
+
+### Overview
+
+MTGJSON provides `AtomicCards.json` — a ~120MB JSON file keyed by card name containing oracle-level card data (no prices, rulings, or set-specific data). This serves as:
+
+1. **Cold-start cache** — eliminates Scryfall API calls for basic card lookups when the server first starts (before TTL caches warm up).
+2. **Standalone MCP provider** — rate-limit-free card search via `mtgjson_card_lookup` and `mtgjson_card_search` tools.
+
+### Data Source
+
+| Field | Value |
+|-------|-------|
+| URL | `https://mtgjson.com/api/v5/AtomicCards.json.gz` (~20MB gzipped) |
+| Format | JSON dict keyed by card name, each value is array of printings |
+| Contains | name, mana_cost, type, oracle_text, colors, color_identity, types, subtypes, supertypes, keywords, power, toughness, mana_value |
+| Does NOT contain | prices, rulings, images, set-specific data |
+| Update frequency | Daily |
+
+### Download Strategy
+
+- **Lazy download**: Data is fetched on first access (not at server startup), avoiding blocking server initialization.
+- **Refresh via TTL**: Configurable via `MTG_MCP_MTGJSON_REFRESH_HOURS` (default 24h). After the TTL expires, the next access triggers a re-download.
+- **In-memory storage**: Parsed into `dict[str, MTGJSONCard]` keyed by lowercase card name for O(1) exact lookups.
+- **Gzip decompression**: Downloaded as `.json.gz`, decompressed in memory.
+
+### Integration with Scryfall
+
+MTGJSON integration happens at the **workflow layer**, not inside `ScryfallClient`. This preserves service independence:
+
+- Workflow tools that need card data can optionally check MTGJSON first, falling back to Scryfall.
+- The MTGJSON client is added to the workflow server's `AsyncExitStack` lifespan alongside existing clients.
+- Provider-level Scryfall tools continue to hit the API directly (with TTL caching).
+
+### Relationship to TTL Caching
+
+The two caching layers are complementary:
+
+| Layer | Purpose | When it helps |
+|-------|---------|---------------|
+| TTL cache (cachetools) | Hot-path deduplication | Repeated calls for the same card within a session |
+| MTGJSON bulk cache | Cold-start + offline data | First call for any card, rate limit avoidance, bulk search |
+
+A typical request flow: MTGJSON hit → TTL cache miss → Scryfall API call → TTL cache populated.
+
+### Feature Flag
+
+MTGJSON is behind `MTG_MCP_ENABLE_MTGJSON` (default `true`). When disabled:
+- The MTGJSON provider is not mounted on the orchestrator.
+- Workflow tools skip the MTGJSON lookup step.
+- No downloads are attempted.
