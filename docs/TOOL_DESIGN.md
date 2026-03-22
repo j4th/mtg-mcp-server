@@ -130,6 +130,30 @@ Get synergy data for a specific card with a specific commander.
 
 ---
 
+## MTGJSON Backend (namespace: `mtgjson`)
+
+### `mtgjson_card_lookup`
+Look up a Magic card by exact name using MTGJSON bulk data. Rate-limit-free.
+
+| Field | Detail |
+|-------|--------|
+| Input | `name: str` |
+| Output | Full card data: name, mana cost, type, oracle text, colors, color identity, P/T, keywords, supertypes, subtypes, mana value |
+| Backend | `MTGJSONClient.get_card()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `mtgjson_card_search`
+Search for Magic cards in MTGJSON bulk data by name, type, or oracle text. Rate-limit-free.
+
+| Field | Detail |
+|-------|--------|
+| Input | `query: str`, `search_field: str = "name"` (one of "name", "type", "text"), `limit: int = 20` |
+| Output | Formatted list of matching cards with name, mana cost, type line |
+| Backend | `MTGJSONClient.search_cards()` / `search_by_type()` / `search_by_text()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+---
+
 ## Workflow Tools (orchestrator, no namespace)
 
 Workflow tools compose data from multiple backends. They are implemented as pure async functions

@@ -71,6 +71,8 @@ When PR review comments come in:
 - Optional numeric fields: use `is not None` checks, not truthiness — `0` and `0.0` are valid values.
 - Don't use `Any` type — use `Unknown` or proper types.
 - When compacting, preserve the list of which services/providers are implemented vs stubbed.
+- Service caching: all service methods use `@async_cached` with class-level `TTLCache`. Tests must clear caches (autouse `_clear_caches` fixture in conftest.py).
+- MTGJSON is behind `MTG_MCP_ENABLE_MTGJSON` feature flag. It's a file-based service (not BaseClient). Lazy-loads on first access.
 
 ## Implementation Status
 
@@ -78,6 +80,7 @@ When PR review comments come in:
 - **Phase 1** (Scryfall): Complete — 4 tools (search_cards, card_details, card_price, card_rulings)
 - **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools across 3 backends
 - **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
+- **Phase 4** (Caching + MTGJSON): Complete — TTL caching on all 12 service methods, MTGJSON bulk card provider (2 tools: card_lookup, card_search)
 
 ## Environment
 
