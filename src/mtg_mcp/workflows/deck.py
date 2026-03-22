@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from mtg_mcp.services.base import ServiceError
+
 if TYPE_CHECKING:
     from mtg_mcp.services.edhrec import EDHRECClient
     from mtg_mcp.services.spellbook import SpellbookClient
@@ -91,7 +93,7 @@ async def _fetch_spellbook(
     """Fetch Spellbook data, returning the exception on failure."""
     try:
         return await spellbook.find_decklist_combos([commander_name], decklist)
-    except Exception as exc:
+    except ServiceError as exc:
         return exc
 
 
@@ -102,7 +104,7 @@ async def _fetch_edhrec(
     """Fetch EDHREC data, returning the exception on failure."""
     try:
         return await edhrec.commander_top_cards(commander_name)
-    except Exception as exc:
+    except ServiceError as exc:
         return exc
 
 
@@ -127,7 +129,11 @@ async def _fetch_data(
     # Process spellbook result
     combo_data: DecklistCombos | None = None
     if isinstance(spellbook_result, BaseException):
-        log.warning("spellbook_fetch_failed", error=str(spellbook_result))
+        log.warning(
+            "spellbook_fetch_failed",
+            error=str(spellbook_result),
+            error_type=type(spellbook_result).__name__,
+        )
         sources.failures.append(f"Spellbook: {spellbook_result}")
     else:
         combo_data = spellbook_result
@@ -137,7 +143,11 @@ async def _fetch_data(
     edhrec_data: EDHRECCommanderData | None = None
     if edhrec_result is not None:
         if isinstance(edhrec_result, BaseException):
-            log.warning("edhrec_fetch_failed", error=str(edhrec_result))
+            log.warning(
+                "edhrec_fetch_failed",
+                error=str(edhrec_result),
+                error_type=type(edhrec_result).__name__,
+            )
             sources.failures.append(f"EDHREC: {edhrec_result}")
         else:
             edhrec_data = edhrec_result

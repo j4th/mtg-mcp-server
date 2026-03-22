@@ -42,7 +42,7 @@ Our server runs a single asyncio event loop — no thread contention on dict acc
 | Scryfall | `get_rulings` | 24h | 200 | Rulings change very rarely |
 | Spellbook | `find_combos` | 24h | 200 | Combos rarely added to the database |
 | Spellbook | `get_combo` | 24h | 100 | Static once created |
-| Spellbook | `find_decklist_combos` | 12h | 50 | User-specific query; 12h diverges from SERVICE_CONTRACTS.md blanket 24h because decklist analysis may change as the user iterates |
+| Spellbook | `find_decklist_combos` | 12h | 50 | User-specific query; 12h diverges from the blanket 24h recommendation because decklist analysis may change as the user iterates |
 | Spellbook | `estimate_bracket` | 12h | 50 | Same reasoning as `find_decklist_combos` |
 | 17Lands | `card_ratings` | 4h | 20 | Safe floor — updates heavily during first week of a set, then stabilizes. 4h balances freshness vs. rate limit protection |
 | 17Lands | `color_ratings` | 4h | 20 | Same lifecycle |

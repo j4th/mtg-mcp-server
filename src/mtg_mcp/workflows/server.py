@@ -63,7 +63,7 @@ def _require_spellbook() -> SpellbookClient:
     return _spellbook
 
 
-# --- Tool registrations (added by workflow modules) ---
+# --- Tool registrations ---
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS)
@@ -94,7 +94,7 @@ async def commander_overview(commander_name: str) -> str:
 async def evaluate_upgrade(card_name: str, commander_name: str) -> str:
     """Assess whether a card is worth adding to a specific commander deck.
 
-    Returns card details, price, synergy score, combos enabled, and a recommendation.
+    Returns card details, price, synergy score, and combos enabled for the caller to assess.
     Degrades gracefully if optional sources (EDHREC, Spellbook) are unavailable.
     """
     from mtg_mcp.workflows.commander import evaluate_upgrade as impl
@@ -150,7 +150,7 @@ async def suggest_cuts(
     """Identify the weakest cards to cut from a commander decklist.
 
     Scores cards by synergy, inclusion rate, and combo membership.
-    Degrades gracefully if EDHREC is unavailable (ranks by combo data only).
+    Degrades gracefully if EDHREC or Spellbook backends fail (uses whatever data is available).
     """
     from mtg_mcp.workflows.deck import suggest_cuts as impl
 

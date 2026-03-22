@@ -225,7 +225,11 @@ async def commander_overview(
     spellbook_ok = True
     spellbook_error: str | None = None
     if isinstance(spellbook_result, BaseException):
-        log.warning("commander_overview.spellbook_failed", error=str(spellbook_result))
+        log.warning(
+            "commander_overview.spellbook_failed",
+            error=str(spellbook_result),
+            error_type=type(spellbook_result).__name__,
+        )
         spellbook_ok = False
         spellbook_error = str(spellbook_result)
     else:
@@ -240,7 +244,11 @@ async def commander_overview(
     if edhrec is not None and len(results) > 2:
         edhrec_result = results[2]
         if isinstance(edhrec_result, BaseException):
-            log.warning("commander_overview.edhrec_failed", error=str(edhrec_result))
+            log.warning(
+                "commander_overview.edhrec_failed",
+                error=str(edhrec_result),
+                error_type=type(edhrec_result).__name__,
+            )
             edhrec_ok = False
             edhrec_error = str(edhrec_result)
         else:
@@ -261,6 +269,11 @@ async def commander_overview(
 
     if edhrec_enabled and edhrec_ok and edhrec_data is not None:
         lines.extend(_format_edhrec_staples(edhrec_data))
+    elif edhrec_enabled and edhrec_ok is False:
+        lines.append("")
+        lines.append("## EDHREC Staples")
+        lines.append("")
+        lines.append(f"EDHREC unavailable: {edhrec_error}")
 
     lines.extend(
         _source_status(
@@ -339,7 +352,11 @@ async def evaluate_upgrade(
     spellbook_ok = True
     spellbook_error: str | None = None
     if isinstance(spellbook_result, BaseException):
-        log.warning("evaluate_upgrade.spellbook_failed", error=str(spellbook_result))
+        log.warning(
+            "evaluate_upgrade.spellbook_failed",
+            error=str(spellbook_result),
+            error_type=type(spellbook_result).__name__,
+        )
         spellbook_ok = False
         spellbook_error = str(spellbook_result)
     else:
@@ -354,7 +371,11 @@ async def evaluate_upgrade(
     if edhrec is not None and len(results) > 2:
         edhrec_result = results[2]
         if isinstance(edhrec_result, BaseException):
-            log.warning("evaluate_upgrade.edhrec_failed", error=str(edhrec_result))
+            log.warning(
+                "evaluate_upgrade.edhrec_failed",
+                error=str(edhrec_result),
+                error_type=type(edhrec_result).__name__,
+            )
             edhrec_ok = False
             edhrec_error = str(edhrec_result)
         else:

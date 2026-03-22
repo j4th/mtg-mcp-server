@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mtg_mcp.services.base import ServiceError
 from mtg_mcp.types import (
     Combo,
     ComboCard,
@@ -250,7 +251,9 @@ class TestEdhrecRaisesException:
 
     async def test_ranks_by_combo_data_with_failure_note(self, mock_spellbook: AsyncMock) -> None:
         mock_edhrec = AsyncMock()
-        mock_edhrec.commander_top_cards = AsyncMock(side_effect=Exception("EDHREC is down"))
+        mock_edhrec.commander_top_cards = AsyncMock(
+            side_effect=ServiceError("EDHREC is down", status_code=503)
+        )
 
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
@@ -274,7 +277,9 @@ class TestSpellbookRaisesException:
 
     async def test_ranks_by_edhrec_data_with_failure_note(self, mock_edhrec: AsyncMock) -> None:
         mock_spellbook = AsyncMock()
-        mock_spellbook.find_decklist_combos = AsyncMock(side_effect=Exception("Spellbook is down"))
+        mock_spellbook.find_decklist_combos = AsyncMock(
+            side_effect=ServiceError("Spellbook is down", status_code=503)
+        )
 
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
@@ -300,9 +305,13 @@ class TestBothRaiseExceptions:
 
     async def test_all_cards_flagged_low_confidence(self) -> None:
         mock_spellbook = AsyncMock()
-        mock_spellbook.find_decklist_combos = AsyncMock(side_effect=Exception("Spellbook is down"))
+        mock_spellbook.find_decklist_combos = AsyncMock(
+            side_effect=ServiceError("Spellbook is down", status_code=503)
+        )
         mock_edhrec = AsyncMock()
-        mock_edhrec.commander_top_cards = AsyncMock(side_effect=Exception("EDHREC is down"))
+        mock_edhrec.commander_top_cards = AsyncMock(
+            side_effect=ServiceError("EDHREC is down", status_code=503)
+        )
 
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
