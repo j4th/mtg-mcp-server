@@ -178,6 +178,56 @@ class TestRefreshLogic:
                 await client.ensure_loaded()
                 assert mock_http.get.call_count == 1
 
+    async def test_stale_refresh_failure_serves_stale_data(self):
+        """If data was loaded but refresh fails, serve stale data."""
+        fixture_bytes = _load_fixture_bytes()
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=1)
+        async with client:
+            # First: successful load
+            ok_response = _mock_httpx_response(fixture_bytes)
+            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+                mock_http = AsyncMock()
+                mock_http.get = AsyncMock(return_value=ok_response)
+                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+                mock_http.__aexit__ = AsyncMock(return_value=False)
+                mock_cls.return_value = mock_http
+                await client.ensure_loaded()
+
+            # Simulate stale
+            client._loaded_at = time.monotonic() - 7200
+
+            # Second: refresh fails (HTTP 503)
+            fail_response = _mock_httpx_response(b"", status_code=503)
+            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+                mock_http = AsyncMock()
+                mock_http.get = AsyncMock(return_value=fail_response)
+                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+                mock_http.__aexit__ = AsyncMock(return_value=False)
+                mock_cls.return_value = mock_http
+
+                # Should NOT raise — serves stale data
+                await client.ensure_loaded()
+
+            # Stale data should still be available
+            card = await client.get_card("Sol Ring")
+            assert card is not None
+            assert card.name == "Sol Ring"
+
+    async def test_initial_load_failure_still_raises(self):
+        """If the very first load fails, the error must propagate."""
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
+        async with client:
+            fail_response = _mock_httpx_response(b"", status_code=503)
+            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+                mock_http = AsyncMock()
+                mock_http.get = AsyncMock(return_value=fail_response)
+                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+                mock_http.__aexit__ = AsyncMock(return_value=False)
+                mock_cls.return_value = mock_http
+
+                with pytest.raises(MTGJSONDownloadError, match="HTTP 503"):
+                    await client.ensure_loaded()
+
 
 class TestGetCard:
     """Test exact card lookup."""
@@ -237,6 +287,46 @@ class TestGetCard:
         assert result.name == "Jötun Grunt"
         assert result.power == "4"
         assert result.toughness == "4"
+
+
+class TestDFCDedup:
+    """Test that double-faced cards don't produce duplicate search results."""
+
+    async def test_search_no_duplicates_for_dfc(self, loaded_client: MTGJSONClient):
+        """Searching for 'delver' should return only one result, not two."""
+        results = await loaded_client.search_cards("delver")
+        assert len(results) == 1
+        assert results[0].name == "Delver of Secrets"
+
+    async def test_type_search_no_duplicates(self, loaded_client: MTGJSONClient):
+        """Type search for 'Creature' should not duplicate DFC creatures."""
+        results = await loaded_client.search_by_type("Creature")
+        names = [r.name for r in results]
+        assert names.count("Delver of Secrets") == 1
+
+    async def test_text_search_no_duplicates(self, loaded_client: MTGJSONClient):
+        results = await loaded_client.search_by_text("transform")
+        names = [r.name for r in results]
+        # "Delver of Secrets" has transform text — should appear exactly once
+        delver_count = sum(1 for n in names if n == "Delver of Secrets")
+        assert delver_count <= 1
+
+    async def test_back_face_name_not_matched_in_name_search(self, loaded_client: MTGJSONClient):
+        """Searching for back-face name should not match via dict key alias."""
+        results = await loaded_client.search_cards("insectile")
+        # "Insectile Aberration" is the back face — name search should not match
+        # because card.name is "Delver of Secrets"
+        assert len(results) == 0
+
+    async def test_dfc_still_accessible_by_full_name(self, loaded_client: MTGJSONClient):
+        """Exact lookup by full DFC name should still work."""
+        card = await loaded_client.get_card("Delver of Secrets // Insectile Aberration")
+        assert card is not None
+        assert card.name == "Delver of Secrets"
+
+    async def test_unique_cards_count(self, loaded_client: MTGJSONClient):
+        """_unique_cards should have 8 cards (no duplicates)."""
+        assert len(loaded_client._unique_cards) == 8
 
 
 class TestSearchCards:

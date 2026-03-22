@@ -12,7 +12,6 @@ from mtg_mcp.config import Settings
 from mtg_mcp.providers import TOOL_ANNOTATIONS
 from mtg_mcp.services.base import ServiceError
 from mtg_mcp.services.edhrec import EDHRECClient
-from mtg_mcp.services.mtgjson import MTGJSONClient
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
 from mtg_mcp.services.spellbook import SpellbookClient
@@ -21,12 +20,11 @@ _scryfall: ScryfallClient | None = None
 _spellbook: SpellbookClient | None = None
 _seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
-_mtgjson: MTGJSONClient | None = None
 
 
 @lifespan
 async def workflow_lifespan(server: FastMCP):
-    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _mtgjson
+    global _scryfall, _spellbook, _seventeen_lands, _edhrec
     settings = Settings()
     async with AsyncExitStack() as stack:
         _scryfall = await stack.enter_async_context(
@@ -43,19 +41,11 @@ async def workflow_lifespan(server: FastMCP):
             _edhrec = await stack.enter_async_context(
                 EDHRECClient(base_url=settings.edhrec_base_url)
             )
-        if settings.enable_mtgjson:
-            _mtgjson = await stack.enter_async_context(
-                MTGJSONClient(
-                    data_url=settings.mtgjson_data_url,
-                    refresh_hours=settings.mtgjson_refresh_hours,
-                )
-            )
         yield {}
     _scryfall = None
     _spellbook = None
     _seventeen_lands = None
     _edhrec = None
-    _mtgjson = None
 
 
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)

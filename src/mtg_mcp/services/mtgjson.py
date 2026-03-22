@@ -13,6 +13,7 @@ from typing import Self
 
 import httpx
 import structlog
+from pydantic import ValidationError
 
 from mtg_mcp.services.base import ServiceError
 from mtg_mcp.types import MTGJSONCard
@@ -47,6 +48,7 @@ class MTGJSONClient:
         self._data_url = data_url
         self._refresh_seconds = refresh_hours * 3600
         self._cards: dict[str, MTGJSONCard] = {}
+        self._unique_cards: list[MTGJSONCard] = []
         self._loaded_at: float = 0.0
 
     async def __aenter__(self) -> Self:
@@ -54,19 +56,31 @@ class MTGJSONClient:
 
     async def __aexit__(self, *exc: object) -> None:
         self._cards.clear()
+        self._unique_cards.clear()
         self._loaded_at = 0.0
 
     async def ensure_loaded(self) -> None:
-        """Download and parse AtomicCards if not loaded or stale."""
+        """Download and parse AtomicCards if not loaded or stale.
+
+        On refresh failure (data was previously loaded), logs a warning
+        and serves stale data rather than propagating the error.
+        """
         if not self._is_stale():
             return
 
-        log.info("mtgjson.loading", url=self._data_url, stale=self._loaded_at > 0)
-        raw_bytes = await self._download()
-        decompressed = self._decompress(raw_bytes)
-        self._parse(decompressed)
-        self._loaded_at = time.monotonic()
-        log.info("mtgjson.loaded", card_count=len(self._cards))
+        is_refresh = self._loaded_at > 0
+        log.info("mtgjson.loading", url=self._data_url, stale=is_refresh)
+        try:
+            raw_bytes = await self._download()
+            decompressed = self._decompress(raw_bytes)
+            self._parse(decompressed)
+            self._loaded_at = time.monotonic()
+            log.info("mtgjson.loaded", card_count=len(self._unique_cards))
+        except MTGJSONError:
+            if is_refresh:
+                log.warning("mtgjson.refresh_failed", url=self._data_url)
+                return
+            raise
 
     async def get_card(self, name: str) -> MTGJSONCard | None:
         """Exact card lookup by name (case-insensitive)."""
@@ -78,8 +92,8 @@ class MTGJSONClient:
         await self.ensure_loaded()
         query_lower = query.lower()
         results: list[MTGJSONCard] = []
-        for key, card in self._cards.items():
-            if query_lower in key:
+        for card in self._unique_cards:
+            if query_lower in card.name.lower():
                 results.append(card)
                 if len(results) >= limit:
                     break
@@ -90,7 +104,7 @@ class MTGJSONClient:
         await self.ensure_loaded()
         query_lower = type_query.lower()
         results: list[MTGJSONCard] = []
-        for card in self._cards.values():
+        for card in self._unique_cards:
             if query_lower in card.type_line.lower():
                 results.append(card)
                 if len(results) >= limit:
@@ -102,7 +116,7 @@ class MTGJSONClient:
         await self.ensure_loaded()
         query_lower = text_query.lower()
         results: list[MTGJSONCard] = []
-        for card in self._cards.values():
+        for card in self._unique_cards:
             if query_lower in card.oracle_text.lower():
                 results.append(card)
                 if len(results) >= limit:
@@ -147,6 +161,7 @@ class MTGJSONClient:
 
         data = raw["data"]
         cards: dict[str, MTGJSONCard] = {}
+        unique: list[MTGJSONCard] = []
 
         for card_name, printings in data.items():
             if not isinstance(printings, list) or len(printings) == 0:
@@ -158,22 +173,27 @@ class MTGJSONClient:
             if not isinstance(printing, dict):
                 continue
 
-            card = MTGJSONCard(
-                name=str(printing.get("name", card_name)),
-                mana_cost=str(printing.get("manaCost", "") or ""),
-                type_line=str(printing.get("type", "") or ""),
-                oracle_text=str(printing.get("text", "") or ""),
-                colors=printing.get("colors") or [],
-                color_identity=printing.get("colorIdentity") or [],
-                types=printing.get("types") or [],
-                subtypes=printing.get("subtypes") or [],
-                supertypes=printing.get("supertypes") or [],
-                keywords=printing.get("keywords") or [],
-                power=printing.get("power"),
-                toughness=printing.get("toughness"),
-                mana_value=float(printing.get("manaValue", 0.0) or 0.0),
-            )
+            try:
+                card = MTGJSONCard(
+                    name=str(printing.get("name", card_name)),
+                    mana_cost=str(printing.get("manaCost", "") or ""),
+                    type_line=str(printing.get("type", "") or ""),
+                    oracle_text=str(printing.get("text", "") or ""),
+                    colors=printing.get("colors") or [],
+                    color_identity=printing.get("colorIdentity") or [],
+                    types=printing.get("types") or [],
+                    subtypes=printing.get("subtypes") or [],
+                    supertypes=printing.get("supertypes") or [],
+                    keywords=printing.get("keywords") or [],
+                    power=printing.get("power"),
+                    toughness=printing.get("toughness"),
+                    mana_value=float(printing.get("manaValue", 0.0) or 0.0),
+                )
+            except (ValidationError, ValueError, TypeError) as exc:
+                log.warning("mtgjson.card_parse_error", card_name=card_name, error=str(exc))
+                continue
 
+            unique.append(card)
             # Key by lowercase card name for O(1) case-insensitive lookup.
             # For double-faced cards, also key by the full "//" name.
             cards[card.name.lower()] = card
@@ -181,3 +201,4 @@ class MTGJSONClient:
                 cards[card_name.lower()] = card
 
         self._cards = cards
+        self._unique_cards = unique
