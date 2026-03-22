@@ -136,10 +136,10 @@ mtg-mcp/
 │       │
 │       └── workflows/              # Composed tools (registered on orchestrator, no namespace)
 │           ├── __init__.py
-│           ├── server.py           # workflow_mcp = FastMCP("Workflows")
-│           ├── commander.py        # commander_overview, evaluate_upgrade, suggest_cuts
-│           ├── draft.py            # draft_pack_analysis, sealed_pool_analysis
-│           └── deck.py             # deck_audit, find_upgrades
+│           ├── server.py           # workflow_mcp = FastMCP("Workflows"), multi-client lifespan
+│           ├── commander.py        # commander_overview, evaluate_upgrade (pure functions)
+│           ├── draft.py            # draft_pack_pick (pure function)
+│           └── deck.py             # suggest_cuts (pure function)
 │
 ├── tests/
 │   ├── conftest.py                 # Shared fixtures, mock clients
@@ -150,7 +150,10 @@ mtg-mcp/
 │   │   ├── test_scryfall_provider.py
 │   │   └── ...
 │   ├── workflows/
-│   │   └── test_commander_workflows.py
+│   │   ├── test_commander.py       # 14 tests (AsyncMock, not respx)
+│   │   ├── test_draft.py           # 24 tests
+│   │   ├── test_deck.py            # 15 tests
+│   │   └── test_workflow_server.py # Integration: tool registration
 │   └── fixtures/                   # Real API responses, captured once
 │       ├── scryfall/
 │       │   ├── card_muldrotha.json
@@ -176,7 +179,7 @@ mtg-mcp/
 
 **`services/` vs `providers/`**: Services are plain Python classes with async methods that call external APIs. Providers are FastMCP server instances that register tools backed by services. Services are reusable outside MCP and independently testable.
 
-**`workflows/`**: Functions registered as tools on a separate FastMCP server mounted without a namespace. They import and call service classes directly (not through MCP tool calls), avoiding round-trip overhead.
+**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return formatted strings. Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `draft.py`, `deck.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`.
 
 **`types.py`**: Shared Pydantic models that services return and tools consume. Ensures type safety across the service → provider → workflow pipeline.
 
@@ -253,6 +256,63 @@ async def search_cards(query: str, page: int = 1) -> str:
     client = _get_client()
     result = await client.search_cards(query, page=page)
     ...
+```
+
+### Workflow Server with Multi-Client Lifespan
+
+Workflow tools need multiple service clients. Use `AsyncExitStack` to manage them in a single
+lifespan, respecting feature flags for optional backends.
+
+```python
+# src/mtg_mcp/workflows/server.py
+from contextlib import AsyncExitStack
+from fastmcp import FastMCP
+from fastmcp.server.lifespan import lifespan
+from mtg_mcp.config import Settings
+
+_scryfall: ScryfallClient | None = None
+_spellbook: SpellbookClient | None = None
+_edhrec: EDHRECClient | None = None
+
+@lifespan
+async def workflow_lifespan(server: FastMCP):
+    global _scryfall, _spellbook, _edhrec
+    settings = Settings()
+    async with AsyncExitStack() as stack:
+        _scryfall = await stack.enter_async_context(
+            ScryfallClient(base_url=settings.scryfall_base_url)
+        )
+        _spellbook = await stack.enter_async_context(
+            SpellbookClient(base_url=settings.spellbook_base_url)
+        )
+        if settings.enable_edhrec:
+            _edhrec = await stack.enter_async_context(
+                EDHRECClient(base_url=settings.edhrec_base_url)
+            )
+        yield {}
+    _scryfall = None
+    _spellbook = None
+    _edhrec = None
+
+workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)
+```
+
+> **Note:** `BaseClient.__aenter__` returns `Self` (not `BaseClient`) so that
+> `AsyncExitStack.enter_async_context()` infers the correct subclass type.
+
+Workflow tools wrap pure functions from the workflow modules:
+
+```python
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS)
+async def commander_overview(commander_name: str) -> str:
+    """Comprehensive commander profile from all available sources."""
+    from mtg_mcp.workflows.commander import commander_overview as impl
+    return await impl(
+        commander_name,
+        scryfall=_require_scryfall(),
+        spellbook=_require_spellbook(),
+        edhrec=_edhrec,  # None when disabled
+    )
 ```
 
 ### Tool Annotations
@@ -460,6 +520,11 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | EDHREC | Behind feature flag | Fragile scraping; disable if breaking |
 | 17Lands | Aggressive caching | Rate limited; cache 1-6 hours |
 | Multi-agent execution | Parallel worktree agents | Independent backends (Spellbook, 17Lands, EDHREC) follow same pattern — build simultaneously after Phase 1 establishes the template |
+| Workflow architecture | Pure functions + wiring layer | Workflow modules export pure async functions (no MCP imports); `server.py` wraps them as tools. Avoids circular imports, enables AsyncMock testing |
+| Multi-client lifespan | AsyncExitStack | Cleaner than nested `async with` for managing 4 service clients with feature flags |
+| BaseClient.__aenter__ | Returns `Self` | Enables correct type inference through `AsyncExitStack.enter_async_context()` |
+| Workflow testing | AsyncMock (not respx) | Workflows are pure functions — mock the service clients directly, no HTTP layer to test |
+| draft_pack_pick backends | 17Lands only | 17Lands already provides name, color, rarity, all win rate metrics — no Scryfall calls needed |
 
 ---
 
@@ -470,38 +535,39 @@ The architecture's independent backend design enables parallel development via m
 ### Parallelization Map
 
 ```
-Phase 0 (scaffold) — serial
+Phase 0 (scaffold) — serial                                    ✓ COMPLETE
     │
-Phase 1 (Scryfall) — serial, establishes the pattern
+Phase 1 (Scryfall) — serial, establishes the pattern           ✓ COMPLETE
     │
     ├── Agent A: Spellbook service + provider ──┐
-    ├── Agent B: 17Lands service + provider     ├── Phase 2 (parallel)
+    ├── Agent B: 17Lands service + provider     ├── Phase 2    ✓ COMPLETE
     └── Agent C: EDHREC service + provider ─────┘
                                                   │
-    ┌─────────────────────────────────────────────┘
+    Scaffold (serial): workflow server + mount ────┤
     ├── Agent A: commander_overview + evaluate_upgrade ──┐
-    ├── Agent B: draft_pack_pick                         ├── Phase 3 (parallel)
+    ├── Agent B: draft_pack_pick                         ├── Phase 3  ✓ COMPLETE
     └── Agent C: suggest_cuts                      ──────┘
 ```
 
 ### Execution Pattern
 
 Each parallel agent works in a **git worktree** for isolation:
-1. Create worktree from main branch
-2. Implement service → provider → tests following Phase 1's pattern
+1. Create worktree from the feature branch (not main)
+2. Implement in exclusive files only — shared files scaffolded first
 3. Run quality gates (`mise run check`) in the worktree
-4. Merge back to main, resolving any conflicts in shared files
+4. Cherry-pick implementation files back to feature branch (don't merge agents' shared file rewrites)
 
 ### Shared File Coordination
 
-Files touched by multiple agents:
-- **`types.py`**: Each agent adds Pydantic models for their service. Merge conflicts are additive and straightforward.
-- **`server.py`**: Each agent adds a `mount()` call. One-line additions, trivial to merge.
-- **`conftest.py`**: Shared fixtures. Agents should add fixtures under clearly named sections.
+**Phase 2 lesson:** Agents that modify shared files (`types.py`, `server.py`) produce straightforward additive merge conflicts.
+
+**Phase 3 lesson:** Each agent rewrote `server.py` for its own scope, dropping others' tools. The fix: scaffold shared files first (serial step), then give agents exclusive files only. Cherry-pick implementations, don't merge shared file rewrites.
 
 Files that are agent-exclusive (no conflicts):
 - `services/{backend}.py` — one per agent
 - `providers/{backend}.py` — one per agent
+- `workflows/{module}.py` — one per agent
 - `tests/services/test_{backend}.py` — one per agent
 - `tests/providers/test_{backend}_provider.py` — one per agent
+- `tests/workflows/test_{module}.py` — one per agent
 - `tests/fixtures/{backend}/` — one directory per agent
