@@ -17,7 +17,29 @@ from mtg_mcp.providers.spellbook import spellbook_mcp
 from mtg_mcp.services.cache import disable_all_caches
 from mtg_mcp.workflows.server import workflow_mcp
 
-mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
+mcp = FastMCP(
+    "MTG",
+    instructions=(
+        "Magic: The Gathering data and analytics server.\n\n"
+        "Tool categories:\n"
+        "- scryfall_*: Card search, details, prices, rulings (Scryfall API)\n"
+        "- spellbook_*: Combo search, decklist analysis, bracket estimation (Commander Spellbook)\n"
+        "- draft_*: Draft card ratings and archetype stats (17Lands)\n"
+        "- edhrec_*: Commander staples and synergy scores (EDHREC, beta)\n"
+        "- mtgjson_*: Rate-limit-free card lookup and search (MTGJSON bulk data)\n\n"
+        "Workflow tools (no prefix):\n"
+        "- commander_overview: Full commander profile from all sources\n"
+        "- evaluate_upgrade: Assess a card for a commander deck\n"
+        "- card_comparison: Side-by-side comparison of 2-5 cards\n"
+        "- budget_upgrade: Price-constrained upgrade suggestions\n"
+        "- deck_analysis: Full decklist health check\n"
+        "- set_overview: Draft format overview with archetype tiers\n"
+        "- draft_pack_pick: Rank cards in a draft pack\n"
+        "- suggest_cuts: Identify weakest cards to cut\n\n"
+        "Resources (mtg:// URIs) provide cached card, combo, and rating data.\n"
+        "Prompts guide multi-step analysis workflows."
+    ),
+)
 
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")

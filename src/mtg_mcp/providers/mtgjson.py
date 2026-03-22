@@ -12,7 +12,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.providers import TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONError
 
 _client: MTGJSONClient | None = None
@@ -41,7 +41,7 @@ def _get_client() -> MTGJSONClient:
     return _client
 
 
-@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
 async def card_lookup(name: str) -> str:
     """Look up a Magic card by exact name using MTGJSON bulk data.
 
@@ -77,7 +77,7 @@ async def card_lookup(name: str) -> str:
     return "\n".join(lines)
 
 
-@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
 async def card_search(
     query: str,
     search_field: Literal["name", "type", "text"] = "name",

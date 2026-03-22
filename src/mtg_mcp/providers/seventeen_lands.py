@@ -7,7 +7,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.providers import TAGS_DRAFT, TOOL_ANNOTATIONS
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
 
 _client: SeventeenLandsClient | None = None
@@ -33,7 +33,7 @@ def _get_client() -> SeventeenLandsClient:
     return _client
 
 
-@draft_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@draft_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
 async def card_ratings(
     set_code: str,
     event_type: str = "PremierDraft",
@@ -79,7 +79,7 @@ async def card_ratings(
     return "\n".join(lines)
 
 
-@draft_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@draft_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
 async def archetype_stats(
     set_code: str,
     start_date: str,

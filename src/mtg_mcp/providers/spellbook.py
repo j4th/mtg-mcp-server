@@ -9,7 +9,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.providers import TAGS_COMBO, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
@@ -51,7 +51,7 @@ def _get_client() -> SpellbookClient:
     return _client
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH | TAGS_COMBO)
 async def find_combos(
     card_name: str,
     color_identity: str | None = None,
@@ -81,7 +81,7 @@ async def find_combos(
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP | TAGS_COMBO)
 async def combo_details(
     combo_id: str,
 ) -> str:
@@ -122,7 +122,7 @@ async def combo_details(
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
 async def find_decklist_combos(
     commanders: list[str],
     decklist: list[str],
@@ -155,7 +155,7 @@ async def find_decklist_combos(
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
 async def estimate_bracket(
     commanders: list[str],
     decklist: list[str],
