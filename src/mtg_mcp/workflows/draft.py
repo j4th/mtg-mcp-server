@@ -48,6 +48,26 @@ def _sort_key(rating: DraftCardRating) -> tuple[int, float]:
     return (0, -rating.ever_drawn_win_rate)
 
 
+def _append_rarity_table(lines: list[str], heading: str, cards: list[DraftCardRating]) -> None:
+    """Append a ranked rarity table section to output lines."""
+    lines.append(f"## {heading}")
+    lines.append("")
+    if cards:
+        lines.append("| Rank | Name | Color | GIH WR | ALSA | IWD | Games |")
+        lines.append("|------|------|-------|--------|------|-----|-------|")
+        for i, r in enumerate(cards, 1):
+            lines.append(
+                f"| {i}. | {r.name} | {r.color} "
+                f"| {_fmt_pct(r.ever_drawn_win_rate)} "
+                f"| {_fmt_float(r.avg_seen)} | {_fmt_iwd(r.drawn_improvement_win_rate)} "
+                f"| {r.game_count} |"
+            )
+    else:
+        rarity = heading.split()[-1].lower()
+        lines.append(f"No {rarity} cards with data.")
+    lines.append("")
+
+
 def _build_color_counts(
     picks: list[str],
     lookup: dict[str, DraftCardRating],
@@ -197,28 +217,33 @@ async def set_overview(
     if not rated:
         return f"# Set Overview \u2014 {set_code}\n\nNo card data available for this set."
 
-    # Separate by rarity
-    commons = [r for r in rated if r.rarity.lower() == "common"]
-    uncommons = [r for r in rated if r.rarity.lower() == "uncommon"]
-    rares = [r for r in rated if r.rarity.lower() == "rare"]
-    mythics = [r for r in rated if r.rarity.lower() == "mythic"]
+    # Single-pass: group by rarity and collect GIH WR values
+    by_rarity: dict[str, list[DraftCardRating]] = {
+        "common": [],
+        "uncommon": [],
+        "rare": [],
+        "mythic": [],
+    }
+    all_gih: list[float] = []
+    for r in rated:
+        rarity = r.rarity.lower()
+        if rarity in by_rarity:
+            by_rarity[rarity].append(r)
+        if r.ever_drawn_win_rate is not None:
+            all_gih.append(r.ever_drawn_win_rate)
 
-    # Sort each group by GIH WR descending
-    commons.sort(key=_sort_key)
-    uncommons.sort(key=_sort_key)
-
-    # Compute median GIH WR across ALL rated cards
-    all_gih = [r.ever_drawn_win_rate for r in rated if r.ever_drawn_win_rate is not None]
     median_gih = statistics.median(all_gih) if all_gih else 0.5
 
-    # Top 10 commons and uncommons
-    top_commons = commons[:_TOP_N]
-    top_uncommons = uncommons[:_TOP_N]
+    # Sort commons/uncommons by GIH WR descending, take top 10
+    by_rarity["common"].sort(key=_sort_key)
+    by_rarity["uncommon"].sort(key=_sort_key)
+    top_commons = by_rarity["common"][:_TOP_N]
+    top_uncommons = by_rarity["uncommon"][:_TOP_N]
 
     # Trap rares/mythics: GIH WR below the median
     trap_rares = [
         r
-        for r in rares + mythics
+        for r in by_rarity["rare"] + by_rarity["mythic"]
         if r.ever_drawn_win_rate is not None and r.ever_drawn_win_rate < median_gih
     ]
     trap_rares.sort(key=_sort_key)
@@ -232,39 +257,9 @@ async def set_overview(
     lines.append(f"**Cards with data:** {len(rated)}")
     lines.append("")
 
-    # Top commons
-    lines.append("## Top Commons")
-    lines.append("")
-    if top_commons:
-        lines.append("| Rank | Name | Color | GIH WR | ALSA | IWD | Games |")
-        lines.append("|------|------|-------|--------|------|-----|-------|")
-        for i, r in enumerate(top_commons, 1):
-            lines.append(
-                f"| {i}. | {r.name} | {r.color} "
-                f"| {_fmt_pct(r.ever_drawn_win_rate)} "
-                f"| {_fmt_float(r.avg_seen)} | {_fmt_iwd(r.drawn_improvement_win_rate)} "
-                f"| {r.game_count} |"
-            )
-    else:
-        lines.append("No common cards with data.")
-    lines.append("")
-
-    # Top uncommons
-    lines.append("## Top Uncommons")
-    lines.append("")
-    if top_uncommons:
-        lines.append("| Rank | Name | Color | GIH WR | ALSA | IWD | Games |")
-        lines.append("|------|------|-------|--------|------|-----|-------|")
-        for i, r in enumerate(top_uncommons, 1):
-            lines.append(
-                f"| {i}. | {r.name} | {r.color} "
-                f"| {_fmt_pct(r.ever_drawn_win_rate)} "
-                f"| {_fmt_float(r.avg_seen)} | {_fmt_iwd(r.drawn_improvement_win_rate)} "
-                f"| {r.game_count} |"
-            )
-    else:
-        lines.append("No uncommon cards with data.")
-    lines.append("")
+    # Top commons and uncommons (same table format)
+    _append_rarity_table(lines, "Top Commons", top_commons)
+    _append_rarity_table(lines, "Top Uncommons", top_uncommons)
 
     # Trap rares
     lines.append("## Trap Rares/Mythics")

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from mtg_mcp.services.base import ServiceError
+from mtg_mcp.workflows.deck import _build_synergy_lookup
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -143,19 +144,6 @@ def _compute_color_pips(cards: list[_ResolvedCard]) -> _ColorPips:
     return color_pips
 
 
-def _build_synergy_lookup(
-    edhrec_data: EDHRECCommanderData | None,
-) -> dict[str, EDHRECCard]:
-    """Build a lookup dict from EDHREC data keyed by lowercased card name."""
-    lookup: dict[str, EDHRECCard] = {}
-    if edhrec_data is None:
-        return lookup
-    for cardlist in edhrec_data.cardlists:
-        for card in cardlist.cardviews:
-            lookup[card.name.lower()] = card
-    return lookup
-
-
 # ---------------------------------------------------------------------------
 # Main workflow
 # ---------------------------------------------------------------------------
@@ -216,11 +204,11 @@ async def deck_analysis(
     edhrec_data = await _fetch_edhrec_data(commander_name, edhrec=edhrec, sources=sources)
     synergy_lookup = _build_synergy_lookup(edhrec_data)
 
-    # Step 4/4: Price analysis (use Scryfall for prices)
+    # Step 4/4: Fill in missing prices (for MTGJSON-resolved cards)
     if on_progress is not None:
         await on_progress(4, 4)
 
-    price_lookup = await _fetch_prices(decklist, scryfall=scryfall)
+    await _fill_missing_prices(resolved_cards, scryfall=scryfall)
 
     # Compute analytics
     mana_curve = _compute_mana_curve(resolved_cards)
@@ -229,8 +217,8 @@ async def deck_analysis(
     # Find lowest-synergy cards
     low_synergy = _find_low_synergy(decklist, synergy_lookup)
 
-    # Compute budget
-    total_price, avg_price, priced_count = _compute_budget(decklist, price_lookup)
+    # Compute budget from resolved cards (prices already populated)
+    total_price, avg_price, priced_count = _compute_budget(resolved_cards)
 
     # Format output
     return _format_output(
@@ -346,23 +334,22 @@ async def _fetch_edhrec_data(
     return data
 
 
-async def _fetch_prices(
-    decklist: list[str],
+async def _fill_missing_prices(
+    resolved_cards: list[_ResolvedCard],
     *,
     scryfall: ScryfallClient,
-) -> dict[str, str | None]:
-    """Fetch prices for all cards via Scryfall. Returns name->USD price lookup."""
-    tasks = [scryfall.get_card_by_name(name) for name in decklist]
+) -> None:
+    """Fetch Scryfall prices only for cards that don't already have them (MTGJSON-resolved)."""
+    need_prices = [(i, card) for i, card in enumerate(resolved_cards) if card.price_usd is None]
+    if not need_prices:
+        return
+
+    tasks = [scryfall.get_card_by_name(card.name) for _, card in need_prices]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    lookup: dict[str, str | None] = {}
-    for name, result in zip(decklist, results, strict=True):
-        if isinstance(result, BaseException):
-            lookup[name.lower()] = None
-        else:
-            lookup[name.lower()] = result.prices.usd
-
-    return lookup
+    for (idx, _), result in zip(need_prices, results, strict=True):
+        if not isinstance(result, BaseException) and result.prices.usd is not None:
+            resolved_cards[idx].price_usd = result.prices.usd
 
 
 # ---------------------------------------------------------------------------
@@ -386,20 +373,18 @@ def _find_low_synergy(
 
 
 def _compute_budget(
-    decklist: list[str],
-    price_lookup: dict[str, str | None],
+    resolved_cards: list[_ResolvedCard],
 ) -> tuple[float, float, int]:
-    """Compute total and average price from price lookup.
+    """Compute total and average price from resolved cards.
 
     Returns (total, average, priced_count).
     """
     total = 0.0
     priced = 0
-    for name in decklist:
-        price_str = price_lookup.get(name.lower())
-        if price_str is not None:
+    for card in resolved_cards:
+        if card.price_usd is not None:
             try:
-                total += float(price_str)
+                total += float(card.price_usd)
                 priced += 1
             except ValueError:
                 pass
