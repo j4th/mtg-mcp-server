@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import gzip
-import json
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -130,7 +128,7 @@ class TestDownloadAndParse:
                 mock_http.__aexit__ = AsyncMock(return_value=False)
                 mock_cls.return_value = mock_http
 
-                with pytest.raises(MTGJSONError, match="decompress|parse"):
+                with pytest.raises(MTGJSONError, match=r"decompress|parse"):
                     await client.ensure_loaded()
 
 
