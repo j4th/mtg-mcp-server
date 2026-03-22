@@ -347,9 +347,17 @@ async def _fill_missing_prices(
     tasks = [scryfall.get_card_by_name(card.name) for _, card in need_prices]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    for (idx, _), result in zip(need_prices, results, strict=True):
-        if not isinstance(result, BaseException) and result.prices.usd is not None:
+    failed = 0
+    for (idx, card), result in zip(need_prices, results, strict=True):
+        if isinstance(result, BaseException):
+            log.debug("fill_prices.failed", card=card.name, error=str(result))
+            failed += 1
+            continue
+        if result.prices.usd is not None:
             resolved_cards[idx].price_usd = result.prices.usd
+
+    if failed:
+        log.warning("fill_prices.partial_failure", failed=failed, total=len(need_prices))
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +395,7 @@ def _compute_budget(
                 total += float(card.price_usd)
                 priced += 1
             except ValueError:
-                pass
+                log.warning("compute_budget.bad_price", card=card.name, price=card.price_usd)
 
     avg = total / priced if priced > 0 else 0.0
     return total, avg, priced
