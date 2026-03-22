@@ -145,5 +145,3 @@ async def commander_staples_resource(name: str) -> str:
         return data.model_dump_json()
     except CommanderNotFoundError:
         return json.dumps({"error": f"Commander not found: {name}"})
-    except EDHRECError as exc:
-        return json.dumps({"error": f"EDHREC error: {exc}"})

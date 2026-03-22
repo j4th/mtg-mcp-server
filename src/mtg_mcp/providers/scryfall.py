@@ -165,8 +165,6 @@ async def card_resource(name: str) -> str:
         return card.model_dump_json()
     except CardNotFoundError:
         return json.dumps({"error": f"Card not found: {name}"})
-    except ScryfallError as exc:
-        return json.dumps({"error": f"Scryfall error: {exc}"})
 
 
 @scryfall_mcp.resource("mtg://card/{name}/rulings")
@@ -179,5 +177,3 @@ async def card_rulings_resource(name: str) -> str:
         return json.dumps([r.model_dump() for r in rulings])
     except CardNotFoundError:
         return json.dumps({"error": f"Card not found: {name}"})
-    except ScryfallError as exc:
-        return json.dumps({"error": f"Scryfall error: {exc}"})

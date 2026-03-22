@@ -43,16 +43,14 @@ class TestDraftRatingsResource:
         assert "ever_drawn_win_rate" in data[0]
 
     @respx.mock
-    async def test_server_error_returns_error_json(self, client: Client):
+    async def test_server_error_propagates(self, client: Client):
         respx.get(
             f"{BASE_URL}/card_ratings/data",
             params={"expansion": "FAKE", "event_type": "PremierDraft"},
         ).mock(return_value=httpx.Response(500, text="Internal Server Error"))
 
-        result = await client.read_resource("mtg://draft/FAKE/ratings")
-        data = json.loads(result[0].text)
-        assert "error" in data
-        assert "17Lands error" in data["error"]
+        with pytest.raises(Exception, match="500"):
+            await client.read_resource("mtg://draft/FAKE/ratings")
 
 
 class TestResourceTemplateRegistration:

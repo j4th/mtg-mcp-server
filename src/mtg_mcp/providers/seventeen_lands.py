@@ -128,8 +128,5 @@ async def archetype_stats(
 async def draft_ratings_resource(set_code: str) -> str:
     """Get card ratings for a set as JSON."""
     client = _get_client()
-    try:
-        ratings = await client.card_ratings(set_code)
-        return json.dumps([r.model_dump() for r in ratings])
-    except SeventeenLandsError as exc:
-        return json.dumps({"error": f"17Lands error: {exc}"})
+    ratings = await client.card_ratings(set_code)
+    return json.dumps([r.model_dump() for r in ratings])

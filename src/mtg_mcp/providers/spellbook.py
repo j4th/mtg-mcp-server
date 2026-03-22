@@ -222,5 +222,3 @@ async def combo_resource(combo_id: str) -> str:
         return combo.model_dump_json()
     except ComboNotFoundError:
         return json.dumps({"error": f"Combo not found: {combo_id}"})
-    except SpellbookError as exc:
-        return json.dumps({"error": f"Spellbook error: {exc}"})

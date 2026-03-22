@@ -122,10 +122,7 @@ async def card_search(
 async def card_data_resource(name: str) -> str:
     """Get card data from MTGJSON bulk data as JSON."""
     client = _get_client()
-    try:
-        card = await client.get_card(name)
-        if card is None:
-            return json.dumps({"error": f"Card not found: {name}"})
-        return card.model_dump_json()
-    except MTGJSONError as exc:
-        return json.dumps({"error": f"MTGJSON error: {exc}"})
+    card = await client.get_card(name)
+    if card is None:
+        return json.dumps({"error": f"Card not found: {name}"})
+    return card.model_dump_json()
