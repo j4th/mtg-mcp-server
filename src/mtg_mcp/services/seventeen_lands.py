@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from cachetools import TTLCache
+
 from mtg_mcp.services.base import BaseClient, ServiceError
+from mtg_mcp.services.cache import _method_key, async_cached
 from mtg_mcp.types import ArchetypeRating, DraftCardRating
 
 
@@ -16,6 +19,9 @@ class SeventeenLandsClient(BaseClient):
     Rate limit is aggressive (1 req/sec max). Cache responses wherever possible.
     """
 
+    _card_ratings_cache: TTLCache = TTLCache(maxsize=20, ttl=14400)
+    _color_ratings_cache: TTLCache = TTLCache(maxsize=20, ttl=14400)
+
     def __init__(
         self,
         base_url: str = "https://www.17lands.com",
@@ -28,6 +34,7 @@ class SeventeenLandsClient(BaseClient):
             user_agent=user_agent,
         )
 
+    @async_cached(_card_ratings_cache, key=_method_key)
     async def card_ratings(
         self,
         set_code: str,
@@ -51,6 +58,7 @@ class SeventeenLandsClient(BaseClient):
             raise SeventeenLandsError(exc.message, status_code=exc.status_code) from exc
         return [DraftCardRating.model_validate(item) for item in response.json()]
 
+    @async_cached(_color_ratings_cache, key=_method_key)
     async def color_ratings(
         self,
         set_code: str,

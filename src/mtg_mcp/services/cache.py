@@ -27,7 +27,8 @@ def _method_key(*args: object, **kwargs: object) -> object:
 def _decklist_key(*args: object, **kwargs: object) -> object:
     """Cache key for methods taking ``list[str]`` args — converts to tuples."""
     converted = tuple(tuple(a) if isinstance(a, list) else a for a in args[1:])
-    return keys.hashkey(*converted, **kwargs)
+    converted_kw = {k: tuple(v) if isinstance(v, list) else v for k, v in kwargs.items()}
+    return keys.hashkey(*converted, **converted_kw)
 
 
 def async_cached(cache: TTLCache, key: _KeyFunc = _method_key):

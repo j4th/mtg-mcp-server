@@ -6,13 +6,13 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
+    "cachetools>=6.0",
     "fastmcp>=3.1.0",
     "httpx>=0.28",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "tenacity>=9.0",
     "structlog>=24.0",
-    "cachetools>=6.0",
 ]
 
 [project.scripts]

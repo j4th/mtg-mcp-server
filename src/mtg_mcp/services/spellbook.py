@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from cachetools import TTLCache
+
 from mtg_mcp.services.base import BaseClient, ServiceError
+from mtg_mcp.services.cache import _decklist_key, _method_key, async_cached
 from mtg_mcp.types import BracketEstimate, Combo, ComboCard, ComboResult, DecklistCombos
 
 
@@ -67,6 +70,11 @@ def _build_decklist_body(commanders: list[str], decklist: list[str]) -> dict:
 class SpellbookClient(BaseClient):
     """Async client for the Commander Spellbook REST API."""
 
+    _combos_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)
+    _combo_cache: TTLCache = TTLCache(maxsize=100, ttl=86400)
+    _decklist_combos_cache: TTLCache = TTLCache(maxsize=50, ttl=43200)
+    _bracket_cache: TTLCache = TTLCache(maxsize=50, ttl=43200)
+
     def __init__(
         self,
         base_url: str = "https://backend.commanderspellbook.com",
@@ -77,6 +85,7 @@ class SpellbookClient(BaseClient):
             rate_limit_rps=rate_limit_rps,
         )
 
+    @async_cached(_combos_cache, key=_method_key)
     async def find_combos(
         self,
         card_name: str,
@@ -108,6 +117,7 @@ class SpellbookClient(BaseClient):
         data = response.json()
         return [_parse_combo(r) for r in data.get("results", [])]
 
+    @async_cached(_combo_cache, key=_method_key)
     async def get_combo(self, combo_id: str) -> Combo:
         """Get detailed information about a specific combo by ID.
 
@@ -129,6 +139,7 @@ class SpellbookClient(BaseClient):
 
         return _parse_combo(response.json())
 
+    @async_cached(_decklist_combos_cache, key=_decklist_key)
     async def find_decklist_combos(
         self,
         commanders: list[str],
@@ -159,6 +170,7 @@ class SpellbookClient(BaseClient):
             almost_included=[_parse_combo(c) for c in inner.get("almostIncluded", [])],
         )
 
+    @async_cached(_bracket_cache, key=_decklist_key)
     async def estimate_bracket(
         self,
         commanders: list[str],
