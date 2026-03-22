@@ -79,6 +79,7 @@ class MTGJSONClient:
         except MTGJSONError:
             if is_refresh:
                 log.warning("mtgjson.refresh_failed", url=self._data_url)
+                self._loaded_at = time.monotonic()
                 return
             raise
 

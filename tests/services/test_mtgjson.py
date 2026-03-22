@@ -213,6 +213,37 @@ class TestRefreshLogic:
             assert card is not None
             assert card.name == "Sol Ring"
 
+    async def test_stale_refresh_failure_does_not_retry_immediately(self):
+        """After a failed refresh, subsequent calls should not retry until next TTL."""
+        fixture_bytes = _load_fixture_bytes()
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=1)
+        async with client:
+            # Successful initial load
+            ok_response = _mock_httpx_response(fixture_bytes)
+            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+                mock_http = AsyncMock()
+                mock_http.get = AsyncMock(return_value=ok_response)
+                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+                mock_http.__aexit__ = AsyncMock(return_value=False)
+                mock_cls.return_value = mock_http
+                await client.ensure_loaded()
+
+            # Simulate stale + failed refresh
+            client._loaded_at = time.monotonic() - 7200
+            fail_response = _mock_httpx_response(b"", status_code=503)
+            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+                mock_http = AsyncMock()
+                mock_http.get = AsyncMock(return_value=fail_response)
+                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+                mock_http.__aexit__ = AsyncMock(return_value=False)
+                mock_cls.return_value = mock_http
+                await client.ensure_loaded()
+                assert mock_http.get.call_count == 1
+
+                # Immediate subsequent call should NOT retry
+                await client.ensure_loaded()
+                assert mock_http.get.call_count == 1
+
     async def test_initial_load_failure_still_raises(self):
         """If the very first load fails, the error must propagate."""
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)

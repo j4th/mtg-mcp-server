@@ -194,11 +194,11 @@ MTGJSON provides `AtomicCards.json` — a ~120MB JSON file keyed by card name co
 
 ### Integration with Scryfall
 
-MTGJSON integration happens at the **workflow layer**, not inside `ScryfallClient`. This preserves service independence:
+MTGJSON is a **standalone provider** (not wired into the workflow server). This preserves service independence:
 
-- Workflow tools that need card data can optionally check MTGJSON first, falling back to Scryfall.
-- The MTGJSON client is added to the workflow server's `AsyncExitStack` lifespan alongside existing clients.
+- MTGJSON has its own provider lifespan (`providers/mtgjson.py`) and is mounted on the orchestrator with `namespace="mtgjson"`.
 - Provider-level Scryfall tools continue to hit the API directly (with TTL caching).
+- Future workflow-layer integration (checking MTGJSON before Scryfall) can be added when a workflow needs it, without modifying existing services.
 
 ### Relationship to TTL Caching
 

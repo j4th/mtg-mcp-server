@@ -309,8 +309,7 @@ Coverage target: **80%+ on services and servers**, measured per phase.
 4. Apply `@async_cached` to all 12 service methods with per-method TTLs (24h for card data, 1h for search, 4h for 17Lands, 12h for decklist analysis)
 5. Build `MTGJSONClient` in `services/mtgjson.py` — lazy download, gzip decompress, in-memory dict for O(1) lookups
 6. Build MTGJSON provider in `providers/mtgjson.py` — `card_lookup` and `card_search` tools
-7. Wire MTGJSON into workflow server lifespan via `AsyncExitStack`
-8. Mount on orchestrator with `namespace="mtgjson"` behind feature flag
+7. Mount MTGJSON provider on orchestrator with `namespace="mtgjson"` behind feature flag
 
 **Done when:** All 12 service methods cached, MTGJSON tools appear in tools/list, `disable_cache` flag works.
 
