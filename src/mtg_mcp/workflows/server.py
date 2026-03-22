@@ -10,8 +10,9 @@ from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
 from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.services.base import ServiceError
 from mtg_mcp.services.edhrec import EDHRECClient
-from mtg_mcp.services.scryfall import ScryfallClient
+from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
 from mtg_mcp.services.spellbook import SpellbookClient
 
@@ -74,12 +75,19 @@ async def commander_overview(commander_name: str) -> str:
     """
     from mtg_mcp.workflows.commander import commander_overview as impl
 
-    return await impl(
-        commander_name,
-        scryfall=_require_scryfall(),
-        spellbook=_require_spellbook(),
-        edhrec=_edhrec,
-    )
+    try:
+        return await impl(
+            commander_name,
+            scryfall=_require_scryfall(),
+            spellbook=_require_spellbook(),
+            edhrec=_edhrec,
+        )
+    except CardNotFoundError as exc:
+        raise ToolError(
+            f"Commander not found: '{commander_name}'. Check spelling or try a different name."
+        ) from exc
+    except ServiceError as exc:
+        raise ToolError(f"Service error: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS)
@@ -91,13 +99,20 @@ async def evaluate_upgrade(card_name: str, commander_name: str) -> str:
     """
     from mtg_mcp.workflows.commander import evaluate_upgrade as impl
 
-    return await impl(
-        card_name,
-        commander_name,
-        scryfall=_require_scryfall(),
-        spellbook=_require_spellbook(),
-        edhrec=_edhrec,
-    )
+    try:
+        return await impl(
+            card_name,
+            commander_name,
+            scryfall=_require_scryfall(),
+            spellbook=_require_spellbook(),
+            edhrec=_edhrec,
+        )
+    except CardNotFoundError as exc:
+        raise ToolError(
+            f"Card not found: '{card_name}'. Check spelling or try a different name."
+        ) from exc
+    except ServiceError as exc:
+        raise ToolError(f"Service error: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS)
@@ -115,12 +130,15 @@ async def draft_pack_pick(
         raise ToolError("17Lands data is not enabled. Set MTG_MCP_ENABLE_17LANDS=true.")
     from mtg_mcp.workflows.draft import draft_pack_pick as impl
 
-    return await impl(
-        pack,
-        set_code,
-        seventeen_lands=_seventeen_lands,
-        current_picks=current_picks,
-    )
+    try:
+        return await impl(
+            pack,
+            set_code,
+            seventeen_lands=_seventeen_lands,
+            current_picks=current_picks,
+        )
+    except ServiceError as exc:
+        raise ToolError(f"17Lands error: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS)
@@ -136,10 +154,13 @@ async def suggest_cuts(
     """
     from mtg_mcp.workflows.deck import suggest_cuts as impl
 
-    return await impl(
-        decklist,
-        commander_name,
-        spellbook=_require_spellbook(),
-        edhrec=_edhrec,
-        num_cuts=num_cuts,
-    )
+    try:
+        return await impl(
+            decklist,
+            commander_name,
+            spellbook=_require_spellbook(),
+            edhrec=_edhrec,
+            num_cuts=num_cuts,
+        )
+    except ServiceError as exc:
+        raise ToolError(f"Service error: {exc}") from exc

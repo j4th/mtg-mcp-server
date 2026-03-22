@@ -5,9 +5,13 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING
 
+import structlog
+
 if TYPE_CHECKING:
     from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
     from mtg_mcp.types import DraftCardRating
+
+log = structlog.get_logger(service="workflow.draft")
 
 
 def _fmt_pct(value: float | None) -> str:
@@ -73,6 +77,8 @@ async def draft_pack_pick(
     Returns:
         Formatted markdown string with ranked cards and stats.
     """
+    log.info("draft_pack_pick.start", set_code=set_code, pack_size=len(pack))
+
     if not pack:
         return f"# Draft Pack Analysis \u2014 {set_code}\n\nNo cards in pack."
 
@@ -142,4 +148,5 @@ async def draft_pack_pick(
         for card_name in no_data:
             lines.append(f"- {card_name}")
 
+    log.info("draft_pack_pick.complete", set_code=set_code, found=len(found), no_data=len(no_data))
     return "\n".join(lines)

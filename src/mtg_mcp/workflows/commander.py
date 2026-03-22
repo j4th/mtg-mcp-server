@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from mtg_mcp.services.spellbook import SpellbookClient
     from mtg_mcp.types import Card, Combo, EDHRECCard, EDHRECCommanderData
 
-log = structlog.get_logger(workflow="commander")
+log = structlog.get_logger(service="workflow.commander")
 
 # ---------------------------------------------------------------------------
 # Formatting helpers
@@ -131,7 +131,7 @@ def _format_synergy_section(synergy: EDHRECCard | None, commander_name: str) -> 
 def _source_status(
     *,
     scryfall_ok: bool,
-    spellbook_ok: bool | None,
+    spellbook_ok: bool,
     spellbook_error: str | None,
     edhrec_ok: bool | None,
     edhrec_error: str | None,
@@ -143,9 +143,7 @@ def _source_status(
     scryfall_status = "OK" if scryfall_ok else "error"
     lines.append(f"- Scryfall: {scryfall_status}")
 
-    if spellbook_ok is None:
-        lines.append("- Spellbook: not queried")
-    elif spellbook_ok:
+    if spellbook_ok:
         lines.append("- Spellbook: OK")
     else:
         lines.append(f"- Spellbook: error ({spellbook_error})")

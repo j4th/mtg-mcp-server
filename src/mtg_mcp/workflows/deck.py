@@ -250,13 +250,13 @@ def _format_output(
             )
 
         if cs.is_combo_piece:
-            reasoning_parts.append("PROTECTED -- combo piece")
+            reasoning_parts.append("PROTECTED \u2014 combo piece")
 
         if not cs.has_data:
-            reasoning_parts.append("Low confidence -- no data found")
+            reasoning_parts.append("Low confidence \u2014 no data found")
 
         reasoning = " | ".join(reasoning_parts) if reasoning_parts else "No additional data"
-        lines.append(f"{i}. **{cs.name}** -- {reasoning}")
+        lines.append(f"{i}. **{cs.name}** \u2014 {reasoning}")
 
     # Notes section if any sources failed
     if sources.failures:
