@@ -1,13 +1,16 @@
-"""Draft workflow tools — rank picks using 17Lands data."""
+"""Draft workflow tools — rank picks and set overviews using 17Lands data."""
 
 from __future__ import annotations
 
+import statistics
 from collections import Counter
 from typing import TYPE_CHECKING
 
 import structlog
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
     from mtg_mcp.types import DraftCardRating
 
@@ -149,4 +152,140 @@ async def draft_pack_pick(
             lines.append(f"- {card_name}")
 
     log.info("draft_pack_pick.complete", set_code=set_code, found=len(found), no_data=len(no_data))
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Set overview
+# ---------------------------------------------------------------------------
+
+_TOP_N = 10
+
+
+async def set_overview(
+    set_code: str,
+    *,
+    event_type: str = "PremierDraft",
+    seventeen_lands: SeventeenLandsClient,
+    on_progress: Callable[[int, int], Awaitable[None]] | None = None,
+) -> str:
+    """Draft format overview with top commons, top uncommons, and trap rares.
+
+    Args:
+        set_code: Three-letter set code (e.g. "LRW").
+        event_type: Draft event type (default "PremierDraft").
+        seventeen_lands: Initialized SeventeenLandsClient.
+        on_progress: Optional progress callback (step, total).
+
+    Returns:
+        Formatted markdown string with format overview.
+    """
+    log.info("set_overview.start", set_code=set_code, event_type=event_type)
+
+    if on_progress is not None:
+        await on_progress(1, 2)
+
+    # Fetch card ratings
+    ratings = await seventeen_lands.card_ratings(set_code, event_type=event_type)
+
+    # Filter out cards with no GIH WR
+    rated: list[DraftCardRating] = [r for r in ratings if r.ever_drawn_win_rate is not None]
+
+    if on_progress is not None:
+        await on_progress(2, 2)
+
+    if not rated:
+        return f"# Set Overview \u2014 {set_code}\n\nNo card data available for this set."
+
+    # Separate by rarity
+    commons = [r for r in rated if r.rarity.lower() == "common"]
+    uncommons = [r for r in rated if r.rarity.lower() == "uncommon"]
+    rares = [r for r in rated if r.rarity.lower() == "rare"]
+    mythics = [r for r in rated if r.rarity.lower() == "mythic"]
+
+    # Sort each group by GIH WR descending
+    commons.sort(key=_sort_key)
+    uncommons.sort(key=_sort_key)
+
+    # Compute median GIH WR across ALL rated cards
+    all_gih = [r.ever_drawn_win_rate for r in rated if r.ever_drawn_win_rate is not None]
+    median_gih = statistics.median(all_gih) if all_gih else 0.5
+
+    # Top 10 commons and uncommons
+    top_commons = commons[:_TOP_N]
+    top_uncommons = uncommons[:_TOP_N]
+
+    # Trap rares/mythics: GIH WR below the median
+    trap_rares = [
+        r
+        for r in rares + mythics
+        if r.ever_drawn_win_rate is not None and r.ever_drawn_win_rate < median_gih
+    ]
+    trap_rares.sort(key=_sort_key)
+
+    # --- Build output ---
+    lines: list[str] = []
+    lines.append(f"# Set Overview \u2014 {set_code}")
+    lines.append("")
+    lines.append(f"**Event type:** {event_type}")
+    lines.append(f"**Median GIH WR:** {_fmt_pct(median_gih)}")
+    lines.append(f"**Cards with data:** {len(rated)}")
+    lines.append("")
+
+    # Top commons
+    lines.append("## Top Commons")
+    lines.append("")
+    if top_commons:
+        lines.append("| Rank | Name | Color | GIH WR | ALSA | IWD | Games |")
+        lines.append("|------|------|-------|--------|------|-----|-------|")
+        for i, r in enumerate(top_commons, 1):
+            lines.append(
+                f"| {i}. | {r.name} | {r.color} "
+                f"| {_fmt_pct(r.ever_drawn_win_rate)} "
+                f"| {_fmt_float(r.avg_seen)} | {_fmt_iwd(r.drawn_improvement_win_rate)} "
+                f"| {r.game_count} |"
+            )
+    else:
+        lines.append("No common cards with data.")
+    lines.append("")
+
+    # Top uncommons
+    lines.append("## Top Uncommons")
+    lines.append("")
+    if top_uncommons:
+        lines.append("| Rank | Name | Color | GIH WR | ALSA | IWD | Games |")
+        lines.append("|------|------|-------|--------|------|-----|-------|")
+        for i, r in enumerate(top_uncommons, 1):
+            lines.append(
+                f"| {i}. | {r.name} | {r.color} "
+                f"| {_fmt_pct(r.ever_drawn_win_rate)} "
+                f"| {_fmt_float(r.avg_seen)} | {_fmt_iwd(r.drawn_improvement_win_rate)} "
+                f"| {r.game_count} |"
+            )
+    else:
+        lines.append("No uncommon cards with data.")
+    lines.append("")
+
+    # Trap rares
+    lines.append("## Trap Rares/Mythics")
+    lines.append("")
+    lines.append(f"Rares and mythics with GIH WR below the set median ({_fmt_pct(median_gih)}):")
+    lines.append("")
+    if trap_rares:
+        for r in trap_rares:
+            lines.append(
+                f"- **{r.name}** ({r.rarity}) \u2014 "
+                f"GIH WR: {_fmt_pct(r.ever_drawn_win_rate)}, "
+                f"ALSA: {_fmt_float(r.avg_seen)}"
+            )
+    else:
+        lines.append("No trap rares found \u2014 all rares/mythics are above the median.")
+
+    log.info(
+        "set_overview.complete",
+        set_code=set_code,
+        commons=len(top_commons),
+        uncommons=len(top_uncommons),
+        trap_rares=len(trap_rares),
+    )
     return "\n".join(lines)

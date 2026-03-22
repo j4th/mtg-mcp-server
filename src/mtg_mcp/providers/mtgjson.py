@@ -5,6 +5,7 @@ Uses the MTGJSON AtomicCards bulk file for in-memory card data.
 
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 from fastmcp import FastMCP
@@ -110,3 +111,21 @@ async def card_search(
         cost = f" {card.mana_cost}" if card.mana_cost else ""
         lines.append(f"  {card.name}{cost} — {card.type_line}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@mtgjson_mcp.resource("mtg://card-data/{name}")
+async def card_data_resource(name: str) -> str:
+    """Get card data from MTGJSON bulk data as JSON."""
+    client = _get_client()
+    try:
+        card = await client.get_card(name)
+        if card is None:
+            return json.dumps({"error": f"Card not found: {name}"})
+        return card.model_dump_json()
+    except MTGJSONError as exc:
+        return json.dumps({"error": f"MTGJSON error: {exc}"})

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
@@ -115,3 +117,19 @@ async def archetype_stats(
         prefix = "  [Summary] " if arch.is_summary else "  "
         lines.append(f"{prefix}{arch.color_name} — WR: {wr}, Games: {games}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@draft_mcp.resource("mtg://draft/{set_code}/ratings")
+async def draft_ratings_resource(set_code: str) -> str:
+    """Get card ratings for a set as JSON."""
+    client = _get_client()
+    try:
+        ratings = await client.card_ratings(set_code)
+        return json.dumps([r.model_dump() for r in ratings])
+    except SeventeenLandsError as exc:
+        return json.dumps({"error": f"17Lands error: {exc}"})

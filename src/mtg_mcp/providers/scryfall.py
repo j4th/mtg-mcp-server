@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
@@ -147,3 +149,35 @@ def _format_legalities(legalities: dict[str, str]) -> str:
     if not legal:
         return "Not legal in any format"
     return ", ".join(legal)
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@scryfall_mcp.resource("mtg://card/{name}")
+async def card_resource(name: str) -> str:
+    """Get card data as JSON by exact name."""
+    client = _get_client()
+    try:
+        card = await client.get_card_by_name(name)
+        return card.model_dump_json()
+    except CardNotFoundError:
+        return json.dumps({"error": f"Card not found: {name}"})
+    except ScryfallError as exc:
+        return json.dumps({"error": f"Scryfall error: {exc}"})
+
+
+@scryfall_mcp.resource("mtg://card/{name}/rulings")
+async def card_rulings_resource(name: str) -> str:
+    """Get card rulings as JSON by card name."""
+    client = _get_client()
+    try:
+        card = await client.get_card_by_name(name)
+        rulings = await client.get_rulings(card.id)
+        return json.dumps([r.model_dump() for r in rulings])
+    except CardNotFoundError:
+        return json.dumps({"error": f"Card not found: {name}"})
+    except ScryfallError as exc:
+        return json.dumps({"error": f"Scryfall error: {exc}"})

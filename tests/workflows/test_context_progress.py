@@ -1,0 +1,285 @@
+"""Tests for Context progress reporting and Phase 5 tool input validation.
+
+Tests the _progress helper function, verifies new tools are registered,
+and checks input validation on the new workflow tools (card_comparison,
+budget_upgrade, deck_analysis, set_overview).
+
+NOTE: The Phase 5 implementation functions (card_comparison, budget_upgrade,
+deck_analysis, set_overview) are not yet implemented -- their modules are stubs.
+Validation tests mock the lazy imports so the ToolError checks can be exercised
+before the tool's try-block is reached.
+"""
+
+from __future__ import annotations
+
+import sys
+import types
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+if TYPE_CHECKING:
+    from fastmcp import Client
+
+
+# ---------------------------------------------------------------------------
+# Helpers -- mock unimplemented workflow functions
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def _mock_commander_stubs():
+    """Patch commander module to expose card_comparison and budget_upgrade stubs.
+
+    The server.py tool wrappers do lazy imports like:
+        from mtg_mcp.workflows.commander import card_comparison as impl
+    These fail because the functions aren't implemented yet.  We inject them
+    into the already-imported module object so the lazy import succeeds.
+    """
+    mod = sys.modules.get("mtg_mcp.workflows.commander")
+    if mod is None:
+        mod = types.ModuleType("mtg_mcp.workflows.commander")
+        sys.modules["mtg_mcp.workflows.commander"] = mod
+
+    stub = AsyncMock(return_value="stub")
+    originals: dict[str, object] = {}
+
+    for name in ("card_comparison", "budget_upgrade"):
+        originals[name] = getattr(mod, name, None)
+        setattr(mod, name, stub)
+
+    yield stub
+
+    # Restore originals
+    for name, orig in originals.items():
+        if orig is None:
+            if hasattr(mod, name):
+                delattr(mod, name)
+        else:
+            setattr(mod, name, orig)
+
+
+@pytest.fixture
+def _mock_analysis_stubs():
+    """Patch analysis module to expose deck_analysis stub."""
+    mod = sys.modules.get("mtg_mcp.workflows.analysis")
+    if mod is None:
+        mod = types.ModuleType("mtg_mcp.workflows.analysis")
+        sys.modules["mtg_mcp.workflows.analysis"] = mod
+
+    stub = AsyncMock(return_value="stub")
+    original = getattr(mod, "deck_analysis", None)
+    mod.deck_analysis = stub
+
+    yield stub
+
+    if original is None:
+        if hasattr(mod, "deck_analysis"):
+            delattr(mod, "deck_analysis")
+    else:
+        mod.deck_analysis = original
+
+
+@pytest.fixture
+def _mock_draft_stubs():
+    """Patch draft module to expose set_overview stub."""
+    mod = sys.modules.get("mtg_mcp.workflows.draft")
+    if mod is None:
+        mod = types.ModuleType("mtg_mcp.workflows.draft")
+        sys.modules["mtg_mcp.workflows.draft"] = mod
+
+    stub = AsyncMock(return_value="stub")
+    original = getattr(mod, "set_overview", None)
+    mod.set_overview = stub
+
+    yield stub
+
+    if original is None:
+        if hasattr(mod, "set_overview"):
+            delattr(mod, "set_overview")
+    else:
+        mod.set_overview = original
+
+
+# ---------------------------------------------------------------------------
+# _progress helper
+# ---------------------------------------------------------------------------
+
+
+class TestProgressHelper:
+    """Test the _progress helper function."""
+
+    async def test_progress_calls_report(self):
+        from mtg_mcp.workflows.server import _progress
+
+        mock_ctx = AsyncMock()
+        await _progress(mock_ctx, 1, 3)
+        mock_ctx.report_progress.assert_called_once_with(progress=1, total=3)
+
+    async def test_progress_passes_step_and_total(self):
+        from mtg_mcp.workflows.server import _progress
+
+        mock_ctx = AsyncMock()
+        await _progress(mock_ctx, 5, 10)
+        mock_ctx.report_progress.assert_called_once_with(progress=5, total=10)
+
+    async def test_progress_zero_step(self):
+        from mtg_mcp.workflows.server import _progress
+
+        mock_ctx = AsyncMock()
+        await _progress(mock_ctx, 0, 5)
+        mock_ctx.report_progress.assert_called_once_with(progress=0, total=5)
+
+
+# ---------------------------------------------------------------------------
+# Input validation -- card_comparison
+# ---------------------------------------------------------------------------
+
+
+class TestCardComparisonValidation:
+    """Test that card_comparison validates card count."""
+
+    @pytest.fixture(autouse=True)
+    def _stubs(self, _mock_commander_stubs):
+        pass
+
+    async def test_too_few_cards(self, mcp_client: Client):
+        result = await mcp_client.call_tool(
+            "card_comparison",
+            {"cards": ["Sol Ring"], "commander_name": "Muldrotha"},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "at least 2" in result.content[0].text.lower()
+
+    async def test_too_many_cards(self, mcp_client: Client):
+        result = await mcp_client.call_tool(
+            "card_comparison",
+            {
+                "cards": ["A", "B", "C", "D", "E", "F"],
+                "commander_name": "X",
+            },
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "maximum 5" in result.content[0].text.lower()
+
+    async def test_empty_cards_list(self, mcp_client: Client):
+        result = await mcp_client.call_tool(
+            "card_comparison",
+            {"cards": [], "commander_name": "Muldrotha"},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "at least 2" in result.content[0].text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Input validation -- budget_upgrade
+# ---------------------------------------------------------------------------
+
+
+class TestBudgetUpgradeValidation:
+    """Test that budget_upgrade validates budget amount."""
+
+    @pytest.fixture(autouse=True)
+    def _stubs(self, _mock_commander_stubs):
+        pass
+
+    async def test_negative_budget(self, mcp_client: Client):
+        result = await mcp_client.call_tool(
+            "budget_upgrade",
+            {"commander_name": "Muldrotha", "budget": -1.0},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "positive" in result.content[0].text.lower()
+
+    async def test_zero_budget(self, mcp_client: Client):
+        result = await mcp_client.call_tool(
+            "budget_upgrade",
+            {"commander_name": "Muldrotha", "budget": 0.0},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "positive" in result.content[0].text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Input validation -- deck_analysis
+# ---------------------------------------------------------------------------
+
+
+class TestDeckAnalysisValidation:
+    """Test that deck_analysis validates decklist."""
+
+    @pytest.fixture(autouse=True)
+    def _stubs(self, _mock_analysis_stubs):
+        pass
+
+    async def test_empty_decklist(self, mcp_client: Client):
+        result = await mcp_client.call_tool(
+            "deck_analysis",
+            {"decklist": [], "commander_name": "Muldrotha"},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "at least one" in result.content[0].text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Input validation -- set_overview
+# ---------------------------------------------------------------------------
+
+
+class TestSetOverviewValidation:
+    """Test that set_overview validates 17Lands availability."""
+
+    @pytest.fixture(autouse=True)
+    def _stubs(self, _mock_draft_stubs):
+        pass
+
+    async def test_17lands_disabled(self, mcp_client: Client):
+        with patch("mtg_mcp.workflows.server._seventeen_lands", None):
+            result = await mcp_client.call_tool(
+                "set_overview",
+                {"set_code": "LCI"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+        assert "not enabled" in result.content[0].text.lower()
+
+
+# ---------------------------------------------------------------------------
+# New Phase 5 tools registered
+# ---------------------------------------------------------------------------
+
+
+class TestNewToolsRegistered:
+    """Verify all Phase 5 tools are registered."""
+
+    async def test_new_tools_present(self, mcp_client: Client):
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        assert "card_comparison" in tool_names
+        assert "budget_upgrade" in tool_names
+        assert "deck_analysis" in tool_names
+        assert "set_overview" in tool_names
+
+    async def test_total_workflow_tool_count(self, mcp_client: Client):
+        """All 8 workflow tools are registered (4 original + 4 new)."""
+        tools = await mcp_client.list_tools()
+        workflow_tools = {
+            "commander_overview",
+            "evaluate_upgrade",
+            "draft_pack_pick",
+            "suggest_cuts",
+            "card_comparison",
+            "budget_upgrade",
+            "deck_analysis",
+            "set_overview",
+        }
+        tool_names = {t.name for t in tools}
+        for tool in workflow_tools:
+            assert tool in tool_names, f"Missing workflow tool: {tool}"
