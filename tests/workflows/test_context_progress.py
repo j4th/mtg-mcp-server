@@ -1,13 +1,8 @@
-"""Tests for Context progress reporting and Phase 5 tool input validation.
+"""Tests for Context progress reporting and tool input validation.
 
-Tests the _progress helper function, verifies new tools are registered,
-and checks input validation on the new workflow tools (card_comparison,
+Tests the _progress helper function, verifies workflow tools are registered,
+and checks input validation on the workflow tools (card_comparison,
 budget_upgrade, deck_analysis, set_overview).
-
-NOTE: The Phase 5 implementation functions (card_comparison, budget_upgrade,
-deck_analysis, set_overview) are not yet implemented -- their modules are stubs.
-Validation tests mock the lazy imports so the ToolError checks can be exercised
-before the tool's try-block is reached.
 """
 
 from __future__ import annotations
@@ -23,20 +18,9 @@ if TYPE_CHECKING:
     from fastmcp import Client
 
 
-# ---------------------------------------------------------------------------
-# Helpers -- mock unimplemented workflow functions
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def _mock_commander_stubs():
-    """Patch commander module to expose card_comparison and budget_upgrade stubs.
-
-    The server.py tool wrappers do lazy imports like:
-        from mtg_mcp.workflows.commander import card_comparison as impl
-    These fail because the functions aren't implemented yet.  We inject them
-    into the already-imported module object so the lazy import succeeds.
-    """
+    """Patch commander module to stub card_comparison and budget_upgrade."""
     mod = sys.modules.get("mtg_mcp.workflows.commander")
     if mod is None:
         mod = types.ModuleType("mtg_mcp.workflows.commander")
