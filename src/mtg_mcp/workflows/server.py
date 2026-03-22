@@ -84,6 +84,12 @@ def _require_seventeen_lands() -> SeventeenLandsClient:
     return _seventeen_lands
 
 
+def _require_edhrec() -> EDHRECClient:
+    if _edhrec is None:
+        raise ToolError("EDHREC is not enabled. Set MTG_MCP_ENABLE_EDHREC=true.")
+    return _edhrec
+
+
 # ---------------------------------------------------------------------------
 # Progress callback helper
 # ---------------------------------------------------------------------------
@@ -260,7 +266,7 @@ async def budget_upgrade(
             budget=budget,
             num_suggestions=num_suggestions,
             scryfall=_require_scryfall(),
-            edhrec=_edhrec,
+            edhrec=_require_edhrec(),
             on_progress=lambda step, total: _progress(ctx, step, total),
         )
     except CardNotFoundError as exc:
