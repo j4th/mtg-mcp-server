@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from mtg_mcp.services.base import ServiceError
-from mtg_mcp.workflows.deck import _build_synergy_lookup
+from mtg_mcp.workflows.deck import build_synergy_lookup
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -32,8 +32,6 @@ log = structlog.get_logger(service="workflow.analysis")
 
 _MANA_PIP_RE = re.compile(r"\{([WUBRG])\}")
 
-# CMC buckets: 0, 1, 2, 3, 4, 5, 6, 7+
-_CMC_BUCKETS = [0, 1, 2, 3, 4, 5, 6]
 _CMC_HEADER = ["0", "1", "2", "3", "4", "5", "6", "7+"]
 
 
@@ -202,7 +200,7 @@ async def deck_analysis(
         await on_progress(3, 4)
 
     edhrec_data = await _fetch_edhrec_data(commander_name, edhrec=edhrec, sources=sources)
-    synergy_lookup = _build_synergy_lookup(edhrec_data)
+    synergy_lookup = build_synergy_lookup(edhrec_data)
 
     # Step 4/4: Fill in missing prices (for MTGJSON-resolved cards)
     if on_progress is not None:
