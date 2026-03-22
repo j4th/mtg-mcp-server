@@ -29,6 +29,11 @@ _MAX_COMBOS = 5
 _MAX_STAPLES = 10
 
 
+def _fmt_synergy(value: float) -> str:
+    """Format a synergy score with sign prefix (e.g. '+61%' or '-5%')."""
+    return f"+{value:.0%}" if value >= 0 else f"{value:.0%}"
+
+
 def _format_card_header(card: Card) -> list[str]:
     """Format the card header section for a commander overview."""
     lines = [
@@ -97,10 +102,9 @@ def _format_edhrec_staples(data: EDHRECCommanderData) -> list[str]:
     all_cards.sort(key=lambda c: c.inclusion, reverse=True)
 
     for card in all_cards[:_MAX_STAPLES]:
-        synergy_str = f"+{card.synergy:.0%}" if card.synergy >= 0 else f"{card.synergy:.0%}"
         lines.append(
             f"- **{card.name}** — {card.inclusion}% inclusion, "
-            f"{synergy_str} synergy ({card.num_decks} decks)"
+            f"{_fmt_synergy(card.synergy)} synergy ({card.num_decks} decks)"
         )
     return lines
 
@@ -111,8 +115,7 @@ def _format_synergy_section(synergy: EDHRECCard | None, commander_name: str) -> 
     if synergy is None:
         lines.append("No synergy data found for this card with this commander.")
         return lines
-    synergy_str = f"+{synergy.synergy:.0%}" if synergy.synergy >= 0 else f"{synergy.synergy:.0%}"
-    lines.append(f"**Synergy Score:** {synergy_str}")
+    lines.append(f"**Synergy Score:** {_fmt_synergy(synergy.synergy)}")
     lines.append(f"**Inclusion Rate:** {synergy.inclusion}%")
     lines.append(f"**In Decks:** {synergy.num_decks}")
     if synergy.label:

@@ -229,21 +229,14 @@ def _format_output(
 
     # Data sources status
     lines.append("## Data Sources")
-    if sources.spellbook_ok:
-        lines.append("- Spellbook: OK")
-    elif sources.failures and any("Spellbook" in f for f in sources.failures):
-        lines.append("- Spellbook: Failed")
-    else:
-        lines.append("- Spellbook: OK")
+    lines.append(f"- Spellbook: {'OK' if sources.spellbook_ok else 'Failed'}")
 
-    if sources.edhrec_ok:
-        lines.append("- EDHREC: OK")
-    elif not sources.edhrec_available:
+    if not sources.edhrec_available:
         lines.append("- EDHREC: Unavailable (disabled)")
-    elif sources.failures and any("EDHREC" in f for f in sources.failures):
-        lines.append("- EDHREC: Failed")
-    else:
+    elif sources.edhrec_ok:
         lines.append("- EDHREC: OK")
+    else:
+        lines.append("- EDHREC: Failed")
     lines.append("")
 
     # Ranked list
