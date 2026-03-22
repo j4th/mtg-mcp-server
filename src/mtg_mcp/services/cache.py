@@ -18,6 +18,14 @@ if TYPE_CHECKING:
 
 type _KeyFunc = Callable[..., object]
 
+_disabled: bool = False
+
+
+def disable_all_caches() -> None:
+    """Bypass all ``@async_cached`` decorators (calls go straight through)."""
+    global _disabled
+    _disabled = True
+
 
 def _method_key(*args: object, **kwargs: object) -> object:
     """Cache key that skips ``self`` (first arg) for instance methods."""
@@ -38,11 +46,14 @@ def async_cached(cache: TTLCache, key: _KeyFunc = _method_key):
     is keyed only on the method arguments, not the instance identity.
 
     The wrapped function exposes a ``.cache`` attribute for test access.
+    Respects the module-level ``_disabled`` flag set by ``disable_all_caches()``.
     """
 
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args: object, **kwargs: object) -> object:
+            if _disabled:
+                return await func(*args, **kwargs)
             k = key(*args, **kwargs)
             try:
                 return cache[k]

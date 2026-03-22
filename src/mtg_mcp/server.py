@@ -14,6 +14,7 @@ from mtg_mcp.providers.mtgjson import mtgjson_mcp
 from mtg_mcp.providers.scryfall import scryfall_mcp
 from mtg_mcp.providers.seventeen_lands import draft_mcp
 from mtg_mcp.providers.spellbook import spellbook_mcp
+from mtg_mcp.services.cache import disable_all_caches
 from mtg_mcp.workflows.server import workflow_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
@@ -22,6 +23,8 @@ mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
 
 _settings = Settings()
+if _settings.disable_cache:
+    disable_all_caches()
 if _settings.enable_17lands:
     mcp.mount(draft_mcp, namespace="draft")
 if _settings.enable_edhrec:

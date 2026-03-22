@@ -125,4 +125,5 @@ class TestCardSearch:
         )
         assert result.is_error
         text = result.content[0].text
-        assert "invalid search field" in text.lower()
+        # Pydantic validates Literal type before our code runs
+        assert "'name'" in text or "literal_error" in text

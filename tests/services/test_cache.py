@@ -15,6 +15,7 @@ import httpx
 import respx
 from cachetools import TTLCache
 
+import mtg_mcp.services.cache as cache_mod
 from mtg_mcp.services.cache import _decklist_key, _method_key, async_cached
 from mtg_mcp.services.edhrec import EDHRECClient
 from mtg_mcp.services.scryfall import ScryfallClient
@@ -104,6 +105,27 @@ class TestAsyncCachedDecorator:
         cache.clear()
         await fetch(sentinel, "abc")
         assert call_count == 2  # had to re-fetch after clear
+
+    async def test_disabled_flag_bypasses_cache(self):
+        cache: TTLCache = TTLCache(maxsize=10, ttl=300)
+        call_count = 0
+
+        @async_cached(cache)
+        async def fetch(self, key: str) -> str:
+            nonlocal call_count
+            call_count += 1
+            return f"result-{key}"
+
+        sentinel = object()
+        old = cache_mod._disabled
+        try:
+            cache_mod._disabled = True
+            await fetch(sentinel, "abc")
+            await fetch(sentinel, "abc")
+            assert call_count == 2  # both calls hit the function
+            assert len(cache) == 0  # nothing stored in cache
+        finally:
+            cache_mod._disabled = old
 
 
 class TestMethodKey:

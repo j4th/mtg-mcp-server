@@ -13,6 +13,8 @@ from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONDownloadError, MTGJSO
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "mtgjson"
 
+_DATA_URL = "https://example.com/AtomicCards.json.gz"
+
 
 def _load_fixture_bytes() -> bytes:
     """Load the gzipped fixture file as raw bytes."""
@@ -24,25 +26,37 @@ def _mock_httpx_response(content: bytes, status_code: int = 200) -> httpx.Respon
     return httpx.Response(status_code=status_code, content=content)
 
 
+@pytest.fixture
+async def loaded_client():
+    """A client with pre-loaded fixture data (mocked HTTP)."""
+    fixture_bytes = _load_fixture_bytes()
+    client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
+    async with client:
+        mock_response = _mock_httpx_response(fixture_bytes)
+        with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            mock_http = AsyncMock()
+            mock_http.get = AsyncMock(return_value=mock_response)
+            mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_http.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_http
+
+            await client.ensure_loaded()
+            yield client
+
+
 class TestLazyLoading:
     """Test that data is not downloaded until first access."""
 
     async def test_no_download_on_init(self):
         """Creating and entering the client should NOT trigger a download."""
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             # No cards should be loaded yet
-            assert not client._loaded
+            assert client._loaded_at == 0.0
 
     async def test_first_access_triggers_download(self):
         fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
             with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
@@ -63,10 +77,7 @@ class TestDownloadAndParse:
 
     async def test_downloads_and_parses(self):
         fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
             with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
@@ -77,15 +88,12 @@ class TestDownloadAndParse:
                 mock_cls.return_value = mock_http
 
                 await client.ensure_loaded()
-                assert client._loaded
+                assert client._loaded_at > 0
                 # 8 cards + 1 extra key for double-faced "Delver of Secrets // ..."
                 assert len(client._cards) == 9
 
     async def test_download_error_raises(self):
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(b"", status_code=500)
             with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
@@ -99,10 +107,7 @@ class TestDownloadAndParse:
                     await client.ensure_loaded()
 
     async def test_network_error_raises(self):
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
@@ -115,10 +120,7 @@ class TestDownloadAndParse:
                     await client.ensure_loaded()
 
     async def test_corrupt_gzip_raises(self):
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(b"not-gzip-data")
             with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
@@ -137,10 +139,7 @@ class TestRefreshLogic:
 
     async def test_stale_data_triggers_refresh(self):
         fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=1,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=1)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
             with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
@@ -163,10 +162,7 @@ class TestRefreshLogic:
 
     async def test_fresh_data_does_not_re_download(self):
         fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
+        client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
             with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
@@ -185,26 +181,6 @@ class TestRefreshLogic:
 
 class TestGetCard:
     """Test exact card lookup."""
-
-    @pytest.fixture
-    async def loaded_client(self):
-        """A client with pre-loaded fixture data (no HTTP calls)."""
-        fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
-        async with client:
-            mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
-                mock_http = AsyncMock()
-                mock_http.get = AsyncMock(return_value=mock_response)
-                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
-                mock_http.__aexit__ = AsyncMock(return_value=False)
-                mock_cls.return_value = mock_http
-
-                await client.ensure_loaded()
-                yield client
 
     async def test_exact_lookup(self, loaded_client: MTGJSONClient):
         result = await loaded_client.get_card("Sol Ring")
@@ -266,25 +242,6 @@ class TestGetCard:
 class TestSearchCards:
     """Test name substring search."""
 
-    @pytest.fixture
-    async def loaded_client(self):
-        fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
-        async with client:
-            mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
-                mock_http = AsyncMock()
-                mock_http.get = AsyncMock(return_value=mock_response)
-                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
-                mock_http.__aexit__ = AsyncMock(return_value=False)
-                mock_cls.return_value = mock_http
-
-                await client.ensure_loaded()
-                yield client
-
     async def test_search_by_name(self, loaded_client: MTGJSONClient):
         results = await loaded_client.search_cards("ring")
         assert len(results) == 1
@@ -321,25 +278,6 @@ class TestSearchCards:
 class TestSearchByType:
     """Test type line substring search."""
 
-    @pytest.fixture
-    async def loaded_client(self):
-        fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
-        async with client:
-            mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
-                mock_http = AsyncMock()
-                mock_http.get = AsyncMock(return_value=mock_response)
-                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
-                mock_http.__aexit__ = AsyncMock(return_value=False)
-                mock_cls.return_value = mock_http
-
-                await client.ensure_loaded()
-                yield client
-
     async def test_search_creature(self, loaded_client: MTGJSONClient):
         results = await loaded_client.search_by_type("Creature")
         names = [r.name for r in results]
@@ -368,25 +306,6 @@ class TestSearchByType:
 
 class TestSearchByText:
     """Test oracle text substring search."""
-
-    @pytest.fixture
-    async def loaded_client(self):
-        fixture_bytes = _load_fixture_bytes()
-        client = MTGJSONClient(
-            data_url="https://example.com/AtomicCards.json.gz",
-            refresh_hours=24,
-        )
-        async with client:
-            mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
-                mock_http = AsyncMock()
-                mock_http.get = AsyncMock(return_value=mock_response)
-                mock_http.__aenter__ = AsyncMock(return_value=mock_http)
-                mock_http.__aexit__ = AsyncMock(return_value=False)
-                mock_cls.return_value = mock_http
-
-                await client.ensure_loaded()
-                yield client
 
     async def test_search_by_text(self, loaded_client: MTGJSONClient):
         results = await loaded_client.search_by_text("damage")

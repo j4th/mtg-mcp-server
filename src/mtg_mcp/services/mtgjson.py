@@ -47,7 +47,6 @@ class MTGJSONClient:
         self._data_url = data_url
         self._refresh_seconds = refresh_hours * 3600
         self._cards: dict[str, MTGJSONCard] = {}
-        self._loaded = False
         self._loaded_at: float = 0.0
 
     async def __aenter__(self) -> Self:
@@ -55,19 +54,17 @@ class MTGJSONClient:
 
     async def __aexit__(self, *exc: object) -> None:
         self._cards.clear()
-        self._loaded = False
         self._loaded_at = 0.0
 
     async def ensure_loaded(self) -> None:
         """Download and parse AtomicCards if not loaded or stale."""
-        if self._loaded and not self._is_stale():
+        if not self._is_stale():
             return
 
-        log.info("mtgjson.loading", url=self._data_url, stale=self._loaded)
+        log.info("mtgjson.loading", url=self._data_url, stale=self._loaded_at > 0)
         raw_bytes = await self._download()
         decompressed = self._decompress(raw_bytes)
         self._parse(decompressed)
-        self._loaded = True
         self._loaded_at = time.monotonic()
         log.info("mtgjson.loaded", card_count=len(self._cards))
 
@@ -114,10 +111,9 @@ class MTGJSONClient:
 
     def _is_stale(self) -> bool:
         """Check if the loaded data has exceeded the refresh interval."""
-        if not self._loaded:
+        if self._loaded_at == 0.0:
             return True
-        elapsed = time.monotonic() - self._loaded_at
-        return elapsed >= self._refresh_seconds
+        return (time.monotonic() - self._loaded_at) >= self._refresh_seconds
 
     async def _download(self) -> bytes:
         """Download the gzipped AtomicCards file."""

@@ -5,6 +5,8 @@ Uses the MTGJSON AtomicCards bulk file for in-memory card data.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
@@ -78,7 +80,7 @@ async def card_lookup(name: str) -> str:
 @mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def card_search(
     query: str,
-    search_field: str = "name",
+    search_field: Literal["name", "type", "text"] = "name",
     limit: int = 20,
 ) -> str:
     """Search for Magic cards in MTGJSON bulk data.
@@ -95,12 +97,8 @@ async def card_search(
             results = await client.search_cards(query, limit=limit)
         elif search_field == "type":
             results = await client.search_by_type(query, limit=limit)
-        elif search_field == "text":
+        else:  # search_field == "text"
             results = await client.search_by_text(query, limit=limit)
-        else:
-            raise ToolError(
-                f"Invalid search field: '{search_field}'. Use 'name', 'type', or 'text'."
-            )
     except MTGJSONError as exc:
         raise ToolError(f"MTGJSON error: {exc}") from exc
 
