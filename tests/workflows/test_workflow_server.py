@@ -9,81 +9,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallError
 from mtg_mcp.services.seventeen_lands import SeventeenLandsError
 from mtg_mcp.services.spellbook import SpellbookError
-from mtg_mcp.types import (
-    Card,
-    CardPrices,
-    Combo,
-    ComboCard,
-    ComboResult,
-    EDHRECCard,
-    EDHRECCardList,
-    EDHRECCommanderData,
-)
 
 if TYPE_CHECKING:
     from fastmcp import Client
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def mock_card() -> Card:
-    return Card(
-        id="test-id",
-        name="Muldrotha, the Gravetide",
-        mana_cost="{3}{B}{G}{U}",
-        cmc=6.0,
-        type_line="Legendary Creature \u2014 Elemental Avatar",
-        oracle_text="During each of your turns, you may play a permanent.",
-        colors=["B", "G", "U"],
-        color_identity=["B", "G", "U"],
-        set="dom",
-        rarity="mythic",
-        prices=CardPrices(usd="5.50"),
-    )
-
-
-@pytest.fixture
-def mock_combos() -> list[Combo]:
-    return [
-        Combo(
-            id="combo-1",
-            cards=[ComboCard(name="Muldrotha, the Gravetide")],
-            produces=[ComboResult(feature_name="Infinite value")],
-            identity="BGU",
-            popularity=3000,
-        ),
-    ]
-
-
-@pytest.fixture
-def mock_edhrec_data() -> EDHRECCommanderData:
-    return EDHRECCommanderData(
-        commander_name="Muldrotha, the Gravetide",
-        total_decks=19741,
-        cardlists=[
-            EDHRECCardList(
-                header="Creatures",
-                cardviews=[
-                    EDHRECCard(
-                        name="Spore Frog",
-                        sanitized="spore-frog",
-                        synergy=0.61,
-                        inclusion=61,
-                        num_decks=12050,
-                    ),
-                ],
-            ),
-        ],
-    )
 
 
 # ---------------------------------------------------------------------------

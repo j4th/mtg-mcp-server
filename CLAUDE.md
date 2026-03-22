@@ -65,7 +65,7 @@ See @docs/ARCHITECTURE.md for full details.
 - **Phase 0** (scaffold): Complete
 - **Phase 1** (Scryfall): Complete — 4 tools, 8 service tests, 6 provider tests
 - **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools, 104 total tests, 88% coverage
-- **Phase 3** (Workflow tools): Complete — 4 workflow tools, 159 total tests, 90% coverage
+- **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
 
 ## Environment
 

@@ -338,9 +338,8 @@ class TestDraftPackPickColorAnalysis:
             pack, "LRW", seventeen_lands=client, current_picks=current_picks
         )
 
-        # Should still show color analysis section but with no colors
-        # (The fake card won't contribute to any color counts)
-        assert "Current colors" not in result or "N/A" not in result
+        # No recognized picks → no color counts → color section omitted
+        assert "Current colors" not in result
 
 
 class TestDraftPackPickEdgeCases:
