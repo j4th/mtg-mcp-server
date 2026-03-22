@@ -6,6 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
+    "cachetools>=6.0",
     "fastmcp>=3.1.0",
     "httpx>=0.28",
     "pydantic>=2.0",

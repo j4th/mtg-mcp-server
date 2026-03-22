@@ -664,6 +664,7 @@ name = "mtg-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cachetools" },
     { name = "fastmcp" },
     { name = "httpx" },
     { name = "pydantic" },
@@ -682,6 +683,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cachetools", specifier = ">=6.0" },
     { name = "fastmcp", specifier = ">=3.1.0" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "pydantic", specifier = ">=2.0" },

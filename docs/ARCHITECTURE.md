@@ -52,6 +52,10 @@ Claude Code / claude.ai / any MCP client
     │  │  EDHREC      │────┼──► edhrec.com (scraping)
     │  │  ns=edhrec  │    │    Commander staples, synergy scores
     │  └─────────────┘    │
+    │  ┌─────────────┐    │
+    │  │  MTGJSON     │────┼──► mtgjson.com (bulk file)
+    │  │  ns=mtgjson  │    │    Offline card data, rate-limit-free search
+    │  └─────────────┘    │
     └─────────────────────┘
 ```
 
@@ -525,6 +529,9 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | BaseClient.__aenter__ | Returns `Self` | Enables correct type inference through `AsyncExitStack.enter_async_context()` |
 | Workflow testing | AsyncMock (not respx) | Workflows are pure functions — mock the service clients directly, no HTTP layer to test |
 | draft_pack_pick backends | 17Lands only | 17Lands already provides name, color, rarity, all win rate metrics — no Scryfall calls needed |
+| Service caching | cachetools TTLCache per method | Caches parsed Pydantic models (skips network + parsing). Per-method TTL granularity. Single asyncio loop = no locking needed |
+| MTGJSON | Bulk file service (not BaseClient) | File-based, not HTTP API — lazy download, in-memory dict for O(1) lookups. Behind feature flag |
+| MTGJSON integration | Workflow layer, not ScryfallClient | Preserves service independence — workflows can check MTGJSON before Scryfall |
 
 ---
 

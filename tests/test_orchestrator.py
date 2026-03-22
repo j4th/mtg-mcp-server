@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import respx
@@ -16,6 +17,7 @@ SCRYFALL_FIXTURES = Path(__file__).parent / "fixtures" / "scryfall"
 SPELLBOOK_FIXTURES = Path(__file__).parent / "fixtures" / "spellbook"
 SEVENTEEN_LANDS_FIXTURES = Path(__file__).parent / "fixtures" / "seventeen_lands"
 EDHREC_FIXTURES = Path(__file__).parent / "fixtures" / "edhrec"
+MTGJSON_FIXTURES = Path(__file__).parent / "fixtures" / "mtgjson"
 SCRYFALL_BASE = "https://api.scryfall.com"
 SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
@@ -152,3 +154,44 @@ class TestEdhrecMounted:
         )
         text = result.content[0].text
         assert "Muldrotha, the Gravetide" in text
+
+
+class TestMtgjsonMounted:
+    """Verify MTGJSON tools appear with mtgjson_ namespace on the orchestrator."""
+
+    async def test_namespaced_tools_appear(self, mcp_client: Client):
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        assert "mtgjson_card_lookup" in tool_names
+        assert "mtgjson_card_search" in tool_names
+
+    async def test_end_to_end_card_lookup(self, mcp_client: Client):
+        fixture_bytes = (MTGJSON_FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
+        mock_response = httpx.Response(200, content=fixture_bytes)
+
+        with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            mock_http = AsyncMock()
+            mock_http.get = AsyncMock(return_value=mock_response)
+            mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_http.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_http
+
+            result = await mcp_client.call_tool("mtgjson_card_lookup", {"name": "Sol Ring"})
+            text = result.content[0].text
+            assert "Sol Ring" in text
+            assert "Artifact" in text
+
+    async def test_end_to_end_card_search(self, mcp_client: Client):
+        fixture_bytes = (MTGJSON_FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
+        mock_response = httpx.Response(200, content=fixture_bytes)
+
+        with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            mock_http = AsyncMock()
+            mock_http.get = AsyncMock(return_value=mock_response)
+            mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_http.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_http
+
+            result = await mcp_client.call_tool("mtgjson_card_search", {"query": "bolt"})
+            text = result.content[0].text
+            assert "Lightning Bolt" in text

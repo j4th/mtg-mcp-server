@@ -294,3 +294,29 @@ uv run pytest --cov --cov-report=term-missing
 ```
 
 Coverage target: **80%+ on services and servers**, measured per phase.
+
+---
+
+## Phase 4: Service Caching + MTGJSON Bulk Card Cache [COMPLETE]
+
+**Goal:** Two complementary caching layers: in-memory TTL caching across all 4 existing services, and MTGJSON bulk card data as a standalone MCP provider with rate-limit-free search.
+
+### Steps
+
+1. Add `cachetools` dependency and `async_cached` decorator in `services/cache.py`
+2. Update `Settings`: replace `cache_ttl_seconds` with `disable_cache: bool` + MTGJSON settings (`mtgjson_data_url`, `mtgjson_refresh_hours`, `enable_mtgjson`)
+3. Add `MTGJSONCard` model to `types.py`
+4. Apply `@async_cached` to all 12 service methods with per-method TTLs (24h for card data, 1h for search, 4h for 17Lands, 12h for decklist analysis)
+5. Build `MTGJSONClient` in `services/mtgjson.py` — lazy download, gzip decompress, in-memory dict for O(1) lookups
+6. Build MTGJSON provider in `providers/mtgjson.py` — `card_lookup` and `card_search` tools
+7. Mount MTGJSON provider on orchestrator with `namespace="mtgjson"` behind feature flag
+
+**Done when:** All 12 service methods cached, MTGJSON tools appear in tools/list, `disable_cache` flag works.
+
+**Completed:** Two parallel agents in worktrees (Agent A: TTL caching, Agent B: MTGJSON). Cherry-picked and merged. Final state: 245 tests, 92% coverage, 15 tools + 4 workflows.
+
+**Key learnings from Phase 4:**
+- `_decklist_key` must convert lists in both positional args AND kwargs — `find_decklist_combos(commanders=[...], decklist=[...])` uses kwargs
+- Autouse `_clear_caches` fixture in conftest.py is essential — without it, cached results leak between tests
+- MTGJSON is file-based (not BaseClient) — different lifecycle from HTTP services, but same lifespan/module-level-client pattern for the provider
+- MTGJSON `AtomicCards.json` keys by display name (with `//` for DFCs) — need to key by both short name and full name for DFC lookup

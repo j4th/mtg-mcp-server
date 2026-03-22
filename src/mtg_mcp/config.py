@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     enable_edhrec: bool = True
 
     # Caching
-    cache_ttl_seconds: int = 3600
+    disable_cache: bool = False
+
+    # MTGJSON
+    mtgjson_data_url: str = "https://mtgjson.com/api/v5/AtomicCards.json.gz"
+    mtgjson_refresh_hours: int = 24
+    enable_mtgjson: bool = True
 
     model_config = {"env_prefix": "MTG_MCP_", "env_file": ".env", "extra": "ignore"}

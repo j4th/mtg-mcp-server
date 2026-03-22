@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from cachetools import TTLCache
+
 from mtg_mcp.services.base import BaseClient, ServiceError
+from mtg_mcp.services.cache import _method_key, async_cached
 from mtg_mcp.types import Card, CardSearchResult, Ruling
 
 
@@ -17,6 +20,11 @@ class CardNotFoundError(ScryfallError):
 class ScryfallClient(BaseClient):
     """Async client for the Scryfall REST API."""
 
+    _card_name_cache: TTLCache = TTLCache(maxsize=500, ttl=86400)
+    _card_id_cache: TTLCache = TTLCache(maxsize=500, ttl=86400)
+    _search_cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
+    _rulings_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)
+
     def __init__(
         self,
         base_url: str = "https://api.scryfall.com",
@@ -29,6 +37,7 @@ class ScryfallClient(BaseClient):
             user_agent=user_agent,
         )
 
+    @async_cached(_card_name_cache, key=_method_key)
     async def get_card_by_name(self, name: str, *, fuzzy: bool = False) -> Card:
         """Look up a card by exact or fuzzy name."""
         param_key = "fuzzy" if fuzzy else "exact"
@@ -40,6 +49,7 @@ class ScryfallClient(BaseClient):
             raise ScryfallError(exc.message, status_code=exc.status_code) from exc
         return Card.model_validate(response.json())
 
+    @async_cached(_search_cache, key=_method_key)
     async def search_cards(self, query: str, page: int = 1) -> CardSearchResult:
         """Search for cards using Scryfall syntax."""
         try:
@@ -52,6 +62,7 @@ class ScryfallClient(BaseClient):
             raise ScryfallError(exc.message, status_code=exc.status_code) from exc
         return CardSearchResult.model_validate(response.json())
 
+    @async_cached(_card_id_cache, key=_method_key)
     async def get_card_by_id(self, scryfall_id: str) -> Card:
         """Look up a card by Scryfall UUID."""
         try:
@@ -64,6 +75,7 @@ class ScryfallClient(BaseClient):
             raise ScryfallError(exc.message, status_code=exc.status_code) from exc
         return Card.model_validate(response.json())
 
+    @async_cached(_rulings_cache, key=_method_key)
     async def get_rulings(self, scryfall_id: str) -> list[Ruling]:
         """Get official rulings for a card by Scryfall UUID."""
         try:

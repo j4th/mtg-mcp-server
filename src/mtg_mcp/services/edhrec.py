@@ -10,7 +10,10 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from cachetools import TTLCache
+
 from mtg_mcp.services.base import BaseClient, ServiceError
+from mtg_mcp.services.cache import _method_key, async_cached
 from mtg_mcp.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
 
 _RE_SPECIAL_CHARS = re.compile(r"[,.'\"!?:;()]+")
@@ -37,6 +40,9 @@ class EDHRECClient(BaseClient):
     with .get() chains and default to empty values when fields are missing.
     """
 
+    _commander_cache: TTLCache = TTLCache(maxsize=100, ttl=86400)
+    _synergy_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)
+
     def __init__(
         self,
         base_url: str = "https://json.edhrec.com",
@@ -61,6 +67,7 @@ class EDHRECClient(BaseClient):
         slug = _RE_MULTI_HYPHEN.sub("-", slug)
         return slug.strip("-")
 
+    @async_cached(_commander_cache, key=_method_key)
     async def commander_top_cards(
         self, commander_name: str, category: str | None = None
     ) -> EDHRECCommanderData:
@@ -91,6 +98,7 @@ class EDHRECClient(BaseClient):
         data = response.json()
         return self._parse_commander_data(data, commander_name, category)
 
+    @async_cached(_synergy_cache, key=_method_key)
     async def card_synergy(self, card_name: str, commander_name: str) -> EDHRECCard | None:
         """Get synergy data for a specific card with a commander.
 

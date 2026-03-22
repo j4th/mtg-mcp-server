@@ -76,7 +76,7 @@ Useful for specific use cases but not core to the initial build.
 |--------|------|--------|-----------|-----------|
 | Scryfall | None (headers required) | REST API | Rock solid | Phase 1 |
 | Commander Spellbook | None | REST API | Solid (open source) | Phase 2 |
-| MTGJSON | None | File download | Solid | Optional cache layer |
+| MTGJSON | None | File download | Solid | Phase 4 (implemented) |
 | 17Lands | None | Undocumented REST + bulk CSV | Stable but unofficial | Phase 3 |
 | EDHREC | None | Reverse-engineered JSON | Fragile — feature flag | Phase 4 |
 | Moxfield | User-Agent header | Reverse-engineered REST | Fragile | Deferred |
