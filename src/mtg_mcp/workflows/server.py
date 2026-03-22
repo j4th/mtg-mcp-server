@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from contextlib import AsyncExitStack
 
 from fastmcp import Context, FastMCP
@@ -90,14 +91,10 @@ def _require_edhrec() -> EDHRECClient:
     return _edhrec
 
 
-# ---------------------------------------------------------------------------
-# Progress callback helper
-# ---------------------------------------------------------------------------
-
-
 async def _progress(ctx: Context, step: int, total: int) -> None:
-    """Report progress to the MCP client."""
-    await ctx.report_progress(progress=step, total=total)
+    """Report progress to the MCP client. Never raises — progress is best-effort."""
+    with contextlib.suppress(Exception):
+        await ctx.report_progress(progress=step, total=total)
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)

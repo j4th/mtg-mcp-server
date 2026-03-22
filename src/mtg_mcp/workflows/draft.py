@@ -215,7 +215,11 @@ async def set_overview(
         await on_progress(2, 2)
 
     if not rated:
-        return f"# Set Overview \u2014 {set_code}\n\nNo card data available for this set."
+        return (
+            f"# Set Overview \u2014 {set_code}\n\n"
+            f"No card data available for this set. "
+            f"Check the set code is correct and that 17Lands has data for {event_type}."
+        )
 
     # Single-pass: group by rarity and collect GIH WR values
     by_rarity: dict[str, list[DraftCardRating]] = {
