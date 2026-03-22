@@ -33,7 +33,7 @@ mcp = FastMCP(
         "- card_comparison: Side-by-side comparison of 2-5 cards\n"
         "- budget_upgrade: Price-constrained upgrade suggestions\n"
         "- deck_analysis: Full decklist health check\n"
-        "- set_overview: Draft format overview with archetype tiers\n"
+        "- set_overview: Draft format card ratings overview and trap rares\n"
         "- draft_pack_pick: Rank cards in a draft pack\n"
         "- suggest_cuts: Identify weakest cards to cut\n\n"
         "Resources (mtg:// URIs) provide cached card, combo, and rating data.\n"

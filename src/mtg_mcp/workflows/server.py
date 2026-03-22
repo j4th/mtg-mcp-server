@@ -17,7 +17,7 @@ from mtg_mcp.providers import (
     TOOL_ANNOTATIONS,
 )
 from mtg_mcp.services.base import ServiceError
-from mtg_mcp.services.edhrec import EDHRECClient
+from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient
 from mtg_mcp.services.mtgjson import MTGJSONClient
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
@@ -217,7 +217,6 @@ async def card_comparison(
         return await impl(
             cards,
             commander_name,
-            mtgjson=_mtgjson,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
@@ -256,7 +255,7 @@ async def budget_upgrade(
             edhrec=_require_edhrec(),
             on_progress=lambda step, total: _progress(ctx, step, total),
         )
-    except CardNotFoundError as exc:
+    except CommanderNotFoundError as exc:
         raise ToolError(f"Commander not found: '{commander_name}'.") from exc
     except ServiceError as exc:
         raise ToolError(f"Service error: {exc}") from exc
@@ -300,10 +299,10 @@ async def set_overview(
     *,
     ctx: Context,
 ) -> str:
-    """Draft format overview — archetype tiers, top commons/uncommons, trap rares.
+    """Draft format overview — top commons/uncommons and trap rares.
 
-    Uses 17Lands archetype stats and card ratings to provide a comprehensive
-    format breakdown. Requires 17Lands to be enabled.
+    Uses 17Lands card ratings to provide a data-driven format breakdown.
+    Requires 17Lands to be enabled.
     """
     from mtg_mcp.workflows.draft import set_overview as impl
 
@@ -374,10 +373,9 @@ def draft_strategy(set_code: str) -> str:
     """Guide a draft format preparation session."""
     return f"""Prepare a draft strategy guide for {set_code}.
 
-Step 1: Use set_overview to get the full format breakdown:
-  - Archetype tier list (which color pairs are winning?)
-  - Top commons and uncommons (which cards should you prioritize?)
-  - Trap rares (which rares underperform?)
+Step 1: Use set_overview to get the card ratings breakdown:
+  - Top commons and uncommons by GIH WR (which cards should you prioritize?)
+  - Trap rares/mythics (which rares underperform the median?)
 
 Step 2: For the top 2-3 archetypes, note:
   - Key commons that signal the archetype is open (ALSA > 5 = late picks = open lane)

@@ -249,7 +249,13 @@ async def _resolve_cards(
     """Resolve all cards in the decklist using MTGJSON-first fallback."""
     from mtg_mcp.workflows.card_resolver import resolve_card
 
-    tasks = [resolve_card(name, mtgjson=mtgjson, scryfall=scryfall) for name in decklist]
+    sem = asyncio.Semaphore(10)
+
+    async def _bounded_resolve(name: str) -> Card | MTGJSONCard:
+        async with sem:
+            return await resolve_card(name, mtgjson=mtgjson, scryfall=scryfall)
+
+    tasks = [_bounded_resolve(name) for name in decklist]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     resolved: list[_ResolvedCard] = []
@@ -342,7 +348,13 @@ async def _fill_missing_prices(
     if not need_prices:
         return
 
-    tasks = [scryfall.get_card_by_name(card.name) for _, card in need_prices]
+    sem = asyncio.Semaphore(10)
+
+    async def _fetch_price(name: str) -> Card:
+        async with sem:
+            return await scryfall.get_card_by_name(name)
+
+    tasks = [_fetch_price(card.name) for _, card in need_prices]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     failed = 0

@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from mtg_mcp.services.edhrec import EDHRECClient
-    from mtg_mcp.services.mtgjson import MTGJSONClient
     from mtg_mcp.services.scryfall import ScryfallClient
     from mtg_mcp.services.spellbook import SpellbookClient
     from mtg_mcp.types import Card, Combo, EDHRECCard, EDHRECCommanderData
@@ -431,7 +430,6 @@ async def card_comparison(
     cards: list[str],
     commander_name: str,
     *,
-    mtgjson: MTGJSONClient | None,
     scryfall: ScryfallClient,
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
@@ -439,13 +437,13 @@ async def card_comparison(
 ) -> str:
     """Compare multiple cards side-by-side for a specific commander deck.
 
-    Resolves each card via MTGJSON/Scryfall, then fetches synergy (EDHREC) and
-    combo count (Spellbook) data for each. Outputs a markdown comparison table.
+    Resolves each card via Scryfall (prices required), then fetches synergy
+    (EDHREC) and combo count (Spellbook) data for each. Outputs a markdown
+    comparison table.
 
     Args:
         cards: Card names to compare (2-5).
         commander_name: The commander to evaluate against.
-        mtgjson: Initialized MTGJSONClient, or None if disabled.
         scryfall: Initialized ScryfallClient.
         spellbook: Initialized SpellbookClient.
         edhrec: Initialized EDHRECClient, or None if disabled.
@@ -460,17 +458,13 @@ async def card_comparison(
     from mtg_mcp.types import Card as ScryfallCard
     from mtg_mcp.types import MTGJSONCard
 
-    from .card_resolver import resolve_card
-
     log.info("card_comparison.start", cards=cards, commander=commander_name)
 
-    # Step 1/3: Resolve cards
+    # Step 1/3: Resolve cards (always Scryfall — prices required)
     if on_progress is not None:
         await on_progress(1, 3)
 
-    resolve_tasks = [
-        resolve_card(name, mtgjson=mtgjson, scryfall=scryfall, need_prices=True) for name in cards
-    ]
+    resolve_tasks = [scryfall.get_card_by_name(name) for name in cards]
     resolved = await asyncio.gather(*resolve_tasks, return_exceptions=True)
 
     # Check for resolution failures — propagate first CardNotFoundError
@@ -612,7 +606,13 @@ async def budget_upgrade(
     if on_progress is not None:
         await on_progress(2, 2)
 
-    price_tasks = [scryfall.get_card_by_name(ecard.name) for ecard in all_edhrec_cards]
+    sem = asyncio.Semaphore(10)
+
+    async def _fetch_price(name: str) -> Card:
+        async with sem:
+            return await scryfall.get_card_by_name(name)
+
+    price_tasks = [_fetch_price(ecard.name) for ecard in all_edhrec_cards]
     price_results = await asyncio.gather(*price_tasks, return_exceptions=True)
 
     # Build candidates: pair EDHREC data with Scryfall prices

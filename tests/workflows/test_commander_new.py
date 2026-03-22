@@ -205,11 +205,6 @@ def edhrec() -> AsyncMock:
     return AsyncMock()
 
 
-@pytest.fixture
-def mtgjson() -> AsyncMock:
-    return AsyncMock()
-
-
 # ===========================================================================
 # card_comparison tests
 # ===========================================================================
@@ -223,7 +218,6 @@ class TestCardComparison:
         scryfall: AsyncMock,
         spellbook: AsyncMock,
         edhrec: AsyncMock,
-        mtgjson: AsyncMock,
         sol_ring: Card,
         spore_frog: Card,
         mock_combos_sol_ring: list[Combo],
@@ -233,7 +227,6 @@ class TestCardComparison:
     ) -> None:
         """All sources succeed — full comparison table."""
         scryfall.get_card_by_name = AsyncMock(side_effect=[sol_ring, spore_frog])
-        mtgjson.get_card = AsyncMock(return_value=None)  # MTGJSON miss, falls back to Scryfall
         spellbook.find_combos = AsyncMock(
             side_effect=[mock_combos_sol_ring, mock_combos_spore_frog]
         )
@@ -242,7 +235,6 @@ class TestCardComparison:
         result = await card_comparison(
             ["Sol Ring", "Spore Frog"],
             COMMANDER_NAME,
-            mtgjson=mtgjson,
             scryfall=scryfall,
             spellbook=spellbook,
             edhrec=edhrec,
@@ -280,7 +272,6 @@ class TestCardComparison:
         self,
         scryfall: AsyncMock,
         spellbook: AsyncMock,
-        mtgjson: AsyncMock,
         sol_ring: Card,
         spore_frog: Card,
         mock_combos_sol_ring: list[Combo],
@@ -288,7 +279,6 @@ class TestCardComparison:
     ) -> None:
         """EDHREC is None — synergy/inclusion show N/A."""
         scryfall.get_card_by_name = AsyncMock(side_effect=[sol_ring, spore_frog])
-        mtgjson.get_card = AsyncMock(return_value=None)
         spellbook.find_combos = AsyncMock(
             side_effect=[mock_combos_sol_ring, mock_combos_spore_frog]
         )
@@ -296,7 +286,6 @@ class TestCardComparison:
         result = await card_comparison(
             ["Sol Ring", "Spore Frog"],
             COMMANDER_NAME,
-            mtgjson=mtgjson,
             scryfall=scryfall,
             spellbook=spellbook,
             edhrec=None,
@@ -311,7 +300,6 @@ class TestCardComparison:
         scryfall: AsyncMock,
         spellbook: AsyncMock,
         edhrec: AsyncMock,
-        mtgjson: AsyncMock,
         sol_ring: Card,
         spore_frog: Card,
         mock_combos_sol_ring: list[Combo],
@@ -319,7 +307,6 @@ class TestCardComparison:
     ) -> None:
         """EDHREC raises exception — synergy columns show N/A, rest works."""
         scryfall.get_card_by_name = AsyncMock(side_effect=[sol_ring, spore_frog])
-        mtgjson.get_card = AsyncMock(return_value=None)
         spellbook.find_combos = AsyncMock(
             side_effect=[mock_combos_sol_ring, mock_combos_spore_frog]
         )
@@ -328,7 +315,6 @@ class TestCardComparison:
         result = await card_comparison(
             ["Sol Ring", "Spore Frog"],
             COMMANDER_NAME,
-            mtgjson=mtgjson,
             scryfall=scryfall,
             spellbook=spellbook,
             edhrec=edhrec,
@@ -345,7 +331,6 @@ class TestCardComparison:
         scryfall: AsyncMock,
         spellbook: AsyncMock,
         edhrec: AsyncMock,
-        mtgjson: AsyncMock,
         sol_ring: Card,
         spore_frog: Card,
         synergy_sol_ring: EDHRECCard,
@@ -353,7 +338,6 @@ class TestCardComparison:
     ) -> None:
         """Spellbook raises exception — combo column shows N/A, rest works."""
         scryfall.get_card_by_name = AsyncMock(side_effect=[sol_ring, spore_frog])
-        mtgjson.get_card = AsyncMock(return_value=None)
         spellbook.find_combos = AsyncMock(
             side_effect=SpellbookError("Spellbook timeout", status_code=503)
         )
@@ -362,7 +346,6 @@ class TestCardComparison:
         result = await card_comparison(
             ["Sol Ring", "Spore Frog"],
             COMMANDER_NAME,
-            mtgjson=mtgjson,
             scryfall=scryfall,
             spellbook=spellbook,
             edhrec=edhrec,
@@ -383,19 +366,16 @@ class TestCardComparison:
         scryfall: AsyncMock,
         spellbook: AsyncMock,
         edhrec: AsyncMock,
-        mtgjson: AsyncMock,
     ) -> None:
         """Scryfall CardNotFoundError during resolve — propagated."""
         scryfall.get_card_by_name = AsyncMock(
             side_effect=CardNotFoundError("Card not found: 'Nonexistent'", status_code=404)
         )
-        mtgjson.get_card = AsyncMock(return_value=None)
 
         with pytest.raises(CardNotFoundError):
             await card_comparison(
                 ["Nonexistent", "Sol Ring"],
                 COMMANDER_NAME,
-                mtgjson=mtgjson,
                 scryfall=scryfall,
                 spellbook=spellbook,
                 edhrec=edhrec,
@@ -406,13 +386,11 @@ class TestCardComparison:
         scryfall: AsyncMock,
         spellbook: AsyncMock,
         edhrec: AsyncMock,
-        mtgjson: AsyncMock,
         sol_ring: Card,
         spore_frog: Card,
     ) -> None:
         """Progress callback is called for each step."""
         scryfall.get_card_by_name = AsyncMock(side_effect=[sol_ring, spore_frog])
-        mtgjson.get_card = AsyncMock(return_value=None)
         spellbook.find_combos = AsyncMock(return_value=[])
         edhrec.card_synergy = AsyncMock(return_value=None)
 
@@ -421,7 +399,6 @@ class TestCardComparison:
         await card_comparison(
             ["Sol Ring", "Spore Frog"],
             COMMANDER_NAME,
-            mtgjson=mtgjson,
             scryfall=scryfall,
             spellbook=spellbook,
             edhrec=edhrec,
@@ -437,48 +414,22 @@ class TestCardComparison:
         self,
         scryfall: AsyncMock,
         spellbook: AsyncMock,
-        mtgjson: AsyncMock,
         sol_ring: Card,
         spore_frog: Card,
     ) -> None:
         """Works fine with no progress callback (None)."""
         scryfall.get_card_by_name = AsyncMock(side_effect=[sol_ring, spore_frog])
-        mtgjson.get_card = AsyncMock(return_value=None)
         spellbook.find_combos = AsyncMock(return_value=[])
 
         result = await card_comparison(
             ["Sol Ring", "Spore Frog"],
             COMMANDER_NAME,
-            mtgjson=mtgjson,
             scryfall=scryfall,
             spellbook=spellbook,
             edhrec=None,
         )
 
         assert "Sol Ring" in result
-
-    async def test_no_mtgjson(
-        self,
-        scryfall: AsyncMock,
-        spellbook: AsyncMock,
-        sol_ring: Card,
-        spore_frog: Card,
-    ) -> None:
-        """MTGJSON is None — goes straight to Scryfall."""
-        scryfall.get_card_by_name = AsyncMock(side_effect=[sol_ring, spore_frog])
-        spellbook.find_combos = AsyncMock(return_value=[])
-
-        result = await card_comparison(
-            ["Sol Ring", "Spore Frog"],
-            COMMANDER_NAME,
-            mtgjson=None,
-            scryfall=scryfall,
-            spellbook=spellbook,
-            edhrec=None,
-        )
-
-        assert "Sol Ring" in result
-        assert "Spore Frog" in result
 
 
 # ===========================================================================

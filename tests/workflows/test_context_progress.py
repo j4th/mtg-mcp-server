@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def _mock_commander_stubs():
     """Patch commander module to stub card_comparison and budget_upgrade."""
+    created = "mtg_mcp.workflows.commander" not in sys.modules
     mod = sys.modules.get("mtg_mcp.workflows.commander")
     if mod is None:
         mod = types.ModuleType("mtg_mcp.workflows.commander")
@@ -35,18 +36,21 @@ def _mock_commander_stubs():
 
     yield stub
 
-    # Restore originals
-    for name, orig in originals.items():
-        if orig is None:
-            if hasattr(mod, name):
-                delattr(mod, name)
-        else:
-            setattr(mod, name, orig)
+    if created:
+        sys.modules.pop("mtg_mcp.workflows.commander", None)
+    else:
+        for name, orig in originals.items():
+            if orig is None:
+                if hasattr(mod, name):
+                    delattr(mod, name)
+            else:
+                setattr(mod, name, orig)
 
 
 @pytest.fixture
 def _mock_analysis_stubs():
     """Patch analysis module to expose deck_analysis stub."""
+    created = "mtg_mcp.workflows.analysis" not in sys.modules
     mod = sys.modules.get("mtg_mcp.workflows.analysis")
     if mod is None:
         mod = types.ModuleType("mtg_mcp.workflows.analysis")
@@ -58,16 +62,20 @@ def _mock_analysis_stubs():
 
     yield stub
 
-    if original is None:
-        if hasattr(mod, "deck_analysis"):
-            delattr(mod, "deck_analysis")
+    if created:
+        sys.modules.pop("mtg_mcp.workflows.analysis", None)
     else:
-        mod.deck_analysis = original
+        if original is None:
+            if hasattr(mod, "deck_analysis"):
+                delattr(mod, "deck_analysis")
+        else:
+            mod.deck_analysis = original
 
 
 @pytest.fixture
 def _mock_draft_stubs():
     """Patch draft module to expose set_overview stub."""
+    created = "mtg_mcp.workflows.draft" not in sys.modules
     mod = sys.modules.get("mtg_mcp.workflows.draft")
     if mod is None:
         mod = types.ModuleType("mtg_mcp.workflows.draft")
@@ -79,11 +87,14 @@ def _mock_draft_stubs():
 
     yield stub
 
-    if original is None:
-        if hasattr(mod, "set_overview"):
-            delattr(mod, "set_overview")
+    if created:
+        sys.modules.pop("mtg_mcp.workflows.draft", None)
     else:
-        mod.set_overview = original
+        if original is None:
+            if hasattr(mod, "set_overview"):
+                delattr(mod, "set_overview")
+        else:
+            mod.set_overview = original
 
 
 # ---------------------------------------------------------------------------
