@@ -43,6 +43,18 @@ See @docs/ARCHITECTURE.md for full details.
 - Workflow tests use `unittest.mock.AsyncMock` (not respx) since they test pure functions, not HTTP.
 - EDHREC is behind a feature flag (`MTG_MCP_ENABLE_EDHREC`). It scrapes undocumented endpoints and will break.
 
+## PR Review Workflow
+
+When PR review comments come in:
+
+1. Fetch comments via `gh api /repos/{owner}/{repo}/pulls/{number}/comments`
+2. Assess each — state what you'll fix or why you'll defer
+3. Reply to each via `gh api .../comments/{id}/replies` with the assessment
+4. Make all code fixes
+5. Run `mise run check`
+6. Commit referencing the PR, push
+7. Resolve threads via GraphQL `resolveReviewThread` mutation (get thread IDs from `repository.pullRequest.reviewThreads`)
+
 ## Gotchas
 
 - FastMCP 3.x import: `from fastmcp import FastMCP` (NOT `from mcp.server.fastmcp`).
@@ -63,8 +75,8 @@ See @docs/ARCHITECTURE.md for full details.
 ## Implementation Status
 
 - **Phase 0** (scaffold): Complete
-- **Phase 1** (Scryfall): Complete — 4 tools, 8 service tests, 6 provider tests
-- **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools, 104 total tests, 88% coverage
+- **Phase 1** (Scryfall): Complete — 4 tools (search_cards, card_details, card_price, card_rulings)
+- **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools across 3 backends
 - **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
 
 ## Environment
