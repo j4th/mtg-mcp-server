@@ -2,6 +2,8 @@
 
 A Magic: The Gathering MCP server for AI assistants. Search cards, analyze draft formats, explore Commander combos, evaluate deck upgrades — all from Claude Code, Claude Desktop, or any MCP client.
 
+> **Built on data from [Scryfall](https://scryfall.com), [Commander Spellbook](https://commanderspellbook.com), [17Lands](https://www.17lands.com), [EDHREC](https://edhrec.com), and [MTGJSON](https://mtgjson.com).** See [Data Sources & Attribution](#data-sources--attribution) for details and usage terms.
+
 ## What It Does
 
 **Card Data** (via Scryfall) — Search the full MTG card database, check prices, look up rulings, verify format legality.
