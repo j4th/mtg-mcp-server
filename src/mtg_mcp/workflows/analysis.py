@@ -357,7 +357,7 @@ async def _fill_missing_prices(
     if not need_prices:
         return
 
-    # Cap concurrent Scryfall lookups (same rationale as _resolve_cards).
+    # Cap concurrent Scryfall lookups to avoid overwhelming the connection pool.
     sem = asyncio.Semaphore(10)
 
     async def _fetch_price(name: str) -> Card:
