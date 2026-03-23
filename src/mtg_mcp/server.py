@@ -1,4 +1,13 @@
-"""MTG MCP Server — orchestrator that mounts all provider backends."""
+"""MTG MCP Server — orchestrator that mounts all provider backends.
+
+Creates the root ``FastMCP("MTG")`` server and mounts each provider sub-server
+with a namespace prefix (e.g. ``scryfall_``, ``draft_``). The workflow server is
+mounted **without** a namespace so its tools have clean names like
+``commander_overview`` rather than ``workflow_commander_overview``.
+
+Feature-flagged backends (17Lands, EDHREC, MTGJSON) are conditionally mounted
+based on ``Settings`` values loaded from ``MTG_MCP_*`` env vars.
+"""
 
 from __future__ import annotations
 
@@ -41,12 +50,17 @@ mcp = FastMCP(
     ),
 )
 
+# Always-on backends: Scryfall and Spellbook are stable public APIs.
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
 
 _settings = Settings()
 if _settings.disable_cache:
     disable_all_caches()
+
+# Feature-flagged backends: disabled by default or behind env vars.
+# 17Lands rate-limits aggressively; EDHREC scrapes undocumented endpoints;
+# MTGJSON requires a ~100MB bulk file download on first access.
 if _settings.enable_17lands:
     mcp.mount(draft_mcp, namespace="draft")
 if _settings.enable_edhrec:
@@ -54,6 +68,7 @@ if _settings.enable_edhrec:
 if _settings.enable_mtgjson:
     mcp.mount(mtgjson_mcp, namespace="mtgjson")
 
+# Workflow tools mounted without namespace for clean names.
 mcp.mount(workflow_mcp)
 
 
