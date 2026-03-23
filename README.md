@@ -1,5 +1,11 @@
 # mtg-mcp-server
 
+[![CI](https://github.com/j4th/mtg-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/j4th/mtg-mcp-server/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/mtg-mcp-server)](https://pypi.org/project/mtg-mcp-server/)
+[![Python 3.12+](https://img.shields.io/pypi/pyversions/mtg-mcp-server)](https://pypi.org/project/mtg-mcp-server/)
+[![License: MIT](https://img.shields.io/github/license/j4th/mtg-mcp-server)](LICENSE)
+[![codecov](https://codecov.io/gh/j4th/mtg-mcp-server/graph/badge.svg)](https://codecov.io/gh/j4th/mtg-mcp-server)
+
 A Magic: The Gathering MCP server for AI assistants. Search cards, analyze draft formats, explore Commander combos, evaluate deck upgrades — all from Claude Code, Claude Desktop, or any MCP client.
 
 > **Built on data from [Scryfall](https://scryfall.com), [Commander Spellbook](https://commanderspellbook.com), [17Lands](https://www.17lands.com), [EDHREC](https://edhrec.com), and [MTGJSON](https://mtgjson.com).** See [Data Sources & Attribution](#data-sources--attribution) for details and usage terms.
