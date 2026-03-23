@@ -529,28 +529,31 @@ def _format_output(
     # Data Sources footer
     lines.append("---")
     lines.append("**Data Sources:**")
-    lines.append(f"- Scryfall: {'OK' if sources.scryfall_ok else 'Failed'}")
+    lines.append(f"- [Scryfall](https://scryfall.com): {'OK' if sources.scryfall_ok else 'Failed'}")
 
     if sources.spellbook_ok:
-        lines.append("- Spellbook: OK")
+        lines.append("- [Commander Spellbook](https://commanderspellbook.com): OK")
     elif sources.spellbook_error is not None:
-        lines.append(f"- Spellbook: Failed ({sources.spellbook_error})")
+        lines.append(
+            f"- [Commander Spellbook](https://commanderspellbook.com): "
+            f"Failed ({sources.spellbook_error})"
+        )
     else:
-        lines.append("- Spellbook: Failed")
+        lines.append("- [Commander Spellbook](https://commanderspellbook.com): Failed")
 
     if not sources.edhrec_available:
-        lines.append("- EDHREC: Disabled")
+        lines.append("- [EDHREC](https://edhrec.com): Disabled")
     elif sources.edhrec_ok:
-        lines.append("- EDHREC: OK")
+        lines.append("- [EDHREC](https://edhrec.com): OK")
     elif sources.edhrec_error is not None:
-        lines.append(f"- EDHREC: Failed ({sources.edhrec_error})")
+        lines.append(f"- [EDHREC](https://edhrec.com): Failed ({sources.edhrec_error})")
     else:
-        lines.append("- EDHREC: Failed")
+        lines.append("- [EDHREC](https://edhrec.com): Failed")
 
     if sources.mtgjson_available:
-        lines.append("- MTGJSON: OK")
+        lines.append("- [MTGJSON](https://mtgjson.com): OK")
     else:
-        lines.append("- MTGJSON: Disabled")
+        lines.append("- [MTGJSON](https://mtgjson.com): Disabled")
 
     log.info("deck_analysis.complete", commander=commander_name, deck_size=deck_size)
     return "\n".join(lines)

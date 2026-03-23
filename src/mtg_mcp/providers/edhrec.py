@@ -12,7 +12,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TAGS_BETA, TOOL_ANNOTATIONS
+from mtg_mcp.providers import ATTRIBUTION_EDHREC, TAGS_BETA, TOOL_ANNOTATIONS
 from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
@@ -70,7 +70,7 @@ async def commander_staples(
 
     if not data.cardlists:
         lines.append("No card data available.")
-        return "\n".join(lines)
+        return "\n".join(lines) + ATTRIBUTION_EDHREC
 
     for cardlist in data.cardlists:
         lines.append(f"\n### {cardlist.header}")
@@ -81,7 +81,7 @@ async def commander_staples(
                 f"  {card.name} — synergy: {synergy_str}, in {pct}% of decks ({card.num_decks})"
             )
 
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_EDHREC
 
 
 @edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BETA)
@@ -112,7 +112,7 @@ async def card_synergy(
     if card is None:
         return (
             f"'{card_name}' was not found in EDHREC data for '{commander_name}'. "
-            "The card may not be commonly played with this commander."
+            "The card may not be commonly played with this commander." + ATTRIBUTION_EDHREC
         )
 
     synergy_str = f"+{card.synergy:.0%}" if card.synergy >= 0 else f"{card.synergy:.0%}"
@@ -124,7 +124,7 @@ async def card_synergy(
     ]
     if card.synergy >= 0.3:
         lines.append("This is a high-synergy card for this commander.")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_EDHREC
 
 
 def _inclusion_pct(num_decks: int, total_decks: int) -> str:

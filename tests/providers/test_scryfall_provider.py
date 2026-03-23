@@ -41,6 +41,7 @@ class TestSearchCards:
         text = result.content[0].text
         assert "9273" in text
         assert fixture["data"][0]["name"] in text
+        assert "Data provided by [Scryfall]" in text
 
 
 class TestCardDetails:

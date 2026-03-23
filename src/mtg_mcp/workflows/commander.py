@@ -140,25 +140,27 @@ def _source_status(
     edhrec_error: str | None,
     edhrec_enabled: bool,
 ) -> list[str]:
-    """Build the Data Sources footer section."""
+    """Build the Data Sources footer section with attribution."""
     lines = ["", "---", "**Data Sources:**"]
 
-    scryfall_status = "OK" if scryfall_ok else "error"
-    lines.append(f"- Scryfall: {scryfall_status}")
+    scryfall_status = "OK" if scryfall_ok else "Failed"
+    lines.append(f"- [Scryfall](https://scryfall.com): {scryfall_status}")
 
     if spellbook_ok:
-        lines.append("- Spellbook: OK")
+        lines.append("- [Commander Spellbook](https://commanderspellbook.com): OK")
     else:
-        lines.append(f"- Spellbook: error ({spellbook_error})")
+        lines.append(
+            f"- [Commander Spellbook](https://commanderspellbook.com): Failed ({spellbook_error})"
+        )
 
     if not edhrec_enabled:
-        lines.append("- EDHREC: not enabled")
+        lines.append("- [EDHREC](https://edhrec.com): Disabled")
     elif edhrec_ok is None:
-        lines.append("- EDHREC: not queried")
+        lines.append("- [EDHREC](https://edhrec.com): not queried")
     elif edhrec_ok:
-        lines.append("- EDHREC: OK")
+        lines.append("- [EDHREC](https://edhrec.com): OK")
     else:
-        lines.append(f"- EDHREC: error ({edhrec_error})")
+        lines.append(f"- [EDHREC](https://edhrec.com): Failed ({edhrec_error})")
 
     return lines
 
@@ -548,6 +550,33 @@ async def card_comparison(
             f"{synergy_str} | {inclusion_str} | {combo_str} | {price_str} |"
         )
 
+    # Data Sources footer — derive status from actual per-card results.
+    # All exceptions = Failed; some exceptions = still OK (partial failure shown as N/A).
+    spellbook_errors = [r for r in combo_results if isinstance(r, BaseException)]
+    spellbook_ok = len(spellbook_errors) < len(combo_results)
+    spellbook_error_msg = (
+        str(spellbook_errors[0]) if spellbook_errors and not spellbook_ok else None
+    )
+
+    if edhrec is not None:
+        edhrec_errors = [r for r in synergy_results if isinstance(r, BaseException)]
+        edhrec_ok: bool | None = len(edhrec_errors) < len(synergy_results)
+        edhrec_error_msg = str(edhrec_errors[0]) if edhrec_errors and not edhrec_ok else None
+    else:
+        edhrec_ok = None
+        edhrec_error_msg = None
+
+    lines.extend(
+        _source_status(
+            scryfall_ok=True,
+            spellbook_ok=spellbook_ok,
+            spellbook_error=spellbook_error_msg,
+            edhrec_ok=edhrec_ok,
+            edhrec_error=edhrec_error_msg,
+            edhrec_enabled=edhrec is not None,
+        )
+    )
+
     log.info("card_comparison.complete", cards=cards, commander=commander_name)
     return "\n".join(lines)
 
@@ -658,6 +687,13 @@ async def budget_upgrade(
             f"| {rank} | {ecard.name} | {_fmt_synergy(ecard.synergy)} | "
             f"{ecard.inclusion}% | ${price:.2f} | {spd:.2f} |"
         )
+
+    # Data Sources footer
+    lines.append("")
+    lines.append("---")
+    lines.append("**Data Sources:**")
+    lines.append("- [Scryfall](https://scryfall.com): OK")
+    lines.append("- [EDHREC](https://edhrec.com): OK")
 
     log.info("budget_upgrade.complete", commander=commander_name, suggestions=len(top))
     return "\n".join(lines)

@@ -268,6 +268,12 @@ class TestCardComparison:
         assert "$1.50" in result
         assert "$0.25" in result
 
+        # Data Sources footer
+        assert "**Data Sources:**" in result
+        assert "Scryfall](https://scryfall.com)" in result
+        assert "Commander Spellbook](https://commanderspellbook.com)" in result
+        assert "EDHREC](https://edhrec.com)" in result
+
     async def test_edhrec_disabled(
         self,
         scryfall: AsyncMock,
@@ -499,6 +505,11 @@ class TestBudgetUpgrade:
 
         # Table structure
         assert "Synergy/$" in result
+
+        # Data Sources footer
+        assert "**Data Sources:**" in result
+        assert "Scryfall](https://scryfall.com)" in result
+        assert "EDHREC](https://edhrec.com)" in result
 
     async def test_edhrec_disabled(
         self,

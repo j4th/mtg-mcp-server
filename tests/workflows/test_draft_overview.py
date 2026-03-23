@@ -81,6 +81,7 @@ class TestSetOverviewHappyPath:
         result = await set_overview("LRW", seventeen_lands=client)
         assert "Set Overview" in result
         assert "LRW" in result
+        assert "Data provided by [17Lands]" in result
 
     async def test_top_commons_section_present(self) -> None:
         client = _make_mock_client()

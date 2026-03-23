@@ -190,7 +190,8 @@ class TestAllSourcesSucceed:
             num_cuts=5,
         )
 
-        assert "Spellbook" in result
+        assert "Data Sources" in result
+        assert "Commander Spellbook](https://commanderspellbook.com)" in result
         assert "EDHREC" in result
 
     async def test_unknown_card_flagged(

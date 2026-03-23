@@ -104,6 +104,22 @@ Services are pure async API clients. Providers register MCP tools. Workflows com
 
 🚧 **Under active development.** See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for current progress.
 
+## Data Sources & Attribution
+
+This project composes data from multiple third-party services:
+
+- **[Scryfall](https://scryfall.com)** — Card database, prices, rulings, search ([API guidelines](https://scryfall.com/docs/api))
+- **[Commander Spellbook](https://commanderspellbook.com)** — Combo search, bracket estimation ([MIT license](https://github.com/SpaceCowMedia/commander-spellbook-backend))
+- **[17Lands](https://www.17lands.com)** — Draft card ratings, archetype win rates ([usage guidelines](https://www.17lands.com/usage_guidelines))
+- **[EDHREC](https://edhrec.com)** — Commander staples, synergy scores (undocumented endpoints, behind feature flag)
+- **[MTGJSON](https://mtgjson.com)** — Bulk card data for rate-limit-free lookups ([MIT license](https://mtgjson.com/license/))
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for full license texts and usage terms.
+
+## Disclaimer
+
+mtg-mcp is unofficial Fan Content permitted under the [Fan Content Policy](https://company.wizards.com/en/legal/fancontentpolicy). Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. &copy; Wizards of the Coast LLC.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE)

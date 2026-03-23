@@ -57,6 +57,7 @@ class TestCardLookup:
         assert "{1}" in text
         assert "Artifact" in text
         assert "{T}: Add {C}{C}." in text
+        assert "Data provided by [MTGJSON]" in text
 
     async def test_legendary_creature(self, client: Client):
         result = await client.call_tool("card_lookup", {"name": "Muldrotha, the Gravetide"})
