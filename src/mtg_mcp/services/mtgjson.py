@@ -1,7 +1,12 @@
 """MTGJSON bulk card data service — lazy download and in-memory card cache.
 
-Downloads AtomicCards.json.gz once and keeps it in memory for O(1) card lookups
-and fast substring searches. Refreshes when the data becomes stale.
+Download ``AtomicCards.json.gz`` once and keep it in memory for O(1) card
+lookups and fast substring searches. Refresh automatically when the data
+becomes stale (default 24h). On refresh failure with existing data, serve
+stale data rather than propagating the error.
+
+Unlike other services, this is **not** a :class:`BaseClient` subclass — it
+manages its own HTTP download and has no rate limiting (single file download).
 """
 
 from __future__ import annotations
@@ -22,14 +27,17 @@ log = structlog.get_logger(service="MTGJSONClient")
 
 
 class MTGJSONError(ServiceError):
-    """Base exception for MTGJSON service errors."""
+    """Base exception for MTGJSON service errors.
+
+    Always passes ``status_code=None`` since MTGJSON is file-based, not a REST API.
+    """
 
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=None)
 
 
 class MTGJSONDownloadError(MTGJSONError):
-    """Error downloading or decompressing MTGJSON data."""
+    """Error downloading or decompressing MTGJSON bulk data file."""
 
 
 class MTGJSONClient:
@@ -45,16 +53,28 @@ class MTGJSONClient:
     """
 
     def __init__(self, data_url: str, refresh_hours: int = 24) -> None:
+        """Initialize the MTGJSON client.
+
+        Args:
+            data_url: URL to ``AtomicCards.json.gz``.
+            refresh_hours: Hours before re-downloading data.
+        """
         self._data_url = data_url
         self._refresh_seconds = refresh_hours * 3600
+        # _cards: lowercase-name -> card for O(1) exact lookup.
+        # _unique_cards: deduplicated list for linear substring search.
+        # The separation avoids double-counting DFCs which have two keys
+        # in _cards (front-face name + full "//" name) but one entry in _unique_cards.
         self._cards: dict[str, MTGJSONCard] = {}
         self._unique_cards: list[MTGJSONCard] = []
-        self._loaded_at: float = 0.0
+        self._loaded_at: float = 0.0  # monotonic timestamp; 0 = never loaded
 
     async def __aenter__(self) -> Self:
+        """Enter async context. Data is loaded lazily on first access, not here."""
         return self
 
     async def __aexit__(self, *exc: object) -> None:
+        """Release in-memory card data."""
         self._cards.clear()
         self._unique_cards.clear()
         self._loaded_at = 0.0
@@ -62,8 +82,14 @@ class MTGJSONClient:
     async def ensure_loaded(self) -> None:
         """Download and parse AtomicCards if not loaded or stale.
 
-        On refresh failure (data was previously loaded), logs a warning
-        and serves stale data rather than propagating the error.
+        On first load failure, the error propagates (server cannot start without
+        data). On **refresh** failure (data was previously loaded), logs a warning
+        and serves stale data — this prevents a temporary network issue from
+        breaking an otherwise working server.
+
+        Raises:
+            MTGJSONDownloadError: On first-load network/HTTP failure.
+            MTGJSONError: On first-load decompression or parse failure.
         """
         if not self._is_stale():
             return
@@ -78,18 +104,34 @@ class MTGJSONClient:
             log.info("mtgjson.loaded", card_count=len(self._unique_cards))
         except MTGJSONError:
             if is_refresh:
+                # Stale data is better than no data — reset the timer and keep serving.
                 log.warning("mtgjson.refresh_failed", url=self._data_url)
                 self._loaded_at = time.monotonic()
                 return
             raise
 
     async def get_card(self, name: str) -> MTGJSONCard | None:
-        """Exact card lookup by name (case-insensitive)."""
+        """Look up a card by exact name (case-insensitive).
+
+        Args:
+            name: Card name (front-face or full ``//`` name for DFCs).
+
+        Returns:
+            Card data, or None if not found.
+        """
         await self.ensure_loaded()
         return self._cards.get(name.lower())
 
     async def search_cards(self, query: str, limit: int = 20) -> list[MTGJSONCard]:
-        """Search cards by name substring (case-insensitive)."""
+        """Search cards by name substring (case-insensitive).
+
+        Args:
+            query: Substring to match against card names.
+            limit: Maximum results to return.
+
+        Returns:
+            Matching cards, up to ``limit``.
+        """
         await self.ensure_loaded()
         query_lower = query.lower()
         results: list[MTGJSONCard] = []
@@ -101,7 +143,15 @@ class MTGJSONClient:
         return results
 
     async def search_by_type(self, type_query: str, limit: int = 20) -> list[MTGJSONCard]:
-        """Search cards by type line substring (case-insensitive)."""
+        """Search cards by type line substring (case-insensitive).
+
+        Args:
+            type_query: Substring to match against type lines.
+            limit: Maximum results to return.
+
+        Returns:
+            Matching cards, up to ``limit``.
+        """
         await self.ensure_loaded()
         query_lower = type_query.lower()
         results: list[MTGJSONCard] = []
@@ -113,7 +163,15 @@ class MTGJSONClient:
         return results
 
     async def search_by_text(self, text_query: str, limit: int = 20) -> list[MTGJSONCard]:
-        """Search cards by oracle text substring (case-insensitive)."""
+        """Search cards by oracle text substring (case-insensitive).
+
+        Args:
+            text_query: Substring to match against oracle text.
+            limit: Maximum results to return.
+
+        Returns:
+            Matching cards, up to ``limit``.
+        """
         await self.ensure_loaded()
         query_lower = text_query.lower()
         results: list[MTGJSONCard] = []
@@ -131,7 +189,11 @@ class MTGJSONClient:
         return (time.monotonic() - self._loaded_at) >= self._refresh_seconds
 
     async def _download(self) -> bytes:
-        """Download the gzipped AtomicCards file."""
+        """Download the gzipped AtomicCards file.
+
+        Raises:
+            MTGJSONDownloadError: On HTTP errors or network failures.
+        """
         try:
             async with httpx.AsyncClient(timeout=120.0) as http:
                 response = await http.get(self._data_url)
@@ -144,14 +206,27 @@ class MTGJSONClient:
             raise MTGJSONDownloadError(f"Network error downloading MTGJSON data: {exc}") from exc
 
     def _decompress(self, raw_bytes: bytes) -> str:
-        """Decompress gzipped data to a JSON string."""
+        """Decompress gzipped data to a JSON string.
+
+        Raises:
+            MTGJSONError: On decompression or decoding failure.
+        """
         try:
             return gzip.decompress(raw_bytes).decode("utf-8")
         except (gzip.BadGzipFile, OSError, UnicodeDecodeError) as exc:
             raise MTGJSONError(f"Failed to decompress MTGJSON data: {exc}") from exc
 
     def _parse(self, json_str: str) -> None:
-        """Parse AtomicCards JSON into the in-memory card dict."""
+        """Parse AtomicCards JSON into the in-memory card dict.
+
+        AtomicCards keys entries by display name. For double-faced cards (DFCs),
+        the dict key uses ``//`` (e.g. ``"Jace, Vryn's Prodigy // Jace, Telepath
+        Unbound"``) but ``printing["name"]`` contains only the front face. We
+        key lookups by **both** names so either form works.
+
+        Raises:
+            MTGJSONError: If JSON is malformed or missing the ``data`` key.
+        """
         try:
             raw = json.loads(json_str)
         except json.JSONDecodeError as exc:
@@ -168,8 +243,9 @@ class MTGJSONClient:
             if not isinstance(printings, list) or len(printings) == 0:
                 continue
 
-            # Use the first printing (index 0) for oracle data.
-            # For double-faced cards, use the front face (side=null or side="a").
+            # AtomicCards groups all printings of a card together. Oracle data is
+            # consistent across printings, so we only need the first one.
+            # For DFCs, printings[0] is the front face (side=null or side="a").
             printing = printings[0]
             if not isinstance(printing, dict):
                 continue
@@ -195,9 +271,10 @@ class MTGJSONClient:
                 continue
 
             unique.append(card)
-            # Key by lowercase card name for O(1) case-insensitive lookup.
-            # For double-faced cards, also key by the full "//" name.
+            # Key by lowercase front-face name for O(1) case-insensitive lookup.
             cards[card.name.lower()] = card
+            # For DFCs, card_name (dict key) is "Front // Back" while card.name is
+            # just "Front". Add the full "//" key so both lookup forms work.
             if card_name.lower() != card.name.lower():
                 cards[card_name.lower()] = card
 
