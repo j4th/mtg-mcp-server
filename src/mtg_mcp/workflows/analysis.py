@@ -30,8 +30,11 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger(service="workflow.analysis")
 
+# Matches single-color mana symbols like {W}, {U}, {B}, {R}, {G} inside a
+# mana cost string (e.g. "{2}{U}{B}"). Ignores generic, hybrid, and phyrexian.
 _MANA_PIP_RE = re.compile(r"\{([WUBRG])\}")
 
+# Column headers for the mana curve table. Bucket 7 collects all CMC >= 7.
 _CMC_HEADER = ["0", "1", "2", "3", "4", "5", "6", "7+"]
 
 
@@ -249,9 +252,11 @@ async def _resolve_cards(
     """Resolve all cards in the decklist using MTGJSON-first fallback."""
     from mtg_mcp.workflows.card_resolver import resolve_card
 
+    # Cap concurrent lookups to respect Scryfall's 10 req/sec rate limit.
     sem = asyncio.Semaphore(10)
 
     async def _bounded_resolve(name: str) -> Card | MTGJSONCard:
+        """Resolve a single card with concurrency limiting."""
         async with sem:
             return await resolve_card(name, mtgjson=mtgjson, scryfall=scryfall)
 
@@ -343,14 +348,20 @@ async def _fill_missing_prices(
     *,
     scryfall: ScryfallClient,
 ) -> None:
-    """Fetch Scryfall prices only for cards that don't already have them (MTGJSON-resolved)."""
+    """Fetch Scryfall prices for MTGJSON-resolved cards that lack price data.
+
+    Only targets cards with ``price_usd is None`` — Scryfall-resolved cards
+    already have prices populated and are skipped.
+    """
     need_prices = [(i, card) for i, card in enumerate(resolved_cards) if card.price_usd is None]
     if not need_prices:
         return
 
+    # Cap concurrent Scryfall lookups (same rationale as _resolve_cards).
     sem = asyncio.Semaphore(10)
 
     async def _fetch_price(name: str) -> Card:
+        """Fetch a single card's price with concurrency limiting."""
         async with sem:
             return await scryfall.get_card_by_name(name)
 
