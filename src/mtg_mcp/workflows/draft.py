@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from mtg_mcp.providers import ATTRIBUTION_17LANDS
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
@@ -103,7 +105,7 @@ async def draft_pack_pick(
     log.info("draft_pack_pick.start", set_code=set_code, pack_size=len(pack))
 
     if not pack:
-        return f"# Draft Pack Analysis \u2014 {set_code}\n\nNo cards in pack."
+        return f"# Draft Pack Analysis \u2014 {set_code}\n\nNo cards in pack.{ATTRIBUTION_17LANDS}"
 
     # Fetch all card ratings for this set
     ratings = await seventeen_lands.card_ratings(set_code)
@@ -171,9 +173,7 @@ async def draft_pack_pick(
         for card_name in no_data:
             lines.append(f"- {card_name}")
 
-    lines.append("")
-    lines.append("---")
-    lines.append("*Data provided by [17Lands](https://www.17lands.com)*")
+    lines.append(ATTRIBUTION_17LANDS)
 
     log.info("draft_pack_pick.complete", set_code=set_code, found=len(found), no_data=len(no_data))
     return "\n".join(lines)
@@ -224,6 +224,7 @@ async def set_overview(
             f"# Set Overview \u2014 {set_code}\n\n"
             f"No card data available for this set. "
             f"Check the set code is correct and that 17Lands has data for {event_type}."
+            f"{ATTRIBUTION_17LANDS}"
         )
 
     # Single-pass: group by rarity and collect GIH WR values
@@ -286,9 +287,7 @@ async def set_overview(
     else:
         lines.append("No trap rares found \u2014 all rares/mythics are above the median.")
 
-    lines.append("")
-    lines.append("---")
-    lines.append("*Data provided by [17Lands](https://www.17lands.com)*")
+    lines.append(ATTRIBUTION_17LANDS)
 
     log.info(
         "set_overview.complete",

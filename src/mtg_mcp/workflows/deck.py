@@ -247,7 +247,7 @@ def _format_output(
     )
 
     if not sources.edhrec_available:
-        lines.append("- [EDHREC](https://edhrec.com): Unavailable (disabled)")
+        lines.append("- [EDHREC](https://edhrec.com): Disabled")
     elif sources.edhrec_ok:
         lines.append("- [EDHREC](https://edhrec.com): OK")
     else:

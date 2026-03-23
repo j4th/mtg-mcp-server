@@ -140,6 +140,7 @@ class TestDraftPackPickBasic:
 
         assert "Draft Pack Analysis" in result
         assert "LRW" in result
+        assert "Data provided by [17Lands]" in result
 
     async def test_output_contains_gih_wr_as_percentage(self):
         pack = ["Mulldrifter"]

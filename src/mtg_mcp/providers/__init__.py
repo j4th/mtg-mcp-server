@@ -33,8 +33,9 @@ TAGS_COMBO = {"combo", "stable"}
 TAGS_PRICING = {"pricing", "stable"}
 TAGS_BETA = {"beta"}
 
-# Attribution lines appended to tool outputs. These ensure the LLM (and by
-# extension the end user) can credit the upstream data source.
+# Attribution lines appended to tool outputs. These ensure compliance with
+# upstream usage terms and enable both the LLM and end user to identify the
+# data source.
 ATTRIBUTION_SCRYFALL = "\n\n*Data provided by [Scryfall](https://scryfall.com)*"
 ATTRIBUTION_SPELLBOOK = (
     "\n\n*Data provided by [Commander Spellbook](https://commanderspellbook.com)*"

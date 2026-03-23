@@ -42,6 +42,7 @@ class TestCommanderStaples:
         assert "22329 decks" in text
         assert "Spore Frog" in text
         assert "+53%" in text
+        assert "Data provided by [EDHREC]" in text
 
     @respx.mock
     async def test_category_filter(self, client: Client):

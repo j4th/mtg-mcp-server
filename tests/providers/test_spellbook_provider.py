@@ -40,6 +40,7 @@ class TestFindCombos:
         assert "5 combo(s)" in text
         assert "Muldrotha, the Gravetide" in text
         assert "1414-2730-5131-5256" in text
+        assert "Data provided by [Commander Spellbook]" in text
 
     @respx.mock
     async def test_no_combos_returns_message(self, client: Client):

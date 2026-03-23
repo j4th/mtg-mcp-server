@@ -41,6 +41,7 @@ class TestCardRatings:
         assert "Abuelo's Awakening" in text
         assert "GIH WR:" in text
         assert "ALSA:" in text
+        assert "Data provided by [17Lands]" in text
 
     @respx.mock
     async def test_empty_results(self, client: Client):

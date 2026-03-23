@@ -49,7 +49,7 @@ mcp = FastMCP(
         "Prompts guide multi-step analysis workflows.\n\n"
         "mtg-mcp is unofficial Fan Content permitted under the Fan Content Policy. "
         "Not approved/endorsed by Wizards. Portions of the materials used are "
-        "property of Wizards of the Coast. (c) Wizards of the Coast LLC."
+        "property of Wizards of the Coast. \u00a9 Wizards of the Coast LLC."
     ),
 )
 

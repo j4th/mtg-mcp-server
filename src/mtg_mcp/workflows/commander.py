@@ -143,24 +143,24 @@ def _source_status(
     """Build the Data Sources footer section with attribution."""
     lines = ["", "---", "**Data Sources:**"]
 
-    scryfall_status = "OK" if scryfall_ok else "error"
+    scryfall_status = "OK" if scryfall_ok else "Failed"
     lines.append(f"- [Scryfall](https://scryfall.com): {scryfall_status}")
 
     if spellbook_ok:
         lines.append("- [Commander Spellbook](https://commanderspellbook.com): OK")
     else:
         lines.append(
-            f"- [Commander Spellbook](https://commanderspellbook.com): error ({spellbook_error})"
+            f"- [Commander Spellbook](https://commanderspellbook.com): Failed ({spellbook_error})"
         )
 
     if not edhrec_enabled:
-        lines.append("- [EDHREC](https://edhrec.com): not enabled")
+        lines.append("- [EDHREC](https://edhrec.com): Disabled")
     elif edhrec_ok is None:
         lines.append("- [EDHREC](https://edhrec.com): not queried")
     elif edhrec_ok:
         lines.append("- [EDHREC](https://edhrec.com): OK")
     else:
-        lines.append(f"- [EDHREC](https://edhrec.com): error ({edhrec_error})")
+        lines.append(f"- [EDHREC](https://edhrec.com): Failed ({edhrec_error})")
 
     return lines
 
@@ -550,6 +550,19 @@ async def card_comparison(
             f"{synergy_str} | {inclusion_str} | {combo_str} | {price_str} |"
         )
 
+    # Data Sources footer — Scryfall always OK (errors propagate), Spellbook
+    # always called (per-card failures shown as N/A), EDHREC depends on flag.
+    lines.extend(
+        _source_status(
+            scryfall_ok=True,
+            spellbook_ok=True,
+            spellbook_error=None,
+            edhrec_ok=True if edhrec is not None else None,
+            edhrec_error=None,
+            edhrec_enabled=edhrec is not None,
+        )
+    )
+
     log.info("card_comparison.complete", cards=cards, commander=commander_name)
     return "\n".join(lines)
 
@@ -660,6 +673,13 @@ async def budget_upgrade(
             f"| {rank} | {ecard.name} | {_fmt_synergy(ecard.synergy)} | "
             f"{ecard.inclusion}% | ${price:.2f} | {spd:.2f} |"
         )
+
+    # Data Sources footer
+    lines.append("")
+    lines.append("---")
+    lines.append("**Data Sources:**")
+    lines.append("- [Scryfall](https://scryfall.com): OK")
+    lines.append("- [EDHREC](https://edhrec.com): OK")
 
     log.info("budget_upgrade.complete", commander=commander_name, suggestions=len(top))
     return "\n".join(lines)
