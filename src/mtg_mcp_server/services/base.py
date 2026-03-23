@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
-from importlib.metadata import version as _pkg_version
 from typing import TYPE_CHECKING, Self
 
 import httpx
@@ -21,7 +20,9 @@ from tenacity import (
     wait_exponential,
 )
 
-DEFAULT_USER_AGENT = f"mtg-mcp-server/{_pkg_version('mtg-mcp-server')}"
+from mtg_mcp_server import __version__
+
+DEFAULT_USER_AGENT = f"mtg-mcp-server/{__version__}"
 
 if TYPE_CHECKING:
     from typing import Any

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from cachetools import TTLCache
 
-from mtg_mcp_server.services.base import BaseClient, ServiceError
+from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, BaseClient, ServiceError
 from mtg_mcp_server.services.cache import _decklist_key, _method_key, async_cached
 from mtg_mcp_server.types import BracketEstimate, Combo, ComboCard, ComboResult, DecklistCombos
 
@@ -111,10 +111,12 @@ class SpellbookClient(BaseClient):
         self,
         base_url: str = "https://backend.commanderspellbook.com",
         rate_limit_rps: float = 3.0,
+        user_agent: str = DEFAULT_USER_AGENT,
     ) -> None:
         super().__init__(
             base_url=base_url,
             rate_limit_rps=rate_limit_rps,
+            user_agent=user_agent,
         )
 
     @async_cached(_combos_cache, key=_method_key)
