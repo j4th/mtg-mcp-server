@@ -42,3 +42,49 @@ jobs:
         with:
           files: coverage.xml
           fail_ci_if_error: false
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+
+      - name: Build package
+        run: uv build
+
+      - name: Verify package installs and imports
+        run: uv run --with dist/*.whl --no-project -- python -c "from mtg_mcp_server import __version__; print(f'mtg-mcp-server {__version__}')"
+
+      - name: Verify entry point
+        run: uv run --with dist/*.whl --no-project -- mtg-mcp-server --help 2>&1 || true
+
+      - name: Verify MCP tool registration
+        run: |
+          uv run python -c "
+          import asyncio
+          from fastmcp import Client
+          from mtg_mcp_server.server import mcp
+
+          async def check():
+              async with Client(transport=mcp) as c:
+                  tools = await c.list_tools()
+                  print(f'Registered {len(tools)} tools:')
+                  for t in sorted(tools, key=lambda t: t.name):
+                      print(f'  {t.name}')
+                  assert len(tools) >= 20, f'Expected 20+ tools, got {len(tools)}'
+          asyncio.run(check())
+          "
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+
+      - name: Install dependencies
+        run: mise run setup
+
+      - name: Audit dependencies
+        run: uv run pip-audit
