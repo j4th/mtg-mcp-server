@@ -12,11 +12,18 @@ from mtg_mcp.config import Settings
 from mtg_mcp.providers import TAGS_LOOKUP, TAGS_PRICING, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
 
+# Module-level client set by the lifespan. This pattern is required because
+# FastMCP's Depends()/lifespan_context DI doesn't propagate through mount().
 _client: ScryfallClient | None = None
 
 
 @lifespan
 async def scryfall_lifespan(server: FastMCP):
+    """Manage the ScryfallClient lifecycle.
+
+    Create the client once at startup using settings (honoring env var overrides),
+    keep the httpx connection pool open for the server's lifetime, then tear down.
+    """
     global _client
     settings = Settings()
     client = ScryfallClient(base_url=settings.scryfall_base_url)
@@ -30,6 +37,7 @@ scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)
 
 
 def _get_client() -> ScryfallClient:
+    """Return the initialized client or raise if the lifespan hasn't started."""
     if _client is None:
         raise RuntimeError("ScryfallClient not initialized — server lifespan not running")
     return _client
@@ -145,6 +153,7 @@ async def card_rulings(
 
 
 def _format_legalities(legalities: dict[str, str]) -> str:
+    """Format a legalities dict as a comma-separated list of legal format names."""
     legal = [fmt for fmt, status in legalities.items() if status == "legal"]
     if not legal:
         return "Not legal in any format"

@@ -320,3 +320,67 @@ Coverage target: **80%+ on services and servers**, measured per phase.
 - Autouse `_clear_caches` fixture in conftest.py is essential — without it, cached results leak between tests
 - MTGJSON is file-based (not BaseClient) — different lifecycle from HTTP services, but same lifespan/module-level-client pattern for the provider
 - MTGJSON `AtomicCards.json` keys by display name (with `//` for DFCs) — need to key by both short name and full name for DFC lookup
+
+---
+
+## Phase 5: Analysis & Comparison Workflows [COMPLETE]
+
+**Goal:** Higher-order workflow tools that compose across backends for deck analysis, card comparison, budget suggestions, and draft format overviews. Prompts to guide multi-step analysis. Resources for cached data access.
+
+**Prerequisites:** All backend providers and Phase 3 workflow tools working. MTGJSON available for rate-limit-free card resolution.
+
+### Steps
+
+1. **Card resolver utility** (`workflows/card_resolver.py`):
+   - MTGJSON-first card resolution with Scryfall fallback
+   - `need_prices` flag to bypass MTGJSON when price data is required
+   - Used by `deck_analysis` for bulk card lookups without rate-limit pressure
+
+2. **card_comparison** (`workflows/commander.py`):
+   - Compare 2-5 cards side-by-side for a specific commander
+   - Parallel Scryfall resolution, EDHREC synergy lookups, Spellbook combo counts
+   - Progress reporting via `ctx.report_progress()` callback
+   - Validation: 2-5 cards enforced at tool wrapper level
+
+3. **budget_upgrade** (`workflows/commander.py`):
+   - Fetch EDHREC staples, look up Scryfall prices in parallel (semaphore=10)
+   - Filter by budget ceiling, rank by synergy-per-dollar
+   - Requires EDHREC (not optional) + Scryfall for prices
+
+4. **deck_analysis** (`workflows/analysis.py`):
+   - Full decklist health check: mana curve, color pips, combos, bracket, budget, synergy
+   - 4-step progress: resolve cards → spellbook data → EDHREC data → fill prices
+   - MTGJSON-first card resolution via `card_resolver` with Scryfall fallback for prices
+   - All backends optional except Scryfall
+
+5. **set_overview** (`workflows/draft.py`):
+   - Top 10 commons/uncommons by GIH WR, trap rares/mythics below median
+   - 17Lands only — single backend, 2-step progress
+
+6. **Prompts** (`workflows/server.py`):
+   - `evaluate_commander_swap`: Multi-step swap evaluation guide
+   - `deck_health_check`: Full deck health assessment workflow
+   - `draft_strategy`: Draft format preparation session
+   - `find_upgrades`: Budget upgrade session guide
+
+7. **Resources** (registered on provider sub-servers):
+   - `mtg://card/{name}` and `mtg://card/{name}/rulings` (Scryfall)
+   - `mtg://combo/{combo_id}` (Spellbook)
+   - `mtg://draft/{set_code}/ratings` (17Lands)
+   - `mtg://commander/{name}/staples` (EDHREC)
+   - `mtg://card-data/{name}` (MTGJSON)
+
+8. **Tool tags** (`providers/__init__.py`):
+   - Tag constants: `TAGS_LOOKUP`, `TAGS_SEARCH`, `TAGS_COMMANDER`, `TAGS_DRAFT`, `TAGS_COMBO`, `TAGS_PRICING`, `TAGS_BETA`
+   - Applied to all tools via `tags=` parameter for categorization
+
+**Done when:** All 8 workflow tools, 4 prompts, and 6 resources registered. 374 tests passing, 92% coverage.
+
+**Completed:** Final state: 15 backend tools + 8 workflow tools + 4 prompts + 6 resources. 374 tests, 92% coverage.
+
+**Key learnings from Phase 5:**
+- Progress reporting works best as a callback pattern: pure functions accept `on_progress: Callable[[int, int], Awaitable[None]]`, `server.py` bridges to `ctx.report_progress()`
+- Card resolver utility avoids duplicating MTGJSON-first logic across workflows
+- `budget_upgrade` requires EDHREC (not optional) — unlike other workflows, it has no fallback for staples data
+- Semaphore(10) on Scryfall price lookups prevents overwhelming the API during bulk operations
+- Tool tags provide categorization without affecting tool naming or behavior

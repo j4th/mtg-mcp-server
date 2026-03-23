@@ -12,11 +12,13 @@ from mtg_mcp.config import Settings
 from mtg_mcp.providers import TAGS_DRAFT, TOOL_ANNOTATIONS
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
 
+# Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: SeventeenLandsClient | None = None
 
 
 @lifespan
 async def draft_lifespan(server: FastMCP):
+    """Manage the SeventeenLandsClient lifecycle."""
     global _client
     settings = Settings()
     client = SeventeenLandsClient(base_url=settings.seventeen_lands_base_url)
@@ -30,6 +32,7 @@ draft_mcp = FastMCP("17Lands", lifespan=draft_lifespan)
 
 
 def _get_client() -> SeventeenLandsClient:
+    """Return the initialized client or raise if the lifespan hasn't started."""
     if _client is None:
         raise RuntimeError("SeventeenLandsClient not initialized — server lifespan not running")
     return _client

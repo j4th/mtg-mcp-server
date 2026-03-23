@@ -374,3 +374,103 @@ These are undocumented internal endpoints. They WILL break eventually. Design th
 2. Fail gracefully — EDHREC being down should never crash the orchestrator
 3. Have fixture-based tests that don't hit the real endpoints
 4. Log warnings when response shapes don't match expected models
+
+---
+
+## MTGJSON
+
+**Status:** Open-source card data project. Bulk JSON file downloads. No rate limits.
+
+### Connection Details
+
+| Field | Value |
+|-------|-------|
+| Data URL | `https://mtgjson.com/api/v5/AtomicCards.json.gz` (~20MB gzipped, ~120MB uncompressed) |
+| Auth | None (public downloads) |
+| Rate limit | N/A (file download, not API) |
+| Update frequency | Daily |
+| Documentation | https://mtgjson.com/data-models/ |
+
+### Data File
+
+**`AtomicCards.json.gz`** — Oracle-level card data keyed by display name.
+
+Gzip-compressed JSON file. After decompression, the structure is:
+```json
+{
+  "data": {
+    "Sol Ring": [
+      {
+        "name": "Sol Ring",
+        "manaCost": "{1}",
+        "type": "Artifact",
+        "text": "{T}: Add {C}{C}.",
+        "colors": [],
+        "colorIdentity": [],
+        "types": ["Artifact"],
+        "subtypes": [],
+        "supertypes": [],
+        "keywords": [],
+        "power": null,
+        "toughness": null,
+        "manaValue": 1.0
+      }
+    ],
+    "Muldrotha, the Gravetide": [
+      { "..." : "..." }
+    ]
+  }
+}
+```
+
+Each card name maps to an array of printings. We use `printings[0]` for oracle data (oracle text is the same across all printings).
+
+### Key Fields Extracted
+
+| MTGJSON Field | Our Model Field | Notes |
+|---------------|-----------------|-------|
+| `name` | `name` | Display name (front face for DFCs) |
+| `manaCost` | `mana_cost` | Mana cost string (e.g. `"{3}{B}{G}{U}"`) |
+| `type` | `type_line` | Full type line |
+| `text` | `oracle_text` | Oracle text |
+| `colors` | `colors` | Color list |
+| `colorIdentity` | `color_identity` | Color identity list |
+| `types` | `types` | Card types (e.g. `["Creature"]`) |
+| `subtypes` | `subtypes` | Subtypes (e.g. `["Elemental", "Avatar"]`) |
+| `supertypes` | `supertypes` | Supertypes (e.g. `["Legendary"]`) |
+| `keywords` | `keywords` | Keywords (e.g. `["Flying", "Trample"]`) |
+| `power` | `power` | Power (nullable) |
+| `toughness` | `toughness` | Toughness (nullable) |
+| `manaValue` | `mana_value` | Converted mana cost as float |
+
+### What MTGJSON Does NOT Have
+
+- **Prices** — Must use Scryfall for price data
+- **Rulings** — Must use Scryfall for official rulings
+- **Images** — No image URIs
+- **Set-specific data** — AtomicCards is oracle-level, not printing-level
+- **Legalities** — Not in the atomic data
+- **EDHREC rank** — Not included
+
+### Double-Faced Card (DFC) Handling
+
+AtomicCards keys DFCs by their full display name with `//` separator (e.g. `"Jace, Vryn's Prodigy // Jace, Telepath Unbound"`). The `name` field in each printing contains only the front face name. Our service keys lookups by both:
+- The front face name (from `printing.name`)
+- The full `//` name (from the dict key)
+
+This allows lookup by either `"Jace, Vryn's Prodigy"` or `"Jace, Vryn's Prodigy // Jace, Telepath Unbound"`.
+
+### Service Architecture
+
+Unlike other services, MTGJSON is **not** a `BaseClient` subclass. It's a file-based service that:
+1. Downloads `AtomicCards.json.gz` lazily on first access (not at startup)
+2. Decompresses and parses into `dict[str, MTGJSONCard]` keyed by lowercase name
+3. Maintains a separate `list[MTGJSONCard]` for substring search
+4. Refreshes when `MTG_MCP_MTGJSON_REFRESH_HOURS` has elapsed (default 24h)
+5. On refresh failure with existing data, serves stale data rather than failing
+
+### Feature Flag
+
+Behind `MTG_MCP_ENABLE_MTGJSON` (default `true`). When disabled:
+- Provider is not mounted on the orchestrator
+- Workflow tools skip MTGJSON lookups and go directly to Scryfall

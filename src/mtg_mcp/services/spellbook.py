@@ -1,4 +1,9 @@
-"""Commander Spellbook API client for combo search and bracket estimation."""
+"""Commander Spellbook API client for combo search and bracket estimation.
+
+Wraps the Commander Spellbook REST API (https://backend.commanderspellbook.com)
+which uses Django REST Framework with paginated responses. The API returns
+camelCase JSON; parsing helpers map it to our snake_case Pydantic models.
+"""
 
 from __future__ import annotations
 
@@ -20,9 +25,17 @@ class ComboNotFoundError(SpellbookError):
 def _parse_combo(data: dict) -> Combo:
     """Parse a raw Spellbook combo variant into a Combo model.
 
-    The API returns camelCase with nested 'uses' and 'produces' arrays
-    that need flattening into our models.
+    The API response nests card data inside ``uses[].card`` and result data
+    inside ``produces[].feature``. This function flattens those structures
+    into our :class:`ComboCard` and :class:`ComboResult` models.
+
+    Args:
+        data: Raw JSON dict for a single combo variant.
+
+    Returns:
+        Parsed Combo model.
     """
+    # Each "use" wraps card info: {"card": {"name": ..., "oracleId": ...}, "zoneLocations": [...]}
     cards = [
         ComboCard(
             name=use["card"]["name"],
@@ -34,6 +47,7 @@ def _parse_combo(data: dict) -> Combo:
         for use in data.get("uses", [])
     ]
 
+    # Each "produce" wraps a feature: {"feature": {"name": ...}, "quantity": N}
     produces = [
         ComboResult(
             feature_name=prod["feature"]["name"],
@@ -60,7 +74,17 @@ def _parse_combo(data: dict) -> Combo:
 
 
 def _build_decklist_body(commanders: list[str], decklist: list[str]) -> dict:
-    """Build the JSON body for /find-my-combos and /estimate-bracket."""
+    """Build the JSON body for ``/find-my-combos`` and ``/estimate-bracket``.
+
+    The API expects ``{"commanders": [{"card": ..., "quantity": 1}], "main": [...]}``.
+
+    Args:
+        commanders: Commander card names.
+        decklist: Main deck card names.
+
+    Returns:
+        Request body dict ready for ``json=`` in httpx.
+    """
     return {
         "commanders": [{"card": name, "quantity": 1} for name in commanders],
         "main": [{"card": name, "quantity": 1} for name in decklist],
@@ -68,12 +92,20 @@ def _build_decklist_body(commanders: list[str], decklist: list[str]) -> dict:
 
 
 class SpellbookClient(BaseClient):
-    """Async client for the Commander Spellbook REST API."""
+    """Async client for the Commander Spellbook REST API.
 
-    _combos_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)
-    _combo_cache: TTLCache = TTLCache(maxsize=100, ttl=86400)
-    _decklist_combos_cache: TTLCache = TTLCache(maxsize=50, ttl=43200)
-    _bracket_cache: TTLCache = TTLCache(maxsize=50, ttl=43200)
+    Args:
+        base_url: Spellbook API base URL.
+        rate_limit_rps: Max requests per second.
+    """
+
+    # Combo data changes infrequently (24h TTL).
+    # Decklist analysis results are less cacheable (12h TTL) since users
+    # may update their decklist between calls.
+    _combos_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)  # 24h
+    _combo_cache: TTLCache = TTLCache(maxsize=100, ttl=86400)  # 24h
+    _decklist_combos_cache: TTLCache = TTLCache(maxsize=50, ttl=43200)  # 12h
+    _bracket_cache: TTLCache = TTLCache(maxsize=50, ttl=43200)  # 12h
 
     def __init__(
         self,
@@ -96,12 +128,16 @@ class SpellbookClient(BaseClient):
 
         Args:
             card_name: Card name to search for.
-            color_identity: Optional color identity filter (e.g. "sultai", "BUG").
+            color_identity: Optional color identity filter (e.g. ``"sultai"``, ``"BUG"``).
             limit: Maximum number of results to return.
 
         Returns:
             List of matching combos.
+
+        Raises:
+            SpellbookError: On API errors.
         """
+        # Spellbook search syntax: card:"Name" coloridentity:XXX
         query = f'card:"{card_name}"'
         if color_identity:
             query += f" coloridentity:{color_identity}"
@@ -114,6 +150,7 @@ class SpellbookClient(BaseClient):
         except ServiceError as exc:
             raise SpellbookError(exc.message, status_code=exc.status_code) from exc
 
+        # Response is a DRF paginated envelope: {count, next, previous, results: [...]}
         data = response.json()
         return [_parse_combo(r) for r in data.get("results", [])]
 
@@ -153,6 +190,9 @@ class SpellbookClient(BaseClient):
 
         Returns:
             Combos categorized as included or almost-included.
+
+        Raises:
+            SpellbookError: On API errors.
         """
         body = _build_decklist_body(commanders, decklist)
         try:
@@ -184,6 +224,9 @@ class SpellbookClient(BaseClient):
 
         Returns:
             Bracket estimation with relevant details.
+
+        Raises:
+            SpellbookError: On API errors.
         """
         body = _build_decklist_body(commanders, decklist)
         try:

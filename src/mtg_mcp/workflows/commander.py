@@ -27,6 +27,7 @@ log = structlog.get_logger(service="workflow.commander")
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
+# Cap output length to keep tool responses concise for LLM context windows.
 _MAX_COMBOS = 5
 _MAX_STAPLES = 10
 
@@ -606,9 +607,11 @@ async def budget_upgrade(
     if on_progress is not None:
         await on_progress(2, 2)
 
+    # Limit concurrent Scryfall requests to avoid overwhelming the connection pool.
     sem = asyncio.Semaphore(10)
 
     async def _fetch_price(name: str) -> Card:
+        """Fetch a single card's price with concurrency limiting."""
         async with sem:
             return await scryfall.get_card_by_name(name)
 
@@ -627,6 +630,7 @@ async def budget_upgrade(
         price = float(scryfall_card.prices.usd)
         if price > budget:
             continue
+        # Floor price at $0.25 to avoid division-by-near-zero inflating bulk cards.
         synergy_per_dollar = ecard.synergy / max(price, 0.25)
         candidates.append((ecard, price, synergy_per_dollar))
 

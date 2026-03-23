@@ -15,11 +15,13 @@ from mtg_mcp.config import Settings
 from mtg_mcp.providers import TAGS_BETA, TOOL_ANNOTATIONS
 from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
 
+# Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: EDHRECClient | None = None
 
 
 @lifespan
 async def edhrec_lifespan(server: FastMCP):
+    """Manage the EDHRECClient lifecycle."""
     global _client
     settings = Settings()
     client = EDHRECClient(base_url=settings.edhrec_base_url)
@@ -33,6 +35,7 @@ edhrec_mcp = FastMCP("EDHREC", lifespan=edhrec_lifespan)
 
 
 def _get_client() -> EDHRECClient:
+    """Return the initialized client or raise if the lifespan hasn't started."""
     if _client is None:
         raise RuntimeError("EDHRECClient not initialized — server lifespan not running")
     return _client

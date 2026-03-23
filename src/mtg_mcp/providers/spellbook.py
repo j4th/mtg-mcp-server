@@ -20,6 +20,8 @@ from mtg_mcp.services.spellbook import (
 if TYPE_CHECKING:
     from mtg_mcp.types import Combo
 
+# Spellbook API uses single-letter zone codes in combo card data.
+# Map them to human-readable names for tool output.
 _ZONE_NAMES = {
     "B": "Battlefield",
     "H": "Hand",
@@ -29,11 +31,13 @@ _ZONE_NAMES = {
     "C": "Command Zone",
 }
 
+# Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: SpellbookClient | None = None
 
 
 @lifespan
 async def spellbook_lifespan(server: FastMCP):
+    """Manage the SpellbookClient lifecycle."""
     global _client
     settings = Settings()
     client = SpellbookClient(base_url=settings.spellbook_base_url)
@@ -47,6 +51,7 @@ spellbook_mcp = FastMCP("Spellbook", lifespan=spellbook_lifespan)
 
 
 def _get_client() -> SpellbookClient:
+    """Return the initialized client or raise if the lifespan hasn't started."""
     if _client is None:
         raise RuntimeError("SpellbookClient not initialized — server lifespan not running")
     return _client

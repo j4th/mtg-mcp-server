@@ -16,11 +16,17 @@ from mtg_mcp.config import Settings
 from mtg_mcp.providers import TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONError
 
+# Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: MTGJSONClient | None = None
 
 
 @lifespan
 async def mtgjson_lifespan(server: FastMCP):
+    """Manage the MTGJSONClient lifecycle.
+
+    Downloads (or refreshes) the AtomicCards bulk file on first access,
+    then keeps the in-memory card index available for the server's lifetime.
+    """
     global _client
     settings = Settings()
     client = MTGJSONClient(
@@ -37,6 +43,7 @@ mtgjson_mcp = FastMCP("MTGJSON", lifespan=mtgjson_lifespan)
 
 
 def _get_client() -> MTGJSONClient:
+    """Return the initialized client or raise if the lifespan hasn't started."""
     if _client is None:
         raise RuntimeError("MTGJSONClient not initialized — server lifespan not running")
     return _client
