@@ -10,7 +10,13 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TAGS_COMBO, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
+from mtg_mcp.providers import (
+    ATTRIBUTION_SPELLBOOK,
+    TAGS_COMBO,
+    TAGS_LOOKUP,
+    TAGS_SEARCH,
+    TOOL_ANNOTATIONS,
+)
 from mtg_mcp.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
@@ -75,7 +81,7 @@ async def find_combos(
         raise ToolError(f"Spellbook API error: {exc}") from exc
 
     if not combos:
-        return f"No combos found involving '{card_name}'."
+        return f"No combos found involving '{card_name}'." + ATTRIBUTION_SPELLBOOK
 
     lines = [f"Found {len(combos)} combo(s) involving {card_name}:"]
     for combo in combos:
@@ -84,7 +90,7 @@ async def find_combos(
         if combo.bracket_tag:
             lines.append(f"    Bracket: {combo.bracket_tag}")
         lines.append(f"    Popularity: {combo.popularity}")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
 
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP | TAGS_COMBO)
@@ -125,7 +131,7 @@ async def combo_details(
         lines.append(f"Bracket: {combo.bracket_tag}")
     lines.append(f"Popularity: {combo.popularity}")
 
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
 
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
@@ -158,7 +164,7 @@ async def find_decklist_combos(
         for combo in result.almost_included:
             lines.extend(_format_combo_summary(combo))
 
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
 
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
@@ -198,7 +204,7 @@ async def estimate_bracket(
     ):
         lines.append("No bracket-relevant concerns found.")
 
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
 
 
 def _zone_name(code: str) -> str:

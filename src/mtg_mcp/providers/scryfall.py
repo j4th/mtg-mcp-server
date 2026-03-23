@@ -9,7 +9,13 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TAGS_LOOKUP, TAGS_PRICING, TAGS_SEARCH, TOOL_ANNOTATIONS
+from mtg_mcp.providers import (
+    ATTRIBUTION_SCRYFALL,
+    TAGS_LOOKUP,
+    TAGS_PRICING,
+    TAGS_SEARCH,
+    TOOL_ANNOTATIONS,
+)
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
 
 # Module-level client set by the lifespan. This pattern is required because
@@ -67,7 +73,7 @@ async def search_cards(
         lines.append(f"  {card.name} {card.mana_cost or ''} — {card.type_line}{price}")
     if result.has_more:
         lines.append(f"\nMore results available — use page={page + 1}")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
@@ -101,7 +107,7 @@ async def card_details(
         lines.append(f"EDHREC Rank: {card.edhrec_rank}")
     lines.append(f"Legalities: {_format_legalities(card.legalities)}")
     lines.append(f"Scryfall: {card.scryfall_uri}")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_PRICING)
@@ -126,7 +132,7 @@ async def card_price(
         lines.append(f"  EUR: \u20ac{card.prices.eur}")
     if not any([card.prices.usd, card.prices.usd_foil, card.prices.eur]):
         lines.append("  No price data available.")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
@@ -144,12 +150,12 @@ async def card_rulings(
         raise ToolError(f"Scryfall API error: {exc}") from exc
 
     if not rulings:
-        return f"**{card.name}** — No rulings available."
+        return f"**{card.name}** — No rulings available." + ATTRIBUTION_SCRYFALL
 
     lines = [f"**{card.name}** — {len(rulings)} ruling(s):"]
     for ruling in rulings:
         lines.append(f"  [{ruling.published_at}] {ruling.comment}")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
 
 
 def _format_legalities(legalities: dict[str, str]) -> str:

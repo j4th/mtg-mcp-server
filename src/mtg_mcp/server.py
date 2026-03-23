@@ -46,7 +46,10 @@ mcp = FastMCP(
         "- draft_pack_pick: Rank cards in a draft pack\n"
         "- suggest_cuts: Identify weakest cards to cut\n\n"
         "Resources (mtg:// URIs) provide cached card, combo, and rating data.\n"
-        "Prompts guide multi-step analysis workflows."
+        "Prompts guide multi-step analysis workflows.\n\n"
+        "mtg-mcp is unofficial Fan Content permitted under the Fan Content Policy. "
+        "Not approved/endorsed by Wizards. Portions of the materials used are "
+        "property of Wizards of the Coast. (c) Wizards of the Coast LLC."
     ),
 )
 

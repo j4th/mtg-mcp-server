@@ -241,14 +241,17 @@ def _format_output(
 
     # Data sources status
     lines.append("## Data Sources")
-    lines.append(f"- Spellbook: {'OK' if sources.spellbook_ok else 'Failed'}")
+    lines.append(
+        f"- [Commander Spellbook](https://commanderspellbook.com): "
+        f"{'OK' if sources.spellbook_ok else 'Failed'}"
+    )
 
     if not sources.edhrec_available:
-        lines.append("- EDHREC: Unavailable (disabled)")
+        lines.append("- [EDHREC](https://edhrec.com): Unavailable (disabled)")
     elif sources.edhrec_ok:
-        lines.append("- EDHREC: OK")
+        lines.append("- [EDHREC](https://edhrec.com): OK")
     else:
-        lines.append("- EDHREC: Failed")
+        lines.append("- [EDHREC](https://edhrec.com): Failed")
     lines.append("")
 
     # Ranked list

@@ -13,7 +13,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
+from mtg_mcp.providers import ATTRIBUTION_MTGJSON, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONError
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
@@ -82,7 +82,7 @@ async def card_lookup(name: str) -> str:
     if card.subtypes:
         lines.append(f"Subtypes: {', '.join(card.subtypes)}")
     lines.append(f"Mana Value: {card.mana_value}")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_MTGJSON
 
 
 @mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
@@ -117,7 +117,7 @@ async def card_search(
     for card in results:
         cost = f" {card.mana_cost}" if card.mana_cost else ""
         lines.append(f"  {card.name}{cost} — {card.type_line}")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_MTGJSON
 
 
 # ---------------------------------------------------------------------------

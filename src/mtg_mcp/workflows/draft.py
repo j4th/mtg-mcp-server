@@ -171,6 +171,10 @@ async def draft_pack_pick(
         for card_name in no_data:
             lines.append(f"- {card_name}")
 
+    lines.append("")
+    lines.append("---")
+    lines.append("*Data provided by [17Lands](https://www.17lands.com)*")
+
     log.info("draft_pack_pick.complete", set_code=set_code, found=len(found), no_data=len(no_data))
     return "\n".join(lines)
 
@@ -281,6 +285,10 @@ async def set_overview(
             )
     else:
         lines.append("No trap rares found \u2014 all rares/mythics are above the median.")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("*Data provided by [17Lands](https://www.17lands.com)*")
 
     log.info(
         "set_overview.complete",

@@ -263,10 +263,10 @@ class TestDeckAnalysisHappyPath:
             edhrec=_make_edhrec(),
         )
         assert "**Data Sources:**" in result
-        assert "Scryfall: OK" in result
-        assert "Spellbook: OK" in result
-        assert "EDHREC: OK" in result
-        assert "MTGJSON: OK" in result
+        assert "Scryfall](https://scryfall.com): OK" in result
+        assert "Commander Spellbook](https://commanderspellbook.com): OK" in result
+        assert "EDHREC](https://edhrec.com): OK" in result
+        assert "MTGJSON](https://mtgjson.com): OK" in result
 
     async def test_bracket_tag_displayed(self) -> None:
         result = await deck_analysis(
@@ -331,7 +331,7 @@ class TestDeckAnalysisMtgjsonDisabled:
             edhrec=_make_edhrec(),
         )
         assert "Deck Analysis" in result
-        assert "MTGJSON: Disabled" in result
+        assert "MTGJSON](https://mtgjson.com): Disabled" in result
 
     async def test_mana_curve_still_computed(self) -> None:
         result = await deck_analysis(
@@ -358,7 +358,7 @@ class TestDeckAnalysisEdhrecDisabled:
             edhrec=None,
         )
         assert "not enabled" in result.lower() or "disabled" in result.lower()
-        assert "EDHREC: Disabled" in result
+        assert "EDHREC](https://edhrec.com): Disabled" in result
 
     async def test_other_sections_still_present(self) -> None:
         result = await deck_analysis(
@@ -393,7 +393,10 @@ class TestDeckAnalysisSpellbookFailure:
             spellbook=spellbook,
             edhrec=_make_edhrec(),
         )
-        assert "Spellbook unavailable" in result or "Spellbook: Failed" in result
+        assert (
+            "Spellbook unavailable" in result
+            or "Spellbook](https://commanderspellbook.com): Failed" in result
+        )
 
     async def test_other_sections_still_present(self) -> None:
         spellbook = AsyncMock()

@@ -32,3 +32,13 @@ TAGS_DRAFT = {"draft", "analysis", "stable"}
 TAGS_COMBO = {"combo", "stable"}
 TAGS_PRICING = {"pricing", "stable"}
 TAGS_BETA = {"beta"}
+
+# Attribution lines appended to tool outputs. These ensure the LLM (and by
+# extension the end user) can credit the upstream data source.
+ATTRIBUTION_SCRYFALL = "\n\n*Data provided by [Scryfall](https://scryfall.com)*"
+ATTRIBUTION_SPELLBOOK = (
+    "\n\n*Data provided by [Commander Spellbook](https://commanderspellbook.com)*"
+)
+ATTRIBUTION_17LANDS = "\n\n*Data provided by [17Lands](https://www.17lands.com)*"
+ATTRIBUTION_EDHREC = "\n\n*Data provided by [EDHREC](https://edhrec.com)*"
+ATTRIBUTION_MTGJSON = "\n\n*Data provided by [MTGJSON](https://mtgjson.com)*"

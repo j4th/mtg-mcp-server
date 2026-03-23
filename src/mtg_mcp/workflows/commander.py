@@ -140,25 +140,27 @@ def _source_status(
     edhrec_error: str | None,
     edhrec_enabled: bool,
 ) -> list[str]:
-    """Build the Data Sources footer section."""
+    """Build the Data Sources footer section with attribution."""
     lines = ["", "---", "**Data Sources:**"]
 
     scryfall_status = "OK" if scryfall_ok else "error"
-    lines.append(f"- Scryfall: {scryfall_status}")
+    lines.append(f"- [Scryfall](https://scryfall.com): {scryfall_status}")
 
     if spellbook_ok:
-        lines.append("- Spellbook: OK")
+        lines.append("- [Commander Spellbook](https://commanderspellbook.com): OK")
     else:
-        lines.append(f"- Spellbook: error ({spellbook_error})")
+        lines.append(
+            f"- [Commander Spellbook](https://commanderspellbook.com): error ({spellbook_error})"
+        )
 
     if not edhrec_enabled:
-        lines.append("- EDHREC: not enabled")
+        lines.append("- [EDHREC](https://edhrec.com): not enabled")
     elif edhrec_ok is None:
-        lines.append("- EDHREC: not queried")
+        lines.append("- [EDHREC](https://edhrec.com): not queried")
     elif edhrec_ok:
-        lines.append("- EDHREC: OK")
+        lines.append("- [EDHREC](https://edhrec.com): OK")
     else:
-        lines.append(f"- EDHREC: error ({edhrec_error})")
+        lines.append(f"- [EDHREC](https://edhrec.com): error ({edhrec_error})")
 
     return lines
 

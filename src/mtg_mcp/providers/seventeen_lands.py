@@ -9,7 +9,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TAGS_DRAFT, TOOL_ANNOTATIONS
+from mtg_mcp.providers import ATTRIBUTION_17LANDS, TAGS_DRAFT, TOOL_ANNOTATIONS
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
@@ -62,7 +62,7 @@ async def card_ratings(
         raise ToolError(f"17Lands API error: {exc}") from exc
 
     if not ratings:
-        return f"No card rating data available for {set_code} ({event_type})."
+        return f"No card rating data available for {set_code} ({event_type})." + ATTRIBUTION_17LANDS
 
     lines = [f"Card ratings for {set_code} ({event_type}) — {len(ratings)} cards:"]
     lines.append("")
@@ -81,7 +81,7 @@ async def card_ratings(
             f"  {card.name} ({card.color}, {card.rarity}) — "
             f"GIH WR: {gih_wr}, ALSA: {alsa}, IWD: {iwd}, Games: {games}"
         )
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_17LANDS
 
 
 @draft_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
@@ -110,7 +110,7 @@ async def archetype_stats(
         raise ToolError(f"17Lands API error: {exc}") from exc
 
     if not ratings:
-        return f"No archetype data available for {set_code} ({event_type})."
+        return f"No archetype data available for {set_code} ({event_type})." + ATTRIBUTION_17LANDS
 
     lines = [f"Archetype stats for {set_code} ({event_type}, {start_date} to {end_date}):"]
     lines.append("")
@@ -119,7 +119,7 @@ async def archetype_stats(
         games = f"{arch.games:,}"
         prefix = "  [Summary] " if arch.is_summary else "  "
         lines.append(f"{prefix}{arch.color_name} — WR: {wr}, Games: {games}")
-    return "\n".join(lines)
+    return "\n".join(lines) + ATTRIBUTION_17LANDS
 
 
 # ---------------------------------------------------------------------------
