@@ -18,34 +18,55 @@ if TYPE_CHECKING:
 
 type _KeyFunc = Callable[..., object]
 
+# Module-level kill switch for tests. When True, @async_cached is a no-op
+# and every call goes straight to the wrapped function.
 _disabled: bool = False
 
 
 def disable_all_caches() -> None:
-    """Bypass all ``@async_cached`` decorators (calls go straight through)."""
+    """Bypass all ``@async_cached`` decorators (calls go straight through).
+
+    Used by the test suite's autouse ``_clear_caches`` fixture to prevent
+    cached results from leaking between tests.
+    """
     global _disabled
     _disabled = True
 
 
 def _method_key(*args: object, **kwargs: object) -> object:
-    """Cache key that skips ``self`` (first arg) for instance methods."""
+    """Build a cache key that skips ``self`` (first positional arg).
+
+    Used as the default key function for ``@async_cached`` on instance methods.
+    Without skipping ``self``, cache hits would require the same object identity.
+    """
     return keys.hashkey(*args[1:], **kwargs)
 
 
 def _decklist_key(*args: object, **kwargs: object) -> object:
-    """Cache key for methods taking ``list[str]`` args — converts to tuples."""
+    """Build a cache key for methods whose args contain lists.
+
+    Lists are unhashable, so we convert them to tuples before hashing.
+    Must handle both positional and keyword list args — e.g.
+    ``find_decklist_combos(commanders=[...], decklist=[...])`` passes lists
+    as kwargs.
+    """
     converted = tuple(tuple(a) if isinstance(a, list) else a for a in args[1:])
     converted_kw = {k: tuple(v) if isinstance(v, list) else v for k, v in kwargs.items()}
     return keys.hashkey(*converted, **converted_kw)
 
 
 def async_cached(cache: TTLCache, key: _KeyFunc = _method_key):
-    """Decorator for caching async method results in a TTLCache.
+    """Decorate an async method to cache its results in a TTLCache.
 
-    By default uses ``_method_key`` which skips ``self`` so that the cache
-    is keyed only on the method arguments, not the instance identity.
+    Caches are class-level (shared across instances) since service clients
+    are singletons managed by provider lifespans. No locking is needed
+    because we run in a single asyncio event loop.
 
-    The wrapped function exposes a ``.cache`` attribute for test access.
+    Args:
+        cache: TTLCache instance (typically a class attribute).
+        key: Key function; defaults to ``_method_key`` (skips ``self``).
+
+    The wrapped function exposes a ``.cache`` attribute for test introspection.
     Respects the module-level ``_disabled`` flag set by ``disable_all_caches()``.
     """
 
