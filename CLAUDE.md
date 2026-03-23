@@ -29,7 +29,7 @@ See @docs/ARCHITECTURE.md for full details.
 - **`src/mtg_mcp/services/`** — Pure async API clients. No MCP awareness. Return Pydantic models.
 - **`src/mtg_mcp/providers/`** — FastMCP sub-servers. Each independently runnable. Register tools that call services.
 - **`src/mtg_mcp/workflows/`** — Composed tools calling multiple services. Mounted without namespace.
-- **`src/mtg_mcp/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`.
+- **`src/mtg_mcp/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `mtgjson_`.
 
 ## Conventions
 
@@ -81,6 +81,7 @@ When PR review comments come in:
 - **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools across 3 backends
 - **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
 - **Phase 4** (Caching + MTGJSON): Complete — TTL caching on all 12 service methods, MTGJSON bulk card provider (2 tools: card_lookup, card_search)
+- **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for MTGJSON-first lookups with Scryfall fallback. Tool tagging via `tags` parameter. 374 tests, 92% coverage.
 
 ## Environment
 
