@@ -216,7 +216,7 @@ class TestCommanderOverview:
         assert "61%" in result or "0.61" in result
 
         # Data sources footer
-        assert "Data Sources:**" in result
+        assert "**Data Sources:**" in result
         assert "Scryfall](https://scryfall.com)" in result
         assert "Spellbook" in result
         assert "EDHREC" in result

@@ -550,15 +550,29 @@ async def card_comparison(
             f"{synergy_str} | {inclusion_str} | {combo_str} | {price_str} |"
         )
 
-    # Data Sources footer — Scryfall always OK (errors propagate), Spellbook
-    # always called (per-card failures shown as N/A), EDHREC depends on flag.
+    # Data Sources footer — derive status from actual per-card results.
+    # All exceptions = Failed; some exceptions = still OK (partial failure shown as N/A).
+    spellbook_errors = [r for r in combo_results if isinstance(r, BaseException)]
+    spellbook_ok = len(spellbook_errors) < len(combo_results)
+    spellbook_error_msg = (
+        str(spellbook_errors[0]) if spellbook_errors and not spellbook_ok else None
+    )
+
+    if edhrec is not None:
+        edhrec_errors = [r for r in synergy_results if isinstance(r, BaseException)]
+        edhrec_ok: bool | None = len(edhrec_errors) < len(synergy_results)
+        edhrec_error_msg = str(edhrec_errors[0]) if edhrec_errors and not edhrec_ok else None
+    else:
+        edhrec_ok = None
+        edhrec_error_msg = None
+
     lines.extend(
         _source_status(
             scryfall_ok=True,
-            spellbook_ok=True,
-            spellbook_error=None,
-            edhrec_ok=True if edhrec is not None else None,
-            edhrec_error=None,
+            spellbook_ok=spellbook_ok,
+            spellbook_error=spellbook_error_msg,
+            edhrec_ok=edhrec_ok,
+            edhrec_error=edhrec_error_msg,
             edhrec_enabled=edhrec is not None,
         )
     )
