@@ -28,10 +28,10 @@ Claude Code / claude.ai / any MCP client
     │   MTG Orchestrator  │  ← FastMCP("MTG")
     │                     │
     │  Workflow Tools:     │  ← Compose across backends
-    │  • commander_overview│
-    │  • evaluate_upgrade  │
-    │  • draft_pack_pick   │
-    │  • suggest_cuts      │
+    │  • commander_overview│  • card_comparison
+    │  • evaluate_upgrade  │  • budget_upgrade
+    │  • draft_pack_pick   │  • deck_analysis
+    │  • suggest_cuts      │  • set_overview
     │                     │
     ├─────────────────────┤
     │  Mounted Backends:   │  ← mount() with namespaces
@@ -129,21 +129,26 @@ mtg-mcp/
 │       │   ├── scryfall.py         # ScryfallClient
 │       │   ├── spellbook.py        # SpellbookClient
 │       │   ├── seventeen_lands.py  # SeventeenLandsClient
-│       │   └── edhrec.py           # EDHRECClient
+│       │   ├── edhrec.py           # EDHRECClient
+│       │   ├── mtgjson.py          # MTGJSONClient (file-based, not BaseClient)
+│       │   └── cache.py            # async_cached decorator, TTLCache helpers
 │       │
 │       ├── providers/              # FastMCP sub-servers (one per backend, independently runnable)
-│       │   ├── __init__.py
+│       │   ├── __init__.py         # TOOL_ANNOTATIONS + tag constants
 │       │   ├── scryfall.py         # scryfall_mcp = FastMCP("Scryfall")
 │       │   ├── spellbook.py        # spellbook_mcp = FastMCP("Spellbook")
 │       │   ├── seventeen_lands.py  # draft_mcp = FastMCP("17Lands")
-│       │   └── edhrec.py           # edhrec_mcp = FastMCP("EDHREC")
+│       │   ├── edhrec.py           # edhrec_mcp = FastMCP("EDHREC")
+│       │   └── mtgjson.py          # mtgjson_mcp = FastMCP("MTGJSON")
 │       │
 │       └── workflows/              # Composed tools (registered on orchestrator, no namespace)
 │           ├── __init__.py
-│           ├── server.py           # workflow_mcp = FastMCP("Workflows"), multi-client lifespan
-│           ├── commander.py        # commander_overview, evaluate_upgrade (pure functions)
-│           ├── draft.py            # draft_pack_pick (pure function)
-│           └── deck.py             # suggest_cuts (pure function)
+│           ├── server.py           # workflow_mcp = FastMCP("Workflows"), multi-client lifespan + prompts
+│           ├── commander.py        # commander_overview, evaluate_upgrade, card_comparison, budget_upgrade
+│           ├── draft.py            # draft_pack_pick, set_overview
+│           ├── deck.py             # suggest_cuts
+│           ├── analysis.py         # deck_analysis
+│           └── card_resolver.py    # MTGJSON-first card resolution with Scryfall fallback
 │
 ├── tests/
 │   ├── conftest.py                 # Shared fixtures, mock clients
@@ -154,20 +159,17 @@ mtg-mcp/
 │   │   ├── test_scryfall_provider.py
 │   │   └── ...
 │   ├── workflows/
-│   │   ├── test_commander.py       # 14 tests (AsyncMock, not respx)
-│   │   ├── test_draft.py           # 24 tests
-│   │   ├── test_deck.py            # 15 tests
-│   │   └── test_workflow_server.py # Integration: tool registration
+│   │   ├── test_commander.py       # commander_overview, evaluate_upgrade, card_comparison, budget_upgrade
+│   │   ├── test_draft.py           # draft_pack_pick, set_overview
+│   │   ├── test_deck.py            # suggest_cuts
+│   │   ├── test_analysis.py        # deck_analysis
+│   │   └── test_workflow_server.py # Integration: tool registration + prompt registration
 │   └── fixtures/                   # Real API responses, captured once
-│       ├── scryfall/
-│       │   ├── card_muldrotha.json
-│       │   └── search_sultai_commander.json
-│       ├── spellbook/
-│       │   └── combos_muldrotha.json
-│       ├── seventeen_lands/
-│       │   └── card_ratings_lwe.json
-│       └── edhrec/
-│           └── commander_muldrotha.json
+│       ├── scryfall/               # Card data, search results, rulings
+│       ├── spellbook/              # Combos, bracket estimates, decklist combos
+│       ├── seventeen_lands/        # Card ratings, color ratings
+│       ├── edhrec/                 # Commander pages, card synergy
+│       └── mtgjson/                # Sample AtomicCards.json.gz
 │
 ├── scripts/
 │   └── capture_fixtures.py
@@ -176,6 +178,8 @@ mtg-mcp/
     ├── ARCHITECTURE.md
     ├── TOOL_DESIGN.md
     ├── SERVICE_CONTRACTS.md
+    ├── CACHING_DESIGN.md
+    ├── DATA_SOURCES.md
     └── PROJECT_PLAN.md
 ```
 
@@ -183,7 +187,7 @@ mtg-mcp/
 
 **`services/` vs `providers/`**: Services are plain Python classes with async methods that call external APIs. Providers are FastMCP server instances that register tools backed by services. Services are reusable outside MCP and independently testable.
 
-**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return formatted strings. Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `draft.py`, `deck.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`.
+**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return formatted strings. Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `draft.py`, `deck.py`, `analysis.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`. `card_resolver.py` provides MTGJSON-first card resolution with Scryfall fallback, used by `analysis.py` for rate-limit-friendly bulk lookups.
 
 **`types.py`**: Shared Pydantic models that services return and tools consume. Ensures type safety across the service → provider → workflow pipeline.
 
@@ -198,6 +202,7 @@ mtg-mcp/
 from fastmcp import FastMCP
 from mtg_mcp.providers.scryfall import scryfall_mcp
 from mtg_mcp.providers.spellbook import spellbook_mcp
+from mtg_mcp.providers.mtgjson import mtgjson_mcp
 from mtg_mcp.workflows.server import workflow_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
@@ -205,6 +210,7 @@ mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics serve
 # Sub-servers get namespaced: scryfall_search_cards, spellbook_find_combos, etc.
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
+mcp.mount(mtgjson_mcp, namespace="mtgjson")  # Behind feature flag
 
 # Workflow tools mounted WITHOUT namespace for clean names
 mcp.mount(workflow_mcp)
@@ -276,11 +282,13 @@ from mtg_mcp.config import Settings
 
 _scryfall: ScryfallClient | None = None
 _spellbook: SpellbookClient | None = None
+_seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
+_mtgjson: MTGJSONClient | None = None
 
 @lifespan
 async def workflow_lifespan(server: FastMCP):
-    global _scryfall, _spellbook, _edhrec
+    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _mtgjson
     settings = Settings()
     async with AsyncExitStack() as stack:
         _scryfall = await stack.enter_async_context(
@@ -289,14 +297,20 @@ async def workflow_lifespan(server: FastMCP):
         _spellbook = await stack.enter_async_context(
             SpellbookClient(base_url=settings.spellbook_base_url)
         )
+        if settings.enable_17lands:
+            _seventeen_lands = await stack.enter_async_context(
+                SeventeenLandsClient(base_url=settings.seventeen_lands_base_url)
+            )
         if settings.enable_edhrec:
             _edhrec = await stack.enter_async_context(
                 EDHRECClient(base_url=settings.edhrec_base_url)
             )
+        if settings.enable_mtgjson:
+            _mtgjson = await stack.enter_async_context(
+                MTGJSONClient(data_url=settings.mtgjson_data_url, ...)
+            )
         yield {}
-    _scryfall = None
-    _spellbook = None
-    _edhrec = None
+    _scryfall = _spellbook = _seventeen_lands = _edhrec = _mtgjson = None
 
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)
 ```
@@ -307,7 +321,7 @@ workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)
 Workflow tools wrap pure functions from the workflow modules:
 
 ```python
-@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
 async def commander_overview(commander_name: str) -> str:
     """Comprehensive commander profile from all available sources."""
     from mtg_mcp.workflows.commander import commander_overview as impl
@@ -514,24 +528,29 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Transport | stdio default, HTTP optional | stdio for Claude Code/Desktop; HTTP for remote use |
 | Type checker | ty (beta) | Astral stack, speed, FastMCP validates against it |
 | HTTP mocking | respx | Decorator-based, clean API for async httpx mocking |
-| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_` | FastMCP mount namespacing |
+| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `mtgjson_` | FastMCP mount namespacing |
 | Workflow tools | No namespace prefix | Clean names: `commander_overview`, `evaluate_upgrade` |
 | Client lifecycle | Lifespan + module-level `_client` | `Depends()`/`lifespan_context` breaks through `mount()` — module-level is the workaround |
 | Settings wiring | `Settings()` in each lifespan | Base URLs are configurable via `MTG_MCP_*` env vars, not hardcoded |
 | Shared annotations | `TOOL_ANNOTATIONS` in `providers/__init__.py` | DRY — single constant shared by all provider tools |
 | Error responses | ToolError (fastmcp.exceptions) | Cleaner than manual is_error; FastMCP handles conversion |
-| Tool metadata | ToolAnnotations (mcp.types) | Standard MCP annotations; tags param not supported |
+| Tool metadata | ToolAnnotations (mcp.types) + tags | Standard MCP annotations; tags categorize tools (commander, draft, pricing, beta) |
 | EDHREC | Behind feature flag | Fragile scraping; disable if breaking |
 | 17Lands | Aggressive caching | Rate limited; cache 1-6 hours |
 | Multi-agent execution | Parallel worktree agents | Independent backends (Spellbook, 17Lands, EDHREC) follow same pattern — build simultaneously after Phase 1 establishes the template |
 | Workflow architecture | Pure functions + wiring layer | Workflow modules export pure async functions (no MCP imports); `server.py` wraps them as tools. Avoids circular imports, enables AsyncMock testing |
-| Multi-client lifespan | AsyncExitStack | Cleaner than nested `async with` for managing 4 service clients with feature flags |
+| Multi-client lifespan | AsyncExitStack | Cleaner than nested `async with` for managing 5 service clients with feature flags |
 | BaseClient.__aenter__ | Returns `Self` | Enables correct type inference through `AsyncExitStack.enter_async_context()` |
 | Workflow testing | AsyncMock (not respx) | Workflows are pure functions — mock the service clients directly, no HTTP layer to test |
 | draft_pack_pick backends | 17Lands only | 17Lands already provides name, color, rarity, all win rate metrics — no Scryfall calls needed |
 | Service caching | cachetools TTLCache per method | Caches parsed Pydantic models (skips network + parsing). Per-method TTL granularity. Single asyncio loop = no locking needed |
 | MTGJSON | Bulk file service (not BaseClient) | File-based, not HTTP API — lazy download, in-memory dict for O(1) lookups. Behind feature flag |
 | MTGJSON integration | Workflow layer, not ScryfallClient | Preserves service independence — workflows can check MTGJSON before Scryfall |
+| Card resolver | Shared utility in `workflows/card_resolver.py` | MTGJSON-first resolution with Scryfall fallback. Avoids duplicating lookup logic across workflow modules |
+| Progress reporting | `ctx.report_progress()` via callback | Workflow pure functions accept `on_progress` callback; `server.py` bridges to MCP `Context.report_progress()` |
+| Tool tags | Tag constants in `providers/__init__.py` | Categorize tools by domain (commander, draft, pricing, beta). Shared constants avoid duplication |
+| Prompts | Registered on workflow server | Guide multi-step analysis workflows. No namespace — clean invocation names |
+| Resources | Registered on provider sub-servers | `mtg://` URI templates for cached JSON data access. Namespaced with providers |
 
 ---
 
