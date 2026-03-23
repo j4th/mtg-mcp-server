@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
@@ -9,7 +10,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.providers import TAGS_COMBO, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
@@ -51,7 +52,7 @@ def _get_client() -> SpellbookClient:
     return _client
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH | TAGS_COMBO)
 async def find_combos(
     card_name: str,
     color_identity: str | None = None,
@@ -81,7 +82,7 @@ async def find_combos(
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP | TAGS_COMBO)
 async def combo_details(
     combo_id: str,
 ) -> str:
@@ -122,7 +123,7 @@ async def combo_details(
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
 async def find_decklist_combos(
     commanders: list[str],
     decklist: list[str],
@@ -155,7 +156,7 @@ async def find_decklist_combos(
     return "\n".join(lines)
 
 
-@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
 async def estimate_bracket(
     commanders: list[str],
     decklist: list[str],
@@ -205,3 +206,19 @@ def _format_combo_summary(combo: Combo) -> list[str]:
     card_names = ", ".join(c.name for c in combo.cards) or "(no cards listed)"
     results = ", ".join(p.feature_name for p in combo.produces) or "(no results listed)"
     return [f"  [{combo.id}] {card_names}", f"    Produces: {results}"]
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@spellbook_mcp.resource("mtg://combo/{combo_id}")
+async def combo_resource(combo_id: str) -> str:
+    """Get combo details as JSON by Spellbook ID."""
+    client = _get_client()
+    try:
+        combo = await client.get_combo(combo_id)
+        return combo.model_dump_json()
+    except ComboNotFoundError:
+        return json.dumps({"error": f"Combo not found: {combo_id}"})

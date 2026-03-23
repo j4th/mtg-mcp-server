@@ -5,6 +5,7 @@ Uses the MTGJSON AtomicCards bulk file for in-memory card data.
 
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 from fastmcp import FastMCP
@@ -12,7 +13,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.providers import TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONError
 
 _client: MTGJSONClient | None = None
@@ -41,7 +42,7 @@ def _get_client() -> MTGJSONClient:
     return _client
 
 
-@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
 async def card_lookup(name: str) -> str:
     """Look up a Magic card by exact name using MTGJSON bulk data.
 
@@ -77,7 +78,7 @@ async def card_lookup(name: str) -> str:
     return "\n".join(lines)
 
 
-@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
 async def card_search(
     query: str,
     search_field: Literal["name", "type", "text"] = "name",
@@ -110,3 +111,18 @@ async def card_search(
         cost = f" {card.mana_cost}" if card.mana_cost else ""
         lines.append(f"  {card.name}{cost} — {card.type_line}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@mtgjson_mcp.resource("mtg://card-data/{name}")
+async def card_data_resource(name: str) -> str:
+    """Get card data from MTGJSON bulk data as JSON."""
+    client = _get_client()
+    card = await client.get_card(name)
+    if card is None:
+        return json.dumps({"error": f"Card not found: {name}"})
+    return card.model_dump_json()

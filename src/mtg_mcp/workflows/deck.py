@@ -71,7 +71,7 @@ async def suggest_cuts(
     combo_pieces = _extract_combo_pieces(combo_data)
 
     # -- 3. Build synergy lookup -----------------------------------------------
-    synergy_lookup = _build_synergy_lookup(edhrec_data)
+    synergy_lookup = build_synergy_lookup(edhrec_data)
 
     # -- 4. Score each card ----------------------------------------------------
     scored = _score_cards(decklist, combo_pieces, synergy_lookup, sources)
@@ -167,7 +167,7 @@ def _extract_combo_pieces(combo_data: DecklistCombos | None) -> set[str]:
     return pieces
 
 
-def _build_synergy_lookup(
+def build_synergy_lookup(
     edhrec_data: EDHRECCommanderData | None,
 ) -> dict[str, EDHRECCard]:
     """Build a lookup dict from EDHREC data keyed by lowercased card name."""

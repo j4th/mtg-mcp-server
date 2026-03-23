@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 import structlog
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from mtg_mcp.services.edhrec import EDHRECClient
     from mtg_mcp.services.scryfall import ScryfallClient
     from mtg_mcp.services.spellbook import SpellbookClient
@@ -421,4 +423,237 @@ async def evaluate_upgrade(
     )
 
     log.info("evaluate_upgrade.complete", card=card_name, commander=commander_name)
+    return "\n".join(lines)
+
+
+async def card_comparison(
+    cards: list[str],
+    commander_name: str,
+    *,
+    scryfall: ScryfallClient,
+    spellbook: SpellbookClient,
+    edhrec: EDHRECClient | None,
+    on_progress: Callable[[int, int], Awaitable[None]] | None = None,
+) -> str:
+    """Compare multiple cards side-by-side for a specific commander deck.
+
+    Resolves each card via Scryfall (prices required), then fetches synergy
+    (EDHREC) and combo count (Spellbook) data for each. Outputs a markdown
+    comparison table.
+
+    Args:
+        cards: Card names to compare (2-5).
+        commander_name: The commander to evaluate against.
+        scryfall: Initialized ScryfallClient.
+        spellbook: Initialized SpellbookClient.
+        edhrec: Initialized EDHRECClient, or None if disabled.
+        on_progress: Optional callback for progress reporting.
+
+    Returns:
+        Formatted markdown comparison table.
+
+    Raises:
+        CardNotFoundError: If a card is not found on Scryfall (propagated).
+    """
+    from mtg_mcp.types import Card as ScryfallCard
+    from mtg_mcp.types import MTGJSONCard
+
+    log.info("card_comparison.start", cards=cards, commander=commander_name)
+
+    # Step 1/3: Resolve cards (always Scryfall — prices required)
+    if on_progress is not None:
+        await on_progress(1, 3)
+
+    resolve_tasks = [scryfall.get_card_by_name(name) for name in cards]
+    resolved = await asyncio.gather(*resolve_tasks, return_exceptions=True)
+
+    # Check for resolution failures — propagate first CardNotFoundError
+    card_data: list[ScryfallCard | MTGJSONCard] = []
+    for i, result in enumerate(resolved):
+        if isinstance(result, BaseException):
+            log.error("card_comparison.resolve_failed", card=cards[i], error=str(result))
+            raise result
+        card_data.append(result)
+
+    # Step 2/3: Fetch synergy + combo data
+    if on_progress is not None:
+        await on_progress(2, 3)
+
+    # EDHREC synergy lookups (parallel)
+    synergy_results: list[EDHRECCard | None | BaseException] = []
+    if edhrec is not None:
+        synergy_tasks = [edhrec.card_synergy(card.name, commander_name) for card in card_data]
+        synergy_results = await asyncio.gather(*synergy_tasks, return_exceptions=True)
+    else:
+        synergy_results = [None] * len(card_data)
+
+    # Spellbook combo count lookups (parallel)
+    combo_tasks = [spellbook.find_combos(card.name, limit=_MAX_COMBOS) for card in card_data]
+    combo_results = await asyncio.gather(*combo_tasks, return_exceptions=True)
+
+    # Step 3/3: Build output
+    if on_progress is not None:
+        await on_progress(3, 3)
+
+    lines: list[str] = [
+        f"# Card Comparison for {commander_name}",
+        "",
+        "| Name | Mana Cost | Type | Synergy | Inclusion % | Combos | Price |",
+        "|------|-----------|------|---------|-------------|--------|-------|",
+    ]
+
+    for i, card in enumerate(card_data):
+        # Extract mana cost and type
+        mana_cost = getattr(card, "mana_cost", None) or "N/A"
+        type_line = getattr(card, "type_line", "") or ""
+
+        # Extract synergy
+        syn_result = synergy_results[i]
+        if isinstance(syn_result, BaseException):
+            log.warning(
+                "card_comparison.edhrec_failed",
+                card=card.name,
+                error=str(syn_result),
+            )
+            synergy_str = "N/A"
+            inclusion_str = "N/A"
+        elif syn_result is not None:
+            synergy_str = _fmt_synergy(syn_result.synergy)
+            inclusion_str = f"{syn_result.inclusion}%"
+        else:
+            synergy_str = "N/A"
+            inclusion_str = "N/A"
+
+        # Extract combo count
+        cmb_result = combo_results[i]
+        if isinstance(cmb_result, BaseException):
+            log.warning(
+                "card_comparison.spellbook_failed",
+                card=card.name,
+                error=str(cmb_result),
+            )
+            combo_str = "N/A"
+        else:
+            combo_str = str(len(cmb_result))
+
+        # Extract price (only available on Scryfall Card, not MTGJSONCard)
+        if isinstance(card, ScryfallCard) and card.prices.usd is not None:
+            price_str = f"${card.prices.usd}"
+        else:
+            price_str = "N/A"
+
+        lines.append(
+            f"| {card.name} | {mana_cost} | {type_line} | "
+            f"{synergy_str} | {inclusion_str} | {combo_str} | {price_str} |"
+        )
+
+    log.info("card_comparison.complete", cards=cards, commander=commander_name)
+    return "\n".join(lines)
+
+
+async def budget_upgrade(
+    commander_name: str,
+    *,
+    budget: float,
+    num_suggestions: int = 10,
+    scryfall: ScryfallClient,
+    edhrec: EDHRECClient | None,
+    on_progress: Callable[[int, int], Awaitable[None]] | None = None,
+) -> str:
+    """Suggest budget-friendly upgrades ranked by synergy-per-dollar.
+
+    Fetches EDHREC staples for the commander, looks up Scryfall prices,
+    then ranks affordable cards by synergy/$.
+
+    Args:
+        commander_name: The commander to find upgrades for.
+        budget: Maximum price per card in USD.
+        num_suggestions: Number of top suggestions to return.
+        scryfall: Initialized ScryfallClient.
+        edhrec: Initialized EDHRECClient, or None if disabled.
+        on_progress: Optional callback for progress reporting.
+
+    Returns:
+        Formatted markdown with ranked budget upgrade suggestions.
+    """
+    log.info("budget_upgrade.start", commander=commander_name, budget=budget)
+
+    # EDHREC is required for this workflow
+    if edhrec is None:
+        return (
+            "EDHREC is not enabled — budget upgrade requires EDHREC staples data.\n\n"
+            "Set MTG_MCP_ENABLE_EDHREC=true to enable."
+        )
+
+    # Step 1/2: Fetch EDHREC staples
+    if on_progress is not None:
+        await on_progress(1, 2)
+
+    edhrec_data = await edhrec.commander_top_cards(commander_name)
+
+    # Collect all cards across all cardlists
+    all_edhrec_cards: list[EDHRECCard] = []
+    for cardlist in edhrec_data.cardlists:
+        all_edhrec_cards.extend(cardlist.cardviews)
+
+    if not all_edhrec_cards:
+        return (
+            f"No staples found for '{commander_name}' on EDHREC.\n\n"
+            "The commander may be too new or rarely played."
+        )
+
+    # Step 2/2: Fetch Scryfall prices in parallel
+    if on_progress is not None:
+        await on_progress(2, 2)
+
+    sem = asyncio.Semaphore(10)
+
+    async def _fetch_price(name: str) -> Card:
+        async with sem:
+            return await scryfall.get_card_by_name(name)
+
+    price_tasks = [_fetch_price(ecard.name) for ecard in all_edhrec_cards]
+    price_results = await asyncio.gather(*price_tasks, return_exceptions=True)
+
+    # Build candidates: pair EDHREC data with Scryfall prices
+    candidates: list[tuple[EDHRECCard, float, float]] = []  # (edhrec, price, synergy_per_dollar)
+    for ecard, price_result in zip(all_edhrec_cards, price_results, strict=True):
+        if isinstance(price_result, BaseException):
+            log.debug("budget_upgrade.price_failed", card=ecard.name, error=str(price_result))
+            continue
+        scryfall_card: Card = price_result
+        if scryfall_card.prices.usd is None:
+            continue
+        price = float(scryfall_card.prices.usd)
+        if price > budget:
+            continue
+        synergy_per_dollar = ecard.synergy / max(price, 0.25)
+        candidates.append((ecard, price, synergy_per_dollar))
+
+    if not candidates:
+        return (
+            f"No cards found under ${budget:.2f} for {commander_name}.\n\n"
+            "Try increasing the budget ceiling."
+        )
+
+    # Sort by synergy-per-dollar descending
+    candidates.sort(key=lambda c: c[2], reverse=True)
+    top = candidates[:num_suggestions]
+
+    # Format output
+    lines: list[str] = [
+        f"# Budget Upgrades for {commander_name}",
+        f"*Budget ceiling: ${budget:.2f} per card*",
+        "",
+        "| # | Name | Synergy | Inclusion % | Price | Synergy/$ |",
+        "|---|------|---------|-------------|-------|-----------|",
+    ]
+
+    for rank, (ecard, price, spd) in enumerate(top, 1):
+        lines.append(
+            f"| {rank} | {ecard.name} | {_fmt_synergy(ecard.synergy)} | "
+            f"{ecard.inclusion}% | ${price:.2f} | {spd:.2f} |"
+        )
+
+    log.info("budget_upgrade.complete", commander=commander_name, suggestions=len(top))
     return "\n".join(lines)

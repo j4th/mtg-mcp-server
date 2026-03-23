@@ -5,12 +5,14 @@ Uses undocumented EDHREC endpoints. Behind the MTG_MCP_ENABLE_EDHREC feature fla
 
 from __future__ import annotations
 
+import json
+
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.providers import TAGS_BETA, TOOL_ANNOTATIONS
 from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
 
 _client: EDHRECClient | None = None
@@ -36,7 +38,7 @@ def _get_client() -> EDHRECClient:
     return _client
 
 
-@edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BETA)
 async def commander_staples(
     commander_name: str,
     category: str | None = None,
@@ -79,7 +81,7 @@ async def commander_staples(
     return "\n".join(lines)
 
 
-@edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BETA)
 async def card_synergy(
     card_name: str,
     commander_name: str,
@@ -127,3 +129,19 @@ def _inclusion_pct(num_decks: int, total_decks: int) -> str:
     if total_decks == 0:
         return "0"
     return f"{num_decks / total_decks * 100:.1f}"
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@edhrec_mcp.resource("mtg://commander/{name}/staples")
+async def commander_staples_resource(name: str) -> str:
+    """Get commander staples data as JSON."""
+    client = _get_client()
+    try:
+        data = await client.commander_top_cards(name)
+        return data.model_dump_json()
+    except CommanderNotFoundError:
+        return json.dumps({"error": f"Commander not found: {name}"})

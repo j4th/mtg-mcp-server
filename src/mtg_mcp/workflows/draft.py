@@ -1,13 +1,16 @@
-"""Draft workflow tools — rank picks using 17Lands data."""
+"""Draft workflow tools — rank picks and set overviews using 17Lands data."""
 
 from __future__ import annotations
 
+import statistics
 from collections import Counter
 from typing import TYPE_CHECKING
 
 import structlog
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
     from mtg_mcp.types import DraftCardRating
 
@@ -43,6 +46,26 @@ def _sort_key(rating: DraftCardRating) -> tuple[int, float]:
     if rating.ever_drawn_win_rate is None:
         return (1, 0.0)
     return (0, -rating.ever_drawn_win_rate)
+
+
+def _append_rarity_table(lines: list[str], heading: str, cards: list[DraftCardRating]) -> None:
+    """Append a ranked rarity table section to output lines."""
+    lines.append(f"## {heading}")
+    lines.append("")
+    if cards:
+        lines.append("| Rank | Name | Color | GIH WR | ALSA | IWD | Games |")
+        lines.append("|------|------|-------|--------|------|-----|-------|")
+        for i, r in enumerate(cards, 1):
+            lines.append(
+                f"| {i}. | {r.name} | {r.color} "
+                f"| {_fmt_pct(r.ever_drawn_win_rate)} "
+                f"| {_fmt_float(r.avg_seen)} | {_fmt_iwd(r.drawn_improvement_win_rate)} "
+                f"| {r.game_count} |"
+            )
+    else:
+        rarity = heading.split()[-1].lower()
+        lines.append(f"No {rarity} cards with data.")
+    lines.append("")
 
 
 def _build_color_counts(
@@ -149,4 +172,119 @@ async def draft_pack_pick(
             lines.append(f"- {card_name}")
 
     log.info("draft_pack_pick.complete", set_code=set_code, found=len(found), no_data=len(no_data))
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Set overview
+# ---------------------------------------------------------------------------
+
+_TOP_N = 10
+
+
+async def set_overview(
+    set_code: str,
+    *,
+    event_type: str = "PremierDraft",
+    seventeen_lands: SeventeenLandsClient,
+    on_progress: Callable[[int, int], Awaitable[None]] | None = None,
+) -> str:
+    """Draft format overview with top commons, top uncommons, and trap rares.
+
+    Args:
+        set_code: Three-letter set code (e.g. "LRW").
+        event_type: Draft event type (default "PremierDraft").
+        seventeen_lands: Initialized SeventeenLandsClient.
+        on_progress: Optional progress callback (step, total).
+
+    Returns:
+        Formatted markdown string with format overview.
+    """
+    log.info("set_overview.start", set_code=set_code, event_type=event_type)
+
+    if on_progress is not None:
+        await on_progress(1, 2)
+
+    # Fetch card ratings
+    ratings = await seventeen_lands.card_ratings(set_code, event_type=event_type)
+
+    # Filter out cards with no GIH WR
+    rated: list[DraftCardRating] = [r for r in ratings if r.ever_drawn_win_rate is not None]
+
+    if on_progress is not None:
+        await on_progress(2, 2)
+
+    if not rated:
+        return (
+            f"# Set Overview \u2014 {set_code}\n\n"
+            f"No card data available for this set. "
+            f"Check the set code is correct and that 17Lands has data for {event_type}."
+        )
+
+    # Single-pass: group by rarity and collect GIH WR values
+    by_rarity: dict[str, list[DraftCardRating]] = {
+        "common": [],
+        "uncommon": [],
+        "rare": [],
+        "mythic": [],
+    }
+    all_gih: list[float] = []
+    for r in rated:
+        rarity = r.rarity.lower()
+        if rarity in by_rarity:
+            by_rarity[rarity].append(r)
+        if r.ever_drawn_win_rate is not None:
+            all_gih.append(r.ever_drawn_win_rate)
+
+    median_gih = statistics.median(all_gih) if all_gih else 0.5
+
+    # Sort commons/uncommons by GIH WR descending, take top 10
+    by_rarity["common"].sort(key=_sort_key)
+    by_rarity["uncommon"].sort(key=_sort_key)
+    top_commons = by_rarity["common"][:_TOP_N]
+    top_uncommons = by_rarity["uncommon"][:_TOP_N]
+
+    # Trap rares/mythics: GIH WR below the median
+    trap_rares = [
+        r
+        for r in by_rarity["rare"] + by_rarity["mythic"]
+        if r.ever_drawn_win_rate is not None and r.ever_drawn_win_rate < median_gih
+    ]
+    trap_rares.sort(key=_sort_key)
+
+    # --- Build output ---
+    lines: list[str] = []
+    lines.append(f"# Set Overview \u2014 {set_code}")
+    lines.append("")
+    lines.append(f"**Event type:** {event_type}")
+    lines.append(f"**Median GIH WR:** {_fmt_pct(median_gih)}")
+    lines.append(f"**Cards with data:** {len(rated)}")
+    lines.append("")
+
+    # Top commons and uncommons (same table format)
+    _append_rarity_table(lines, "Top Commons", top_commons)
+    _append_rarity_table(lines, "Top Uncommons", top_uncommons)
+
+    # Trap rares
+    lines.append("## Trap Rares/Mythics")
+    lines.append("")
+    lines.append(f"Rares and mythics with GIH WR below the set median ({_fmt_pct(median_gih)}):")
+    lines.append("")
+    if trap_rares:
+        for r in trap_rares:
+            lines.append(
+                f"- **{r.name}** ({r.rarity}) \u2014 "
+                f"GIH WR: {_fmt_pct(r.ever_drawn_win_rate)}, "
+                f"ALSA: {_fmt_float(r.avg_seen)}"
+            )
+    else:
+        lines.append("No trap rares found \u2014 all rares/mythics are above the median.")
+
+    log.info(
+        "set_overview.complete",
+        set_code=set_code,
+        commons=len(top_commons),
+        uncommons=len(top_uncommons),
+        trap_rares=len(trap_rares),
+    )
     return "\n".join(lines)

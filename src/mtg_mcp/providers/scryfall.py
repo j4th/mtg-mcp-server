@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
+
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
 from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
+from mtg_mcp.providers import TAGS_LOOKUP, TAGS_PRICING, TAGS_SEARCH, TOOL_ANNOTATIONS
 from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
 
 _client: ScryfallClient | None = None
@@ -33,7 +35,7 @@ def _get_client() -> ScryfallClient:
     return _client
 
 
-@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
 async def search_cards(
     query: str,
     page: int = 1,
@@ -60,7 +62,7 @@ async def search_cards(
     return "\n".join(lines)
 
 
-@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
 async def card_details(
     name: str,
     fuzzy: bool = False,
@@ -94,7 +96,7 @@ async def card_details(
     return "\n".join(lines)
 
 
-@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_PRICING)
 async def card_price(
     name: str,
 ) -> str:
@@ -119,7 +121,7 @@ async def card_price(
     return "\n".join(lines)
 
 
-@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
 async def card_rulings(
     name: str,
 ) -> str:
@@ -147,3 +149,31 @@ def _format_legalities(legalities: dict[str, str]) -> str:
     if not legal:
         return "Not legal in any format"
     return ", ".join(legal)
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@scryfall_mcp.resource("mtg://card/{name}")
+async def card_resource(name: str) -> str:
+    """Get card data as JSON by exact name."""
+    client = _get_client()
+    try:
+        card = await client.get_card_by_name(name)
+        return card.model_dump_json()
+    except CardNotFoundError:
+        return json.dumps({"error": f"Card not found: {name}"})
+
+
+@scryfall_mcp.resource("mtg://card/{name}/rulings")
+async def card_rulings_resource(name: str) -> str:
+    """Get card rulings as JSON by card name."""
+    client = _get_client()
+    try:
+        card = await client.get_card_by_name(name)
+        rulings = await client.get_rulings(card.id)
+        return json.dumps([r.model_dump() for r in rulings])
+    except CardNotFoundError:
+        return json.dumps({"error": f"Card not found: {name}"})
