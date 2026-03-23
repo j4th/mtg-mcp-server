@@ -268,7 +268,12 @@ async def _resolve_cards(
 
     for name, result in zip(decklist, results, strict=True):
         if isinstance(result, BaseException):
-            log.warning("deck_analysis.resolve_failed", card=name, error=str(result))
+            log.warning(
+                "deck_analysis.resolve_failed",
+                card=name,
+                error=str(result),
+                error_type=type(result).__name__,
+            )
             failures.append(name)
             # Add with defaults so curve still counts it
             resolved.append(_ResolvedCard(name=name))
@@ -303,14 +308,22 @@ async def _fetch_spellbook_data(
 
     bracket_result = results[0]
     if isinstance(bracket_result, BaseException):
-        log.warning("deck_analysis.bracket_failed", error=str(bracket_result))
+        log.warning(
+            "deck_analysis.bracket_failed",
+            error=str(bracket_result),
+            error_type=type(bracket_result).__name__,
+        )
         sources.spellbook_error = str(bracket_result)
     else:
         bracket = bracket_result
 
     combo_result = results[1]
     if isinstance(combo_result, BaseException):
-        log.warning("deck_analysis.combos_failed", error=str(combo_result))
+        log.warning(
+            "deck_analysis.combos_failed",
+            error=str(combo_result),
+            error_type=type(combo_result).__name__,
+        )
         if sources.spellbook_error is None:
             sources.spellbook_error = str(combo_result)
     else:

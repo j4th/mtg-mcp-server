@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 
+import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
@@ -32,6 +33,8 @@ async def edhrec_lifespan(server: FastMCP):
 
 
 edhrec_mcp = FastMCP("EDHREC", lifespan=edhrec_lifespan)
+
+log = structlog.get_logger(provider="edhrec")
 
 
 def _get_client() -> EDHRECClient:
@@ -147,4 +150,8 @@ async def commander_staples_resource(name: str) -> str:
         data = await client.commander_top_cards(name)
         return data.model_dump_json()
     except CommanderNotFoundError:
+        log.debug("resource.commander_not_found", name=name)
         return json.dumps({"error": f"Commander not found: {name}"})
+    except EDHRECError as exc:
+        log.warning("resource.staples_error", name=name, error=str(exc))
+        return json.dumps({"error": f"EDHREC error: {exc}"})

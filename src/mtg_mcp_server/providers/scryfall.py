@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
@@ -40,6 +41,8 @@ async def scryfall_lifespan(server: FastMCP):
 
 
 scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)
+
+log = structlog.get_logger(provider="scryfall")
 
 
 def _get_client() -> ScryfallClient:
@@ -179,7 +182,11 @@ async def card_resource(name: str) -> str:
         card = await client.get_card_by_name(name)
         return card.model_dump_json()
     except CardNotFoundError:
+        log.debug("resource.card_not_found", name=name)
         return json.dumps({"error": f"Card not found: {name}"})
+    except ScryfallError as exc:
+        log.warning("resource.card_error", name=name, error=str(exc))
+        return json.dumps({"error": f"Scryfall error: {exc}"})
 
 
 @scryfall_mcp.resource("mtg://card/{name}/rulings")
@@ -191,4 +198,8 @@ async def card_rulings_resource(name: str) -> str:
         rulings = await client.get_rulings(card.id)
         return json.dumps([r.model_dump() for r in rulings])
     except CardNotFoundError:
+        log.debug("resource.rulings_not_found", name=name)
         return json.dumps({"error": f"Card not found: {name}"})
+    except ScryfallError as exc:
+        log.warning("resource.rulings_error", name=name, error=str(exc))
+        return json.dumps({"error": f"Scryfall error: {exc}"})

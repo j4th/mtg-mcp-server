@@ -7,7 +7,6 @@ rate limiting, retry logic, and observability.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import time
 from typing import TYPE_CHECKING, Self
 
@@ -139,7 +138,7 @@ class BaseClient:
             try:
                 await self._client.aclose()
             except Exception:
-                self._log.warning("client_close_error")
+                self._log.warning("client_close_error", exc_info=True)
             finally:
                 self._client = None
 
@@ -191,8 +190,14 @@ class BaseClient:
                     if response.status_code == 429:
                         raw = response.headers.get("Retry-After")
                         if raw is not None:
-                            with contextlib.suppress(ValueError):
+                            try:
                                 retry_after = float(raw)
+                            except ValueError:
+                                self._log.warning(
+                                    "retry_after_parse_failed",
+                                    raw_value=raw,
+                                    status=response.status_code,
+                                )
                     self._log.error(
                         "http_error",
                         method=method,

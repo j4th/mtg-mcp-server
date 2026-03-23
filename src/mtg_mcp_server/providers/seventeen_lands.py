@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
@@ -29,6 +30,8 @@ async def draft_lifespan(server: FastMCP):
 
 
 draft_mcp = FastMCP("17Lands", lifespan=draft_lifespan)
+
+log = structlog.get_logger(provider="17lands")
 
 
 def _get_client() -> SeventeenLandsClient:
@@ -131,5 +134,9 @@ async def archetype_stats(
 async def draft_ratings_resource(set_code: str) -> str:
     """Get card ratings for a set as JSON."""
     client = _get_client()
-    ratings = await client.card_ratings(set_code)
-    return json.dumps([r.model_dump() for r in ratings])
+    try:
+        ratings = await client.card_ratings(set_code)
+        return json.dumps([r.model_dump() for r in ratings])
+    except SeventeenLandsError as exc:
+        log.warning("resource.ratings_error", set_code=set_code, error=str(exc))
+        return json.dumps({"error": f"17Lands error: {exc}"})

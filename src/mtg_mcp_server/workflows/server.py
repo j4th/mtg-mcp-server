@@ -12,9 +12,9 @@ so tool names stay clean (e.g. ``commander_overview``, not
 
 from __future__ import annotations
 
-import contextlib
 from contextlib import AsyncExitStack
 
+import structlog
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
@@ -115,10 +115,15 @@ def _require_edhrec() -> EDHRECClient:
     return _edhrec
 
 
+_log = structlog.get_logger(service="workflows")
+
+
 async def _progress(ctx: Context, step: int, total: int) -> None:
     """Report progress to the MCP client. Never raises — progress is best-effort."""
-    with contextlib.suppress(Exception):
+    try:
         await ctx.report_progress(progress=step, total=total)
+    except Exception:
+        _log.debug("progress_report_failed", step=step, total=total, exc_info=True)
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)

@@ -517,6 +517,7 @@ async def card_comparison(
                 "card_comparison.edhrec_failed",
                 card=card.name,
                 error=str(syn_result),
+                error_type=type(syn_result).__name__,
             )
             synergy_str = "N/A"
             inclusion_str = "N/A"
@@ -534,6 +535,7 @@ async def card_comparison(
                 "card_comparison.spellbook_failed",
                 card=card.name,
                 error=str(cmb_result),
+                error_type=type(cmb_result).__name__,
             )
             combo_str = "N/A"
         else:
