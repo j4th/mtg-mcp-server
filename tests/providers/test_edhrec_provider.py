@@ -10,7 +10,7 @@ import pytest
 import respx
 from fastmcp import Client
 
-from mtg_mcp.providers.edhrec import edhrec_mcp
+from mtg_mcp_server.providers.edhrec import edhrec_mcp
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "edhrec"
 BASE_URL = "https://json.edhrec.com"

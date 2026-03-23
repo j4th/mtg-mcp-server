@@ -15,7 +15,7 @@ API details, authentication, rate limits, and response shapes for each backend s
 | Base URL | `https://api.scryfall.com` |
 | Auth | None (public API) |
 | Rate limit | 10 req/sec (50-100ms delay between requests) |
-| Required headers | `User-Agent: mtg-mcp/0.1.0` and `Accept: application/json` |
+| Required headers | `User-Agent: mtg-mcp-server/<version>` and `Accept: application/json` |
 | Documentation | https://scryfall.com/docs/api |
 
 ### Key Endpoints

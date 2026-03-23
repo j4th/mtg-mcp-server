@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 import structlog
 
 if TYPE_CHECKING:
-    from mtg_mcp.services.mtgjson import MTGJSONClient
-    from mtg_mcp.services.scryfall import ScryfallClient
-    from mtg_mcp.types import Card, MTGJSONCard
+    from mtg_mcp_server.services.mtgjson import MTGJSONClient
+    from mtg_mcp_server.services.scryfall import ScryfallClient
+    from mtg_mcp_server.types import Card, MTGJSONCard
 
 log = structlog.get_logger(service="workflow.card_resolver")
 

@@ -9,7 +9,7 @@ import httpx
 import pytest
 from fastmcp import Client
 
-from mtg_mcp.providers.mtgjson import mtgjson_mcp
+from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "mtgjson"
 
@@ -31,7 +31,7 @@ async def client():
     fixture_bytes = _load_fixture_bytes()
     mock_response = _mock_httpx_response(fixture_bytes)
 
-    with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+    with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
         mock_http = AsyncMock()
         mock_http.get = AsyncMock(return_value=mock_response)
         mock_http.__aenter__ = AsyncMock(return_value=mock_http)

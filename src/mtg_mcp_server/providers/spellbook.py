@@ -9,22 +9,22 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import (
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import (
     ATTRIBUTION_SPELLBOOK,
     TAGS_COMBO,
     TAGS_LOOKUP,
     TAGS_SEARCH,
     TOOL_ANNOTATIONS,
 )
-from mtg_mcp.services.spellbook import (
+from mtg_mcp_server.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
     SpellbookError,
 )
 
 if TYPE_CHECKING:
-    from mtg_mcp.types import Combo
+    from mtg_mcp_server.types import Combo
 
 # Spellbook API uses single-letter zone codes in combo card data.
 # Map them to human-readable names for tool output.

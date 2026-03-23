@@ -20,8 +20,8 @@ import httpx
 import structlog
 from pydantic import ValidationError
 
-from mtg_mcp.services.base import ServiceError
-from mtg_mcp.types import MTGJSONCard
+from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.types import MTGJSONCard
 
 log = structlog.get_logger(service="MTGJSONClient")
 

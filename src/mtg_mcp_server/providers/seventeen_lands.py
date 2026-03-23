@@ -8,9 +8,9 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import ATTRIBUTION_17LANDS, TAGS_DRAFT, TOOL_ANNOTATIONS
-from mtg_mcp.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import ATTRIBUTION_17LANDS, TAGS_DRAFT, TOOL_ANNOTATIONS
+from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: SeventeenLandsClient | None = None

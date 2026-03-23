@@ -16,15 +16,15 @@ import sys
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from mtg_mcp.config import Settings
-from mtg_mcp.logging import configure_logging
-from mtg_mcp.providers.edhrec import edhrec_mcp
-from mtg_mcp.providers.mtgjson import mtgjson_mcp
-from mtg_mcp.providers.scryfall import scryfall_mcp
-from mtg_mcp.providers.seventeen_lands import draft_mcp
-from mtg_mcp.providers.spellbook import spellbook_mcp
-from mtg_mcp.services.cache import disable_all_caches
-from mtg_mcp.workflows.server import workflow_mcp
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.logging import configure_logging
+from mtg_mcp_server.providers.edhrec import edhrec_mcp
+from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
+from mtg_mcp_server.providers.scryfall import scryfall_mcp
+from mtg_mcp_server.providers.seventeen_lands import draft_mcp
+from mtg_mcp_server.providers.spellbook import spellbook_mcp
+from mtg_mcp_server.services.cache import disable_all_caches
+from mtg_mcp_server.workflows.server import workflow_mcp
 
 mcp = FastMCP(
     "MTG",
@@ -47,7 +47,7 @@ mcp = FastMCP(
         "- suggest_cuts: Identify weakest cards to cut\n\n"
         "Resources (mtg:// URIs) provide cached card, combo, and rating data.\n"
         "Prompts guide multi-step analysis workflows.\n\n"
-        "mtg-mcp is unofficial Fan Content permitted under the Fan Content Policy. "
+        "mtg-mcp-server is unofficial Fan Content permitted under the Fan Content Policy. "
         "Not approved/endorsed by Wizards. Portions of the materials used are "
         "property of Wizards of the Coast. \u00a9 Wizards of the Coast LLC."
     ),

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from cachetools import TTLCache
 
-from mtg_mcp.services.base import BaseClient, ServiceError
-from mtg_mcp.services.cache import _decklist_key, _method_key, async_cached
-from mtg_mcp.types import BracketEstimate, Combo, ComboCard, ComboResult, DecklistCombos
+from mtg_mcp_server.services.base import BaseClient, ServiceError
+from mtg_mcp_server.services.cache import _decklist_key, _method_key, async_cached
+from mtg_mcp_server.types import BracketEstimate, Combo, ComboCard, ComboResult, DecklistCombos
 
 
 class SpellbookError(ServiceError):

@@ -8,7 +8,7 @@ import httpx
 import pytest
 import respx
 
-from mtg_mcp.services.base import BaseClient, ServiceError
+from mtg_mcp_server.services.base import BaseClient, ServiceError
 
 
 class TestBaseClientLifecycle:
@@ -103,7 +103,9 @@ class TestBaseClientRateLimiting:
     @respx.mock
     async def test_rate_limit_delay_enforced(self):
         respx.get("https://example.com/data").mock(return_value=httpx.Response(200, json={}))
-        with patch("mtg_mcp.services.base.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with patch(
+            "mtg_mcp_server.services.base.asyncio.sleep", new_callable=AsyncMock
+        ) as mock_sleep:
             async with BaseClient(base_url="https://example.com", rate_limit_rps=10.0) as client:
                 await client._get("/data")
                 mock_sleep.assert_awaited_once()
@@ -115,7 +117,9 @@ class TestBaseClientRateLimiting:
         respx.get("https://example.com/fail").mock(
             return_value=httpx.Response(404, text="Not Found")
         )
-        with patch("mtg_mcp.services.base.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with patch(
+            "mtg_mcp_server.services.base.asyncio.sleep", new_callable=AsyncMock
+        ) as mock_sleep:
             async with BaseClient(base_url="https://example.com", rate_limit_rps=10.0) as client:
                 with pytest.raises(ServiceError):
                     await client._get("/fail")

@@ -10,7 +10,7 @@ import pytest
 import respx
 from fastmcp import Client
 
-from mtg_mcp.providers.seventeen_lands import draft_mcp
+from mtg_mcp_server.providers.seventeen_lands import draft_mcp
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "seventeen_lands"
 BASE_URL = "https://www.17lands.com"

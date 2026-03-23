@@ -116,7 +116,7 @@ mtg-mcp/
 ├── uv.lock
 │
 ├── src/
-│   └── mtg_mcp/
+│   └── mtg_mcp_server/
 │       ├── __init__.py
 │       ├── server.py               # Orchestrator: mounts all providers, runs transport
 │       ├── config.py               # pydantic-settings: API URLs, rate limits, feature flags
@@ -198,12 +198,12 @@ mtg-mcp/
 ### Composition via Mount
 
 ```python
-# src/mtg_mcp/server.py
+# src/mtg_mcp_server/server.py
 from fastmcp import FastMCP
-from mtg_mcp.providers.scryfall import scryfall_mcp
-from mtg_mcp.providers.spellbook import spellbook_mcp
-from mtg_mcp.providers.mtgjson import mtgjson_mcp
-from mtg_mcp.workflows.server import workflow_mcp
+from mtg_mcp_server.providers.scryfall import scryfall_mcp
+from mtg_mcp_server.providers.spellbook import spellbook_mcp
+from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
+from mtg_mcp_server.workflows.server import workflow_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
 
@@ -236,12 +236,12 @@ lifespan to create them once at startup. Store in a module-level variable and ac
 > limitation of FastMCP 3.1.x. The module-level client pattern is the established workaround.
 
 ```python
-# src/mtg_mcp/providers/scryfall.py
+# src/mtg_mcp_server/providers/scryfall.py
 from fastmcp import FastMCP
 from fastmcp.server.lifespan import lifespan
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import TOOL_ANNOTATIONS
-from mtg_mcp.services.scryfall import ScryfallClient
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import TOOL_ANNOTATIONS
+from mtg_mcp_server.services.scryfall import ScryfallClient
 
 _client: ScryfallClient | None = None
 
@@ -276,11 +276,11 @@ Workflow tools need multiple service clients. Use `AsyncExitStack` to manage the
 lifespan, respecting feature flags for optional backends.
 
 ```python
-# src/mtg_mcp/workflows/server.py
+# src/mtg_mcp_server/workflows/server.py
 from contextlib import AsyncExitStack
 from fastmcp import FastMCP
 from fastmcp.server.lifespan import lifespan
-from mtg_mcp.config import Settings
+from mtg_mcp_server.config import Settings
 
 _scryfall: ScryfallClient | None = None
 _spellbook: SpellbookClient | None = None
@@ -326,7 +326,7 @@ Workflow tools wrap pure functions from the workflow modules:
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
 async def commander_overview(commander_name: str) -> str:
     """Comprehensive commander profile from all available sources."""
-    from mtg_mcp.workflows.commander import commander_overview as impl
+    from mtg_mcp_server.workflows.commander import commander_overview as impl
     return await impl(
         commander_name,
         scryfall=_require_scryfall(),
@@ -337,10 +337,10 @@ async def commander_overview(commander_name: str) -> str:
 
 ### Tool Annotations
 
-All tools share a single `TOOL_ANNOTATIONS` constant from `mtg_mcp.providers`:
+All tools share a single `TOOL_ANNOTATIONS` constant from `mtg_mcp_server.providers`:
 
 ```python
-# src/mtg_mcp/providers/__init__.py
+# src/mtg_mcp_server/providers/__init__.py
 from mcp.types import ToolAnnotations
 
 TOOL_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
@@ -402,7 +402,7 @@ string. For testing error responses, pass `raise_on_error=False`.
 # tests/providers/test_scryfall_provider.py
 import pytest
 from fastmcp import Client
-from mtg_mcp.providers.scryfall import scryfall_mcp
+from mtg_mcp_server.providers.scryfall import scryfall_mcp
 
 @pytest.fixture
 async def client():
@@ -482,7 +482,7 @@ All logging to stderr (stdout is MCP transport in stdio mode).
 ## 9. Configuration
 
 ```python
-# src/mtg_mcp/config.py
+# src/mtg_mcp_server/config.py
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):

@@ -11,9 +11,9 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import ATTRIBUTION_EDHREC, TAGS_BETA, TOOL_ANNOTATIONS
-from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import ATTRIBUTION_EDHREC, TAGS_BETA, TOOL_ANNOTATIONS
+from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: EDHRECClient | None = None

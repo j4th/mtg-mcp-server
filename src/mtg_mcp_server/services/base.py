@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
+from importlib.metadata import version as _pkg_version
 from typing import TYPE_CHECKING, Self
 
 import httpx
@@ -19,6 +20,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+DEFAULT_USER_AGENT = f"mtg-mcp-server/{_pkg_version('mtg-mcp-server')}"
 
 if TYPE_CHECKING:
     from typing import Any
@@ -101,7 +104,7 @@ class BaseClient:
         self,
         base_url: str,
         rate_limit_rps: float = 10.0,
-        user_agent: str = "mtg-mcp/0.1.0",
+        user_agent: str = DEFAULT_USER_AGENT,
         timeout: float = 30.0,
     ) -> None:
         if rate_limit_rps <= 0:

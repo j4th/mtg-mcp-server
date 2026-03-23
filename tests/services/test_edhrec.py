@@ -9,8 +9,8 @@ import httpx
 import pytest
 import respx
 
-from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
-from mtg_mcp.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
+from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
+from mtg_mcp_server.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "edhrec"
 BASE_URL = "https://json.edhrec.com"

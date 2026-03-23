@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from mtg_mcp.providers import ATTRIBUTION_17LANDS
+from mtg_mcp_server.providers import ATTRIBUTION_17LANDS
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
-    from mtg_mcp.types import DraftCardRating
+    from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
+    from mtg_mcp_server.types import DraftCardRating
 
 log = structlog.get_logger(service="workflow.draft")
 

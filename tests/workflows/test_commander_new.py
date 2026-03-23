@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from mtg_mcp.services.edhrec import EDHRECError
-from mtg_mcp.services.scryfall import CardNotFoundError
-from mtg_mcp.services.spellbook import SpellbookError
-from mtg_mcp.types import (
+from mtg_mcp_server.services.edhrec import EDHRECError
+from mtg_mcp_server.services.scryfall import CardNotFoundError
+from mtg_mcp_server.services.spellbook import SpellbookError
+from mtg_mcp_server.types import (
     Card,
     CardPrices,
     Combo,
@@ -23,7 +23,7 @@ from mtg_mcp.types import (
     EDHRECCardList,
     EDHRECCommanderData,
 )
-from mtg_mcp.workflows.commander import budget_upgrade, card_comparison
+from mtg_mcp_server.workflows.commander import budget_upgrade, card_comparison
 
 # ---------------------------------------------------------------------------
 # Test fixtures

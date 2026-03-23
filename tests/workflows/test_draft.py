@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from mtg_mcp.types import DraftCardRating
-from mtg_mcp.workflows.draft import draft_pack_pick
+from mtg_mcp_server.types import DraftCardRating
+from mtg_mcp_server.workflows.draft import draft_pack_pick
 
 
 def _make_rating(

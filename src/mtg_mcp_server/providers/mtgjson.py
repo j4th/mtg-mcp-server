@@ -12,9 +12,9 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import ATTRIBUTION_MTGJSON, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
-from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONError
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import ATTRIBUTION_MTGJSON, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
+from mtg_mcp_server.services.mtgjson import MTGJSONClient, MTGJSONError
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: MTGJSONClient | None = None

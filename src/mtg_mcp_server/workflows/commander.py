@@ -16,10 +16,10 @@ import structlog
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from mtg_mcp.services.edhrec import EDHRECClient
-    from mtg_mcp.services.scryfall import ScryfallClient
-    from mtg_mcp.services.spellbook import SpellbookClient
-    from mtg_mcp.types import Card, Combo, EDHRECCard, EDHRECCommanderData
+    from mtg_mcp_server.services.edhrec import EDHRECClient
+    from mtg_mcp_server.services.scryfall import ScryfallClient
+    from mtg_mcp_server.services.spellbook import SpellbookClient
+    from mtg_mcp_server.types import Card, Combo, EDHRECCard, EDHRECCommanderData
 
 log = structlog.get_logger(service="workflow.commander")
 
@@ -458,8 +458,8 @@ async def card_comparison(
     Raises:
         CardNotFoundError: If a card is not found on Scryfall (propagated).
     """
-    from mtg_mcp.types import Card as ScryfallCard
-    from mtg_mcp.types import MTGJSONCard
+    from mtg_mcp_server.types import Card as ScryfallCard
+    from mtg_mcp_server.types import MTGJSONCard
 
     log.info("card_comparison.start", cards=cards, commander=commander_name)
 

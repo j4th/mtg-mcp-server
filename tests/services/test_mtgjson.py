@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONDownloadError, MTGJSONError
+from mtg_mcp_server.services.mtgjson import MTGJSONClient, MTGJSONDownloadError, MTGJSONError
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "mtgjson"
 
@@ -33,7 +33,7 @@ async def loaded_client():
     client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
     async with client:
         mock_response = _mock_httpx_response(fixture_bytes)
-        with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+        with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
             mock_http = AsyncMock()
             mock_http.get = AsyncMock(return_value=mock_response)
             mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -59,7 +59,7 @@ class TestLazyLoading:
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=mock_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -80,7 +80,7 @@ class TestDownloadAndParse:
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=mock_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -96,7 +96,7 @@ class TestDownloadAndParse:
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(b"", status_code=500)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=mock_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -109,7 +109,7 @@ class TestDownloadAndParse:
     async def test_network_error_raises(self):
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -123,7 +123,7 @@ class TestDownloadAndParse:
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(b"not-gzip-data")
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=mock_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -142,7 +142,7 @@ class TestRefreshLogic:
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=1)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=mock_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -165,7 +165,7 @@ class TestRefreshLogic:
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=mock_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -185,7 +185,7 @@ class TestRefreshLogic:
         async with client:
             # First: successful load
             ok_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=ok_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -198,7 +198,7 @@ class TestRefreshLogic:
 
             # Second: refresh fails (HTTP 503)
             fail_response = _mock_httpx_response(b"", status_code=503)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=fail_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -220,7 +220,7 @@ class TestRefreshLogic:
         async with client:
             # Successful initial load
             ok_response = _mock_httpx_response(fixture_bytes)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=ok_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -231,7 +231,7 @@ class TestRefreshLogic:
             # Simulate stale + failed refresh
             client._loaded_at = time.monotonic() - 7200
             fail_response = _mock_httpx_response(b"", status_code=503)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=fail_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -249,7 +249,7 @@ class TestRefreshLogic:
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             fail_response = _mock_httpx_response(b"", status_code=503)
-            with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=fail_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)

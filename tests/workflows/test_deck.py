@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from mtg_mcp.services.base import ServiceError
-from mtg_mcp.types import (
+from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.types import (
     Combo,
     ComboCard,
     ComboResult,
@@ -16,7 +16,7 @@ from mtg_mcp.types import (
     EDHRECCardList,
     EDHRECCommanderData,
 )
-from mtg_mcp.workflows.deck import suggest_cuts
+from mtg_mcp_server.workflows.deck import suggest_cuts
 
 # ---------------------------------------------------------------------------
 # Fixtures — mock data

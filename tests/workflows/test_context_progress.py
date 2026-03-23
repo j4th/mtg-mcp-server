@@ -21,11 +21,11 @@ if TYPE_CHECKING:
 @pytest.fixture
 def _mock_commander_stubs():
     """Patch commander module to stub card_comparison and budget_upgrade."""
-    created = "mtg_mcp.workflows.commander" not in sys.modules
-    mod = sys.modules.get("mtg_mcp.workflows.commander")
+    created = "mtg_mcp_server.workflows.commander" not in sys.modules
+    mod = sys.modules.get("mtg_mcp_server.workflows.commander")
     if mod is None:
-        mod = types.ModuleType("mtg_mcp.workflows.commander")
-        sys.modules["mtg_mcp.workflows.commander"] = mod
+        mod = types.ModuleType("mtg_mcp_server.workflows.commander")
+        sys.modules["mtg_mcp_server.workflows.commander"] = mod
 
     stub = AsyncMock(return_value="stub")
     originals: dict[str, object] = {}
@@ -37,7 +37,7 @@ def _mock_commander_stubs():
     yield stub
 
     if created:
-        sys.modules.pop("mtg_mcp.workflows.commander", None)
+        sys.modules.pop("mtg_mcp_server.workflows.commander", None)
     else:
         for name, orig in originals.items():
             if orig is None:
@@ -50,11 +50,11 @@ def _mock_commander_stubs():
 @pytest.fixture
 def _mock_analysis_stubs():
     """Patch analysis module to expose deck_analysis stub."""
-    created = "mtg_mcp.workflows.analysis" not in sys.modules
-    mod = sys.modules.get("mtg_mcp.workflows.analysis")
+    created = "mtg_mcp_server.workflows.analysis" not in sys.modules
+    mod = sys.modules.get("mtg_mcp_server.workflows.analysis")
     if mod is None:
-        mod = types.ModuleType("mtg_mcp.workflows.analysis")
-        sys.modules["mtg_mcp.workflows.analysis"] = mod
+        mod = types.ModuleType("mtg_mcp_server.workflows.analysis")
+        sys.modules["mtg_mcp_server.workflows.analysis"] = mod
 
     stub = AsyncMock(return_value="stub")
     original = getattr(mod, "deck_analysis", None)
@@ -63,7 +63,7 @@ def _mock_analysis_stubs():
     yield stub
 
     if created:
-        sys.modules.pop("mtg_mcp.workflows.analysis", None)
+        sys.modules.pop("mtg_mcp_server.workflows.analysis", None)
     else:
         if original is None:
             if hasattr(mod, "deck_analysis"):
@@ -75,11 +75,11 @@ def _mock_analysis_stubs():
 @pytest.fixture
 def _mock_draft_stubs():
     """Patch draft module to expose set_overview stub."""
-    created = "mtg_mcp.workflows.draft" not in sys.modules
-    mod = sys.modules.get("mtg_mcp.workflows.draft")
+    created = "mtg_mcp_server.workflows.draft" not in sys.modules
+    mod = sys.modules.get("mtg_mcp_server.workflows.draft")
     if mod is None:
-        mod = types.ModuleType("mtg_mcp.workflows.draft")
-        sys.modules["mtg_mcp.workflows.draft"] = mod
+        mod = types.ModuleType("mtg_mcp_server.workflows.draft")
+        sys.modules["mtg_mcp_server.workflows.draft"] = mod
 
     stub = AsyncMock(return_value="stub")
     original = getattr(mod, "set_overview", None)
@@ -88,7 +88,7 @@ def _mock_draft_stubs():
     yield stub
 
     if created:
-        sys.modules.pop("mtg_mcp.workflows.draft", None)
+        sys.modules.pop("mtg_mcp_server.workflows.draft", None)
     else:
         if original is None:
             if hasattr(mod, "set_overview"):
@@ -106,21 +106,21 @@ class TestProgressHelper:
     """Test the _progress helper function."""
 
     async def test_progress_calls_report(self):
-        from mtg_mcp.workflows.server import _progress
+        from mtg_mcp_server.workflows.server import _progress
 
         mock_ctx = AsyncMock()
         await _progress(mock_ctx, 1, 3)
         mock_ctx.report_progress.assert_called_once_with(progress=1, total=3)
 
     async def test_progress_passes_step_and_total(self):
-        from mtg_mcp.workflows.server import _progress
+        from mtg_mcp_server.workflows.server import _progress
 
         mock_ctx = AsyncMock()
         await _progress(mock_ctx, 5, 10)
         mock_ctx.report_progress.assert_called_once_with(progress=5, total=10)
 
     async def test_progress_zero_step(self):
-        from mtg_mcp.workflows.server import _progress
+        from mtg_mcp_server.workflows.server import _progress
 
         mock_ctx = AsyncMock()
         await _progress(mock_ctx, 0, 5)
@@ -236,7 +236,7 @@ class TestSetOverviewValidation:
         pass
 
     async def test_17lands_disabled(self, mcp_client: Client):
-        with patch("mtg_mcp.workflows.server._seventeen_lands", None):
+        with patch("mtg_mcp_server.workflows.server._seventeen_lands", None):
             result = await mcp_client.call_tool(
                 "set_overview",
                 {"set_code": "LCI"},

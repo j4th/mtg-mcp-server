@@ -8,7 +8,7 @@ This project uses data from the following third-party services and projects.
 
 Magic: The Gathering is a registered trademark of Wizards of the Coast LLC.
 
-mtg-mcp is unofficial Fan Content permitted under the
+mtg-mcp-server is unofficial Fan Content permitted under the
 [Fan Content Policy](https://company.wizards.com/en/legal/fancontentpolicy).
 Not approved/endorsed by Wizards.
 

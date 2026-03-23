@@ -9,12 +9,12 @@ import httpx
 import pytest
 import respx
 
-from mtg_mcp.services.spellbook import (
+from mtg_mcp_server.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
     SpellbookError,
 )
-from mtg_mcp.types import BracketEstimate, Combo, DecklistCombos
+from mtg_mcp_server.types import BracketEstimate, Combo, DecklistCombos
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "spellbook"
 BASE_URL = "https://backend.commanderspellbook.com"

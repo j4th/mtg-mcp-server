@@ -8,15 +8,15 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import (
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import (
     ATTRIBUTION_SCRYFALL,
     TAGS_LOOKUP,
     TAGS_PRICING,
     TAGS_SEARCH,
     TOOL_ANNOTATIONS,
 )
-from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
+from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
 
 # Module-level client set by the lifespan. This pattern is required because
 # FastMCP's Depends()/lifespan_context DI doesn't propagate through mount().

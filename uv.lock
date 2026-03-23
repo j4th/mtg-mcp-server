@@ -660,8 +660,8 @@ wheels = [
 ]
 
 [[package]]
-name = "mtg-mcp"
-version = "0.1.0"
+name = "mtg-mcp-server"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "cachetools" },

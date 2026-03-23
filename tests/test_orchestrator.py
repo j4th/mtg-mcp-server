@@ -169,7 +169,7 @@ class TestMtgjsonMounted:
         fixture_bytes = (MTGJSON_FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
         mock_response = httpx.Response(200, content=fixture_bytes)
 
-        with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+        with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
             mock_http = AsyncMock()
             mock_http.get = AsyncMock(return_value=mock_response)
             mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -185,7 +185,7 @@ class TestMtgjsonMounted:
         fixture_bytes = (MTGJSON_FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
         mock_response = httpx.Response(200, content=fixture_bytes)
 
-        with patch("mtg_mcp.services.mtgjson.httpx.AsyncClient") as mock_cls:
+        with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
             mock_http = AsyncMock()
             mock_http.get = AsyncMock(return_value=mock_response)
             mock_http.__aenter__ = AsyncMock(return_value=mock_http)

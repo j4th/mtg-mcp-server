@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from cachetools import TTLCache
 
-from mtg_mcp.services.base import BaseClient, ServiceError
-from mtg_mcp.services.cache import _method_key, async_cached
-from mtg_mcp.types import ArchetypeRating, DraftCardRating
+from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, BaseClient, ServiceError
+from mtg_mcp_server.services.cache import _method_key, async_cached
+from mtg_mcp_server.types import ArchetypeRating, DraftCardRating
 
 
 class SeventeenLandsError(ServiceError):
@@ -36,7 +36,7 @@ class SeventeenLandsClient(BaseClient):
         self,
         base_url: str = "https://www.17lands.com",
         rate_limit_rps: float = 1.0,
-        user_agent: str = "mtg-mcp/0.1.0",
+        user_agent: str = DEFAULT_USER_AGENT,
     ) -> None:
         super().__init__(
             base_url=base_url,

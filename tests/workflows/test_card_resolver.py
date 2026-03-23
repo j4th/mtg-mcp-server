@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from mtg_mcp.services.scryfall import CardNotFoundError
-from mtg_mcp.workflows.card_resolver import resolve_card
+from mtg_mcp_server.services.scryfall import CardNotFoundError
+from mtg_mcp_server.workflows.card_resolver import resolve_card
 
 
 @pytest.fixture

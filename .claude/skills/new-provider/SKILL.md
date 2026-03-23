@@ -22,11 +22,11 @@ Examples:
 
 Given `/new-provider <name>`:
 
-### 1. Service client: `src/mtg_mcp/services/<name>.py`
+### 1. Service client: `src/mtg_mcp_server/services/<name>.py`
 
 ```python
 import structlog
-from mtg_mcp.services.base import BaseClient
+from mtg_mcp_server.services.base import BaseClient
 
 log = structlog.get_logger(service="<name>")
 
@@ -44,7 +44,7 @@ class <Name>Client(BaseClient):
         )
 ```
 
-### 2. Provider sub-server: `src/mtg_mcp/providers/<name>.py`
+### 2. Provider sub-server: `src/mtg_mcp_server/providers/<name>.py`
 
 ```python
 from fastmcp import FastMCP, Context
@@ -53,7 +53,7 @@ from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
-from mtg_mcp.services.<name> import <Name>Client
+from mtg_mcp_server.services.<name> import <Name>Client
 
 @lifespan
 async def <name>_lifespan(server):
@@ -77,7 +77,7 @@ def get_client(ctx: Context) -> <Name>Client:
 - `tests/providers/test_<name>_provider.py` — Provider tests using FastMCP test client
 - `tests/fixtures/<name>/` — Directory for JSON fixtures (empty, user captures separately)
 
-### 4. Pydantic models in `src/mtg_mcp/types.py`
+### 4. Pydantic models in `src/mtg_mcp_server/types.py`
 
 Add response models for the service. Use `model_validate()`, not `parse_obj()`.
 

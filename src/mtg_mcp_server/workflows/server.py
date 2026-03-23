@@ -19,19 +19,19 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import (
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import (
     TAGS_COMMANDER,
     TAGS_DRAFT,
     TAGS_PRICING,
     TOOL_ANNOTATIONS,
 )
-from mtg_mcp.services.base import ServiceError
-from mtg_mcp.services.edhrec import CommanderNotFoundError, EDHRECClient
-from mtg_mcp.services.mtgjson import MTGJSONClient
-from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient
-from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
-from mtg_mcp.services.spellbook import SpellbookClient
+from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient
+from mtg_mcp_server.services.mtgjson import MTGJSONClient
+from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient
+from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
+from mtg_mcp_server.services.spellbook import SpellbookClient
 
 # Module-level clients managed by the lifespan via AsyncExitStack.
 # Workflows need multiple clients simultaneously; AsyncExitStack is cleaner
@@ -128,7 +128,7 @@ async def commander_overview(commander_name: str) -> str:
     Returns card details, top combos, EDHREC staples, and synergy scores.
     Degrades gracefully if optional sources (EDHREC, Spellbook) are unavailable.
     """
-    from mtg_mcp.workflows.commander import commander_overview as impl
+    from mtg_mcp_server.workflows.commander import commander_overview as impl
 
     try:
         return await impl(
@@ -152,7 +152,7 @@ async def evaluate_upgrade(card_name: str, commander_name: str) -> str:
     Returns card details, price, synergy score, and combos enabled for the caller to assess.
     Degrades gracefully if optional sources (EDHREC, Spellbook) are unavailable.
     """
-    from mtg_mcp.workflows.commander import evaluate_upgrade as impl
+    from mtg_mcp_server.workflows.commander import evaluate_upgrade as impl
 
     try:
         return await impl(
@@ -181,7 +181,7 @@ async def draft_pack_pick(
     Provides GIH WR, ALSA, IWD stats, and color fit analysis based on current picks.
     Requires 17Lands to be enabled.
     """
-    from mtg_mcp.workflows.draft import draft_pack_pick as impl
+    from mtg_mcp_server.workflows.draft import draft_pack_pick as impl
 
     try:
         return await impl(
@@ -205,7 +205,7 @@ async def suggest_cuts(
     Scores cards by synergy, inclusion rate, and combo membership.
     Degrades gracefully if EDHREC or Spellbook backends fail (uses whatever data is available).
     """
-    from mtg_mcp.workflows.deck import suggest_cuts as impl
+    from mtg_mcp_server.workflows.deck import suggest_cuts as impl
 
     try:
         return await impl(
@@ -230,7 +230,7 @@ async def card_comparison(
     Shows mana cost, type, synergy, inclusion rate, combo count, and price for each card.
     Scryfall and Spellbook required; EDHREC optional.
     """
-    from mtg_mcp.workflows.commander import card_comparison as impl
+    from mtg_mcp_server.workflows.commander import card_comparison as impl
 
     if len(cards) < 2:
         raise ToolError("Provide at least 2 cards to compare.")
@@ -265,7 +265,7 @@ async def budget_upgrade(
     Ranks EDHREC staples by synergy-per-dollar within the given budget ceiling.
     Requires EDHREC (for staples) and Scryfall (for prices).
     """
-    from mtg_mcp.workflows.commander import budget_upgrade as impl
+    from mtg_mcp_server.workflows.commander import budget_upgrade as impl
 
     if budget <= 0:
         raise ToolError("Budget must be a positive number.")
@@ -297,7 +297,7 @@ async def deck_analysis(
     and bracket estimation, EDHREC for synergy scores, Scryfall for prices.
     Degrades gracefully if optional backends are unavailable.
     """
-    from mtg_mcp.workflows.analysis import deck_analysis as impl
+    from mtg_mcp_server.workflows.analysis import deck_analysis as impl
 
     if not decklist:
         raise ToolError("Provide at least one card in the decklist.")
@@ -328,7 +328,7 @@ async def set_overview(
     Uses 17Lands card ratings to provide a data-driven format breakdown.
     Requires 17Lands to be enabled.
     """
-    from mtg_mcp.workflows.draft import set_overview as impl
+    from mtg_mcp_server.workflows.draft import set_overview as impl
 
     try:
         return await impl(

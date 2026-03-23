@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 from fastmcp import Client
 
-from mtg_mcp.server import mcp
-from mtg_mcp.services.edhrec import EDHRECClient
-from mtg_mcp.services.scryfall import ScryfallClient
-from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
-from mtg_mcp.services.spellbook import SpellbookClient
+from mtg_mcp_server.server import mcp
+from mtg_mcp_server.services.edhrec import EDHRECClient
+from mtg_mcp_server.services.scryfall import ScryfallClient
+from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
+from mtg_mcp_server.services.spellbook import SpellbookClient
 
 
 @pytest.fixture(autouse=True)
