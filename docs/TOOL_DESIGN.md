@@ -55,8 +55,8 @@ Search for known combos involving specific cards or within a color identity.
 
 | Field | Detail |
 |-------|--------|
-| Input | `card_name: str`, `color_identity: str | None = None` (e.g. "sultai", "BUG", "wubrg") |
-| Output | List of combos with: cards involved, prerequisites, steps, results. Limited to top 10 by default. |
+| Input | `card_name: str`, `color_identity: str | None = None` (e.g. "sultai", "BUG", "wubrg"), `limit: int = 10` |
+| Output | List of combos with: cards involved, prerequisites, steps, results. Limited to `limit` combos. |
 | Backend | `SpellbookClient.find_combos()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -70,13 +70,23 @@ Get detailed steps for a specific combo by its Spellbook ID.
 | Backend | `SpellbookClient.get_combo()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
+### `spellbook_find_decklist_combos`
+Find combos present in (or nearly present in) a Commander decklist.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commanders: list[str]`, `decklist: list[str]` (card names) |
+| Output | Included combos (fully present) and almost-included combos with card lists and results |
+| Backend | `SpellbookClient.find_decklist_combos()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
 ### `spellbook_estimate_bracket`
 Estimate the Commander bracket for a decklist based on its combo density.
 
 | Field | Detail |
 |-------|--------|
-| Input | `commander: str`, `decklist: list[str]` (card names) |
-| Output | Bracket estimate (1-4), combos found, bracket-relevant details |
+| Input | `commanders: list[str]`, `decklist: list[str]` (card names) |
+| Output | Bracket tag, banned cards, game-changer cards, two-card combos, lock combos |
 | Backend | `SpellbookClient.estimate_bracket()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -89,8 +99,8 @@ Get win rate and draft data for cards in a set.
 
 | Field | Detail |
 |-------|--------|
-| Input | `set_code: str` (e.g. "LRW"), `format: str = "PremierDraft"`, `colors: str | None = None` (e.g. "BG") |
-| Output | Per-card: name, color, rarity, GIH WR, OH WR, GD WR, IWD, ALSA, games played |
+| Input | `set_code: str` (e.g. "LCI", "MKM", "OTJ"), `event_type: str = "PremierDraft"` |
+| Output | Per-card: name, color, rarity, GIH WR, ALSA, IWD, games played |
 | Backend | `SeventeenLandsClient.card_ratings()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -99,8 +109,8 @@ Get win rates by color pair/archetype for a set.
 
 | Field | Detail |
 |-------|--------|
-| Input | `set_code: str`, `format: str = "PremierDraft"` |
-| Output | Per-color-pair: win rate, games played, popularity |
+| Input | `set_code: str`, `start_date: str` (YYYY-MM-DD, **required**), `end_date: str` (YYYY-MM-DD, **required**), `event_type: str = "PremierDraft"` |
+| Output | Per-color-pair: win rate, games played. Includes mono-color, two-color, and summary rows |
 | Backend | `SeventeenLandsClient.color_ratings()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -200,6 +210,130 @@ Identify the weakest cards to cut from a commander decklist.
 |-------|--------|
 | Input | `decklist: list[str]`, `commander_name: str`, `num_cuts: int = 5` |
 | Output | Markdown with: data source status, ranked cut candidates with reasoning (synergy/inclusion for EDHREC data, "PROTECTED — combo piece" for combo cards, "Low confidence — no data found" for unknown cards), failure notes |
-| Backends | Spellbook (optional) + EDHREC (optional) |
+| Backends | Spellbook (required) + EDHREC (optional) |
 | Scoring | Low synergy + low inclusion = more cuttable. Combo pieces protected (-2.0). No data = slight penalty (+0.5) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `card_comparison`
+Compare 2-5 cards side-by-side for a specific commander deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `cards: list[str]` (2-5 card names), `commander_name: str` |
+| Output | Markdown comparison table with: name, mana cost, type, synergy, inclusion %, combo count, price for each card |
+| Backends | Scryfall (required) + Spellbook (required) + EDHREC (optional) |
+| Partial failure | Card not found propagates. EDHREC/Spellbook failures show "N/A" per card |
+| Progress | Reports progress (1/3 resolving, 2/3 fetching data, 3/3 formatting) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `budget_upgrade`
+Suggest budget-friendly upgrades for a commander deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commander_name: str`, `budget: float` (max price per card in USD), `num_suggestions: int = 10` |
+| Output | Markdown table ranked by synergy-per-dollar: name, synergy, inclusion %, price, synergy/$ |
+| Backends | Scryfall (required, for prices) + EDHREC (required, for staples) |
+| Error | Returns message if EDHREC disabled, no staples found, or no cards under budget |
+| Progress | Reports progress (1/2 fetching staples, 2/2 fetching prices) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `deck_analysis`
+Full decklist health check — mana curve, colors, combos, bracket, budget, synergy.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `commander_name: str` |
+| Output | Markdown with: mana curve distribution table, color pip requirements, combos & bracket estimate, total/average budget, 5 lowest-synergy cards, unresolved cards, Data Sources footer |
+| Backends | MTGJSON/Scryfall (card data) + Spellbook (combos/bracket) + EDHREC (synergy) + Scryfall (prices) |
+| Card resolution | Uses MTGJSON-first strategy via `card_resolver` with Scryfall fallback. Fills missing prices from Scryfall |
+| Partial failure | Degrades gracefully — all backends except Scryfall are optional |
+| Progress | Reports progress (1/4 resolving, 2/4 combos, 3/4 synergy, 4/4 prices) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `set_overview`
+Draft format overview — top commons/uncommons and trap rares.
+
+| Field | Detail |
+|-------|--------|
+| Input | `set_code: str`, `event_type: str = "PremierDraft"` |
+| Output | Markdown with: event type, median GIH WR, cards with data count, top 10 commons table (rank, name, color, GIH WR, ALSA, IWD, games), top 10 uncommons table, trap rares/mythics list (GIH WR below median) |
+| Backends | 17Lands only |
+| Error | Raises `ToolError` if 17Lands is disabled |
+| Progress | Reports progress (1/2 fetching, 2/2 analyzing) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+---
+
+## Prompts (workflow server)
+
+Prompts are user-invocable templates registered on the workflow server. They guide multi-step analysis workflows by generating structured instructions for the AI assistant.
+
+### `evaluate_commander_swap`
+Evaluate swapping a card in a Commander deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commander: str`, `adding: str`, `cutting: str` |
+| Output | Multi-step prompt: look up both cards, compare synergy via `card_comparison`, check combo implications via `spellbook_find_combos`, recommend SWAP/KEEP/CONSIDER |
+
+### `deck_health_check`
+Guide a comprehensive deck health assessment.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commander: str` |
+| Output | Multi-step prompt: run `deck_analysis` with full decklist, run `suggest_cuts`, analyze mana curve/colors/bracket, provide prioritized recommendations |
+
+### `draft_strategy`
+Guide a draft format preparation session.
+
+| Field | Detail |
+|-------|--------|
+| Input | `set_code: str` |
+| Output | Multi-step prompt: use `set_overview` for card ratings, analyze top archetypes with key commons/uncommons, provide draft heuristics cheat sheet with GIH WR/IWD/ALSA thresholds |
+
+### `find_upgrades`
+Guide a budget upgrade session for a Commander deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commander: str`, `budget: float` |
+| Output | Multi-step prompt: use `budget_upgrade` for ranked suggestions, use `evaluate_upgrade` on top 5, evaluate by synergy/$, combo potential, inclusion rate, recommend top 3-5 |
+
+---
+
+## Resources (mtg:// URIs)
+
+Resources provide cached data access via URI templates. Each returns JSON for programmatic consumption.
+
+### Scryfall Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://card/{name}` | Card data as JSON by exact name |
+| `mtg://card/{name}/rulings` | Card rulings as JSON by card name |
+
+### Spellbook Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://combo/{combo_id}` | Combo details as JSON by Spellbook ID |
+
+### 17Lands Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://draft/{set_code}/ratings` | Card ratings for a set as JSON |
+
+### EDHREC Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://commander/{name}/staples` | Commander staples data as JSON |
+
+### MTGJSON Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://card-data/{name}` | Card data from MTGJSON bulk data as JSON |
