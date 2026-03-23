@@ -252,7 +252,7 @@ async def _resolve_cards(
     """Resolve all cards in the decklist using MTGJSON-first fallback."""
     from mtg_mcp.workflows.card_resolver import resolve_card
 
-    # Cap concurrent lookups to respect Scryfall's 10 req/sec rate limit.
+    # Cap concurrent Scryfall lookups to avoid overwhelming the connection pool.
     sem = asyncio.Semaphore(10)
 
     async def _bounded_resolve(name: str) -> Card | MTGJSONCard:

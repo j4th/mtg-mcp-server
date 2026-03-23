@@ -58,7 +58,7 @@ _settings = Settings()
 if _settings.disable_cache:
     disable_all_caches()
 
-# Feature-flagged backends: disabled by default or behind env vars.
+# Feature-flagged backends: enabled by default but can be disabled via env vars.
 # 17Lands rate-limits aggressively; EDHREC scrapes undocumented endpoints;
 # MTGJSON requires a ~100MB bulk file download on first access.
 if _settings.enable_17lands:

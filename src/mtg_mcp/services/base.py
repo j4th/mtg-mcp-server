@@ -51,7 +51,7 @@ def _is_retryable(exc: BaseException) -> bool:
     """Return True if the exception represents a retryable HTTP/network error.
 
     Network errors (``status_code is None``) are always retryable. HTTP errors
-    are retryable only for rate limiting (429) and server errors (5xx).
+    are retryable only for rate limiting (429) and server errors (500, 502, 503, 504).
     """
     if not isinstance(exc, ServiceError):
         return False

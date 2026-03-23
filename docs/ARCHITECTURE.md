@@ -210,7 +210,9 @@ mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics serve
 # Sub-servers get namespaced: scryfall_search_cards, spellbook_find_combos, etc.
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
-mcp.mount(mtgjson_mcp, namespace="mtgjson")  # Behind feature flag
+# Feature-flagged backends mounted conditionally (see server.py)
+if settings.enable_mtgjson:
+    mcp.mount(mtgjson_mcp, namespace="mtgjson")
 
 # Workflow tools mounted WITHOUT namespace for clean names
 mcp.mount(workflow_mcp)

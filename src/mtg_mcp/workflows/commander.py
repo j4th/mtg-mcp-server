@@ -607,7 +607,7 @@ async def budget_upgrade(
     if on_progress is not None:
         await on_progress(2, 2)
 
-    # Limit concurrent Scryfall requests to stay under the 10 req/sec rate limit.
+    # Limit concurrent Scryfall requests to avoid overwhelming the connection pool.
     sem = asyncio.Semaphore(10)
 
     async def _fetch_price(name: str) -> Card:

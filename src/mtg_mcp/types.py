@@ -176,7 +176,7 @@ class BracketEstimate(BaseModel):
 class DraftCardRating(BaseModel):
     """Card performance data from 17Lands draft tracking.
 
-    All ``Optional[float]`` fields may be ``None`` when the sample size is
+    All ``float | None`` fields may be ``None`` when the sample size is
     too small (< 500 games) or when date range params are omitted from the
     API request. Use ``is not None`` checks — ``0.0`` is a valid win rate.
 
