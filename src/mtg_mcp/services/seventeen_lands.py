@@ -1,4 +1,8 @@
-"""17Lands API client for draft card ratings and archetype statistics."""
+"""17Lands API client for draft card ratings and archetype statistics.
+
+Wraps 17Lands' undocumented but widely-used REST endpoints for card win rates
+and color pair performance data. Rate limited aggressively (1 req/sec max).
+"""
 
 from __future__ import annotations
 
@@ -16,11 +20,17 @@ class SeventeenLandsError(ServiceError):
 class SeventeenLandsClient(BaseClient):
     """Async client for the 17Lands draft data API.
 
-    Rate limit is aggressive (1 req/sec max). Cache responses wherever possible.
+    Rate limit is aggressive (1 req/sec max). All responses are cached with
+    a 4-hour TTL to minimize API pressure.
+
+    Args:
+        base_url: 17Lands base URL.
+        rate_limit_rps: Max requests per second (default 1.0).
+        user_agent: User-Agent header value.
     """
 
-    _card_ratings_cache: TTLCache = TTLCache(maxsize=20, ttl=14400)
-    _color_ratings_cache: TTLCache = TTLCache(maxsize=20, ttl=14400)
+    _card_ratings_cache: TTLCache = TTLCache(maxsize=20, ttl=14400)  # 4h
+    _color_ratings_cache: TTLCache = TTLCache(maxsize=20, ttl=14400)  # 4h
 
     def __init__(
         self,
@@ -43,11 +53,14 @@ class SeventeenLandsClient(BaseClient):
         """Get card performance data for a set.
 
         Args:
-            set_code: Set code (e.g. "LCI", "MKM").
-            event_type: Draft format (e.g. "PremierDraft", "TradDraft").
+            set_code: Set code (e.g. ``"LCI"``, ``"MKM"``).
+            event_type: Draft format (e.g. ``"PremierDraft"``, ``"TradDraft"``).
 
         Returns:
             List of card ratings with win rates, pick rates, etc.
+
+        Raises:
+            SeventeenLandsError: On API errors.
         """
         try:
             response = await self._get(
@@ -69,13 +82,16 @@ class SeventeenLandsClient(BaseClient):
         """Get archetype win rates by color pair for a set.
 
         Args:
-            set_code: Set code (e.g. "LCI", "MKM").
+            set_code: Set code (e.g. ``"LCI"``, ``"MKM"``).
             start_date: Start date in YYYY-MM-DD format (required by API).
             end_date: End date in YYYY-MM-DD format (required by API).
-            event_type: Draft format (e.g. "PremierDraft", "TradDraft").
+            event_type: Draft format (e.g. ``"PremierDraft"``, ``"TradDraft"``).
 
         Returns:
             List of archetype ratings with wins, games, and derived win rates.
+
+        Raises:
+            SeventeenLandsError: On API errors (including 400 if dates are missing).
         """
         try:
             response = await self._get(

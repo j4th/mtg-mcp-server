@@ -16,6 +16,8 @@ from mtg_mcp.services.base import BaseClient, ServiceError
 from mtg_mcp.services.cache import _method_key, async_cached
 from mtg_mcp.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
 
+# Pre-compiled regexes for URL slug generation (_slugify).
+# EDHREC slugs are lowercase-hyphenated with no punctuation.
 _RE_SPECIAL_CHARS = re.compile(r"[,.'\"!?:;()]+")
 _RE_WHITESPACE = re.compile(r"\s+")
 _RE_MULTI_HYPHEN = re.compile(r"-+")
@@ -37,11 +39,17 @@ class EDHRECClient(BaseClient):
     """Async client for EDHREC's internal JSON endpoints.
 
     These endpoints are undocumented and fragile. Use defensive parsing
-    with .get() chains and default to empty values when fields are missing.
+    with ``.get()`` chains and default to empty values when fields are missing.
+
+    Args:
+        base_url: EDHREC JSON endpoint base URL.
+        rate_limit_rps: Max requests per second (0.5 = 1 req per 2 sec).
+        user_agent: User-Agent header value.
     """
 
-    _commander_cache: TTLCache = TTLCache(maxsize=100, ttl=86400)
-    _synergy_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)
+    # Aggressive 24h cache — EDHREC data updates daily and endpoints are fragile.
+    _commander_cache: TTLCache = TTLCache(maxsize=100, ttl=86400)  # 24h
+    _synergy_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)  # 24h
 
     def __init__(
         self,
@@ -131,8 +139,31 @@ class EDHRECClient(BaseClient):
     ) -> EDHRECCommanderData:
         """Defensively parse a commander page JSON response.
 
-        Uses isinstance checks and .get() chains throughout to handle
-        missing or changed fields in this undocumented API.
+        The response has a deeply nested structure::
+
+            {
+              "header": "Muldrotha, the Gravetide (Commander)",
+              "num_decks_avg": 19741,
+              "container": {
+                "json_dict": {
+                  "cardlists": [
+                    {"header": "Creatures", "tag": "creatures",
+                     "cardviews": [{"name": ..., "synergy": ..., ...}]}
+                  ]
+                }
+              }
+            }
+
+        Every level uses ``isinstance`` checks and ``.get()`` with defaults
+        because this undocumented API can change field shapes without notice.
+
+        Args:
+            data: Raw JSON response (expected dict, but guarded against other types).
+            commander_name: Fallback name if the response header is missing.
+            category: Optional tag filter (e.g. ``"creatures"``).
+
+        Returns:
+            Parsed commander data with categorized cardlists.
         """
         if not isinstance(data, dict):
             return EDHRECCommanderData(commander_name=commander_name)
@@ -140,14 +171,13 @@ class EDHRECClient(BaseClient):
         # Extract header — fall back to provided commander name
         raw_header = data.get("header", commander_name)
         header = str(raw_header) if raw_header is not None else commander_name
-        # Strip " (Commander)" suffix if present
         if header.endswith(" (Commander)"):
             header = header[: -len(" (Commander)")]
 
         raw_total = data.get("num_decks_avg", 0)
         total_decks = int(raw_total) if isinstance(raw_total, (int, float)) else 0
 
-        # Navigate the deeply nested container structure defensively
+        # Navigate: data -> container -> json_dict -> cardlists
         container = data.get("container")
         json_dict = container.get("json_dict") if isinstance(container, dict) else None
         raw_cardlists = json_dict.get("cardlists", []) if isinstance(json_dict, dict) else []
@@ -168,6 +198,7 @@ class EDHRECClient(BaseClient):
             for raw_card in raw_views:
                 if not isinstance(raw_card, dict):
                     continue
+                # Use `or 0.0` / `or 0` to coerce None from JSON to numeric defaults
                 cards.append(
                     EDHRECCard(
                         name=str(raw_card.get("name", "")),
@@ -182,7 +213,6 @@ class EDHRECClient(BaseClient):
 
             cardlists.append(EDHRECCardList(header=cl_header, tag=tag, cardviews=cards))
 
-        # Apply category filter if requested
         if category is not None:
             category_lower = category.lower()
             cardlists = [cl for cl in cardlists if cl.tag.lower() == category_lower]
