@@ -194,6 +194,7 @@ cython_debug/
 
 # Claude Code local overrides
 .claude.local.md
+.mcp.json
 
 # Ruff stuff:
 .ruff_cache/
