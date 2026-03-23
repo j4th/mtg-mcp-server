@@ -1,4 +1,14 @@
-"""Workflow MCP server — composed tools calling multiple backend services."""
+"""Workflow MCP server — composed tools calling multiple backend services.
+
+This module is the wiring layer between MCP and the pure workflow functions
+in ``commander.py``, ``draft.py``, ``deck.py``, and ``analysis.py``.  Each tool
+here wraps a pure async function, injecting the service clients from the
+module-level state and converting service exceptions to ``ToolError``.
+
+The workflow server is mounted on the orchestrator **without** a namespace
+so tool names stay clean (e.g. ``commander_overview``, not
+``workflow_commander_overview``).
+"""
 
 from __future__ import annotations
 
@@ -23,6 +33,9 @@ from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient
 from mtg_mcp.services.seventeen_lands import SeventeenLandsClient
 from mtg_mcp.services.spellbook import SpellbookClient
 
+# Module-level clients managed by the lifespan via AsyncExitStack.
+# Workflows need multiple clients simultaneously; AsyncExitStack is cleaner
+# than nested `async with` blocks when some clients are feature-flagged.
 _scryfall: ScryfallClient | None = None
 _spellbook: SpellbookClient | None = None
 _seventeen_lands: SeventeenLandsClient | None = None
@@ -32,6 +45,13 @@ _mtgjson: MTGJSONClient | None = None
 
 @lifespan
 async def workflow_lifespan(server: FastMCP):
+    """Initialize all service clients needed by workflow tools.
+
+    Uses ``AsyncExitStack`` to manage up to 5 clients in a single lifespan.
+    Feature-flagged backends (17Lands, EDHREC, MTGJSON) are only created when
+    their corresponding ``Settings`` flag is enabled. All clients are torn down
+    when the server shuts down.
+    """
     global _scryfall, _spellbook, _seventeen_lands, _edhrec, _mtgjson
     settings = Settings()
     async with AsyncExitStack() as stack:
@@ -68,24 +88,28 @@ workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)
 
 
 def _require_scryfall() -> ScryfallClient:
+    """Return Scryfall client or raise RuntimeError if lifespan hasn't started."""
     if _scryfall is None:
         raise RuntimeError("ScryfallClient not initialized — workflow lifespan not running")
     return _scryfall
 
 
 def _require_spellbook() -> SpellbookClient:
+    """Return Spellbook client or raise RuntimeError if lifespan hasn't started."""
     if _spellbook is None:
         raise RuntimeError("SpellbookClient not initialized — workflow lifespan not running")
     return _spellbook
 
 
 def _require_seventeen_lands() -> SeventeenLandsClient:
+    """Return 17Lands client or raise ToolError if the feature flag is off."""
     if _seventeen_lands is None:
         raise ToolError("17Lands data is not enabled. Set MTG_MCP_ENABLE_17LANDS=true.")
     return _seventeen_lands
 
 
 def _require_edhrec() -> EDHRECClient:
+    """Return EDHREC client or raise ToolError if the feature flag is off."""
     if _edhrec is None:
         raise ToolError("EDHREC is not enabled. Set MTG_MCP_ENABLE_EDHREC=true.")
     return _edhrec
