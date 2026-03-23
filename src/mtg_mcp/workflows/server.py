@@ -204,7 +204,7 @@ async def card_comparison(
     """Compare 2-5 cards side-by-side for a specific commander deck.
 
     Shows mana cost, type, synergy, inclusion rate, combo count, and price for each card.
-    Scryfall required; EDHREC and Spellbook optional.
+    Scryfall and Spellbook required; EDHREC optional.
     """
     from mtg_mcp.workflows.commander import card_comparison as impl
 
