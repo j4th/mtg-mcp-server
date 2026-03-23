@@ -179,6 +179,7 @@ async def draft_pack_pick(
 # Set overview
 # ---------------------------------------------------------------------------
 
+# Number of top-performing cards to show per rarity in set_overview.
 _TOP_N = 10
 
 
@@ -244,7 +245,8 @@ async def set_overview(
     top_commons = by_rarity["common"][:_TOP_N]
     top_uncommons = by_rarity["uncommon"][:_TOP_N]
 
-    # Trap rares/mythics: GIH WR below the median
+    # "Trap" rares/mythics: high-rarity cards that underperform the set median.
+    # Drafters often over-pick rares; flagging underperformers helps avoid that.
     trap_rares = [
         r
         for r in by_rarity["rare"] + by_rarity["mythic"]

@@ -206,13 +206,15 @@ def _score_cards(
         if cs.is_combo_piece:
             cs.has_data = True
 
-        # Cuttability scoring
+        # Cuttability scoring formula:
+        #   base = (1 - synergy) + (1 - inclusion/100)  [0..2 range from EDHREC]
+        #   combo piece:  -2.0  (strongly protects from being cut)
+        #   no data:      +0.5  (slight bias toward cutting unknowns)
+        # Higher cuttability = weaker card = more likely cut candidate.
         cuttability = 0.0
 
         if cs.has_edhrec_data:
-            # Low synergy = more cuttable
             cuttability += 1.0 - cs.synergy_score
-            # Low inclusion = more cuttable
             cuttability += (100 - cs.inclusion_rate) / 100.0
 
         if cs.is_combo_piece:
