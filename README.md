@@ -85,7 +85,8 @@ MTG (orchestrator)
 ├── spellbook (namespace: spellbook_)   → Commander Spellbook API
 ├── draft (namespace: draft_)           → 17Lands data
 ├── edhrec (namespace: edhrec_)         → EDHREC (scraped)
-└── workflows (no namespace)           → Composed tools: commander_overview, etc.
+├── mtgjson (namespace: mtgjson_)       → MTGJSON bulk data
+└── workflows (no namespace)            → Composed tools: commander_overview, etc.
 ```
 
 Services are pure async API clients. Providers register MCP tools. Workflows compose across services. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
@@ -104,7 +105,16 @@ Services are pure async API clients. Providers register MCP tools. Workflows com
 
 ## Status
 
-🚧 **Under active development.** See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for current progress.
+All planned phases are **complete**: 23 tools, 4 prompts, 6 resources, 374 tests at 92% coverage.
+
+| Phase | What | Status |
+|-------|------|--------|
+| 0 | Project scaffold | Done |
+| 1 | Scryfall backend (4 tools) | Done |
+| 2 | Spellbook + 17Lands + EDHREC backends (9 tools) | Done |
+| 3 | Workflow tools — commander, draft, deck (4 tools) | Done |
+| 4 | TTL caching + MTGJSON bulk provider (2 tools) | Done |
+| 5 | Analysis & comparison workflows, prompts, resources (4 tools) | Done |
 
 ## Data Sources & Attribution
 
