@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.j4th/mtg-mcp-server -->
 # mtg-mcp-server
 
 [![CI](https://github.com/j4th/mtg-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/j4th/mtg-mcp-server/actions/workflows/ci.yml)

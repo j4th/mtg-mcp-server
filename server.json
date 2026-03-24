@@ -1,0 +1,16 @@
+{
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "name": "io.github.j4th/mtg-mcp-server",
+    "title": "MTG MCP Server",
+    "description": "Unified MCP server composing Scryfall, Commander Spellbook, 17Lands, EDHREC, and MTGJSON for Magic: The Gathering data and analytics.",
+    "repository": {"url": "https://github.com/j4th/mtg-mcp-server", "source": "github"},
+    "version": "1.0.0",
+    "packages": [
+        {
+            "registryType": "pypi",
+            "identifier": "mtg-mcp-server",
+            "version": "1.0.0",
+            "transport": {"type": "stdio"},
+        }
+    ],
+}
