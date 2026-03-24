@@ -1,6 +1,6 @@
 [project]
 name = "mtg-mcp-server"
-version = "1.1.1"
+version = "1.2.0"
 description = "Unified MCP server providing Magic: The Gathering data to AI assistants"
 readme = "README.md"
 license = "MIT"
@@ -42,6 +42,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "tenacity>=9.0",
     "structlog>=24.0",
+    "smithery>=0.4.4",
 ]
 
 [project.urls]
@@ -82,6 +83,9 @@ default-groups = ["dev"]
 # ---------------------------------------------------------------------------
 # Ruff — linting & formatting
 # ---------------------------------------------------------------------------
+
+[tool.smithery]
+server = "mtg_mcp_server.smithery:create_server"
 
 [tool.ruff]
 line-length = 100
