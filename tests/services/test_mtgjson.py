@@ -193,12 +193,18 @@ class TestRefreshLogic:
                 mock_cls.return_value = mock_http
                 await client.ensure_loaded()
 
-            # Simulate stale
-            client._loaded_at = time.monotonic() - 7200
+            # Simulate stale by controlling the monotonic clock.
+            # In fresh CI containers, time.monotonic() can be small, so
+            # subtracting 7200 could go negative and break is_refresh.
+            loaded_at = client._loaded_at
+            stale_time = loaded_at + 7200  # 2h after load = past 1h refresh
 
             # Second: refresh fails (HTTP 503)
             fail_response = _mock_httpx_response(b"", status_code=503)
-            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with (
+                patch("mtg_mcp_server.services.mtgjson.time.monotonic", return_value=stale_time),
+                patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls,
+            ):
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=fail_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -228,10 +234,14 @@ class TestRefreshLogic:
                 mock_cls.return_value = mock_http
                 await client.ensure_loaded()
 
-            # Simulate stale + failed refresh
-            client._loaded_at = time.monotonic() - 7200
+            # Simulate stale + failed refresh with controlled clock
+            loaded_at = client._loaded_at
+            stale_time = loaded_at + 7200
             fail_response = _mock_httpx_response(b"", status_code=503)
-            with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            with (
+                patch("mtg_mcp_server.services.mtgjson.time.monotonic", return_value=stale_time),
+                patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls,
+            ):
                 mock_http = AsyncMock()
                 mock_http.get = AsyncMock(return_value=fail_response)
                 mock_http.__aenter__ = AsyncMock(return_value=mock_http)
@@ -240,7 +250,9 @@ class TestRefreshLogic:
                 await client.ensure_loaded()
                 assert mock_http.get.call_count == 1
 
-                # Immediate subsequent call should NOT retry
+                # Immediate subsequent call should NOT retry — loaded_at was
+                # reset to stale_time by the failed refresh, so _is_stale
+                # returns False (stale_time - stale_time = 0 < 3600).
                 await client.ensure_loaded()
                 assert mock_http.get.call_count == 1
 
