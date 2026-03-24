@@ -5,6 +5,9 @@
 [![Python 3.12+](https://img.shields.io/pypi/pyversions/mtg-mcp-server)](https://pypi.org/project/mtg-mcp-server/)
 [![License: MIT](https://img.shields.io/github/license/j4th/mtg-mcp-server)](LICENSE)
 [![codecov](https://codecov.io/gh/j4th/mtg-mcp-server/graph/badge.svg)](https://codecov.io/gh/j4th/mtg-mcp-server)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-blue?logo=dependabot)](https://github.com/j4th/mtg-mcp-server/security/dependabot)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 A Magic: The Gathering MCP server for AI assistants. Search cards, analyze draft formats, explore Commander combos, evaluate deck upgrades — all from Claude Code, Claude Desktop, or any MCP client.
 
