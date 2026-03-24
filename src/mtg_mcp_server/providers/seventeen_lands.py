@@ -29,7 +29,7 @@ async def draft_lifespan(server: FastMCP):
     _client = None
 
 
-draft_mcp = FastMCP("17Lands", lifespan=draft_lifespan)
+draft_mcp = FastMCP("17Lands", lifespan=draft_lifespan, mask_error_details=True)
 
 log = structlog.get_logger(provider="17lands")
 

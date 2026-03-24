@@ -17,18 +17,23 @@ BASE_URL = "https://api.scryfall.com"
 
 
 def _load_fixture(name: str) -> dict:
+    """Load a Scryfall JSON fixture file by name."""
     return json.loads((FIXTURES / name).read_text())
 
 
 @pytest.fixture
 async def client():
+    """Provide an in-memory MCP client connected to the Scryfall provider."""
     async with Client(transport=scryfall_mcp) as c:
         yield c
 
 
 class TestSearchCards:
+    """Scryfall search_cards tool behavior."""
+
     @respx.mock
     async def test_returns_formatted_results(self, client: Client):
+        """search_cards returns formatted card list with count and attribution."""
         fixture = _load_fixture("search_sultai_commander.json")
         respx.get(
             f"{BASE_URL}/cards/search",
@@ -45,8 +50,11 @@ class TestSearchCards:
 
 
 class TestCardDetails:
+    """Scryfall card_details tool behavior."""
+
     @respx.mock
     async def test_returns_card_data(self, client: Client):
+        """card_details returns full card data including name, mana cost, and power/toughness."""
         fixture = _load_fixture("card_muldrotha.json")
         respx.get(f"{BASE_URL}/cards/named", params={"exact": "Muldrotha, the Gravetide"}).mock(
             return_value=httpx.Response(200, json=fixture)
@@ -60,6 +68,7 @@ class TestCardDetails:
 
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
+        """card_details returns an error response for nonexistent cards."""
         fixture = _load_fixture("card_not_found.json")
         respx.get(f"{BASE_URL}/cards/named", params={"exact": "Xyzzy"}).mock(
             return_value=httpx.Response(404, json=fixture)
@@ -70,8 +79,11 @@ class TestCardDetails:
 
 
 class TestCardPrice:
+    """Scryfall card_price tool behavior."""
+
     @respx.mock
     async def test_returns_prices(self, client: Client):
+        """card_price returns pricing data with USD formatting."""
         fixture = _load_fixture("card_sol_ring.json")
         respx.get(f"{BASE_URL}/cards/named", params={"exact": "Sol Ring"}).mock(
             return_value=httpx.Response(200, json=fixture)
@@ -84,8 +96,11 @@ class TestCardPrice:
 
 
 class TestCardRulings:
+    """Scryfall card_rulings tool behavior."""
+
     @respx.mock
     async def test_returns_rulings(self, client: Client):
+        """card_rulings returns rulings list with count for a valid card."""
         card_fixture = _load_fixture("card_muldrotha.json")
         rulings_fixture = _load_fixture("rulings_muldrotha.json")
         card_id = card_fixture["id"]
@@ -104,7 +119,10 @@ class TestCardRulings:
 
 
 class TestToolRegistration:
+    """Scryfall provider tool registration."""
+
     async def test_all_tools_registered(self, client: Client):
+        """All four Scryfall tools are registered on the provider."""
         tools = await client.list_tools()
         tool_names = {t.name for t in tools}
         assert tool_names == {"search_cards", "card_details", "card_price", "card_rulings"}

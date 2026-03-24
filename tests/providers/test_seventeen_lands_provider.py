@@ -17,18 +17,23 @@ BASE_URL = "https://www.17lands.com"
 
 
 def _load_fixture(name: str) -> list[dict]:
+    """Load a 17Lands JSON fixture file by name."""
     return json.loads((FIXTURES / name).read_text())
 
 
 @pytest.fixture
 async def client():
+    """Provide an in-memory MCP client connected to the 17Lands provider."""
     async with Client(transport=draft_mcp) as c:
         yield c
 
 
 class TestCardRatings:
+    """17Lands card_ratings tool behavior."""
+
     @respx.mock
     async def test_returns_formatted_results(self, client: Client):
+        """card_ratings returns formatted card list with GIH WR, ALSA, and attribution."""
         fixture = _load_fixture("card_ratings_lci.json")
         respx.get(
             f"{BASE_URL}/card_ratings/data",
@@ -45,6 +50,7 @@ class TestCardRatings:
 
     @respx.mock
     async def test_empty_results(self, client: Client):
+        """card_ratings returns a 'no data' message for unknown set codes."""
         respx.get(
             f"{BASE_URL}/card_ratings/data",
             params={"expansion": "FAKE", "event_type": "PremierDraft"},
@@ -56,6 +62,7 @@ class TestCardRatings:
 
     @respx.mock
     async def test_server_error_returns_tool_error(self, client: Client):
+        """card_ratings returns an error response on server failure."""
         respx.get(
             f"{BASE_URL}/card_ratings/data",
             params={"expansion": "LCI", "event_type": "PremierDraft"},
@@ -66,8 +73,11 @@ class TestCardRatings:
 
 
 class TestArchetypeStats:
+    """17Lands archetype_stats tool behavior."""
+
     @respx.mock
     async def test_returns_formatted_results(self, client: Client):
+        """archetype_stats returns formatted color pair win rates."""
         fixture = _load_fixture("color_ratings_lci.json")
         respx.get(
             f"{BASE_URL}/color_ratings/data",
@@ -94,6 +104,7 @@ class TestArchetypeStats:
 
     @respx.mock
     async def test_server_error_returns_tool_error(self, client: Client):
+        """archetype_stats returns an error response on server failure."""
         respx.get(
             f"{BASE_URL}/color_ratings/data",
             params={
@@ -117,7 +128,10 @@ class TestArchetypeStats:
 
 
 class TestToolRegistration:
+    """17Lands provider tool registration."""
+
     async def test_all_tools_registered(self, client: Client):
+        """Both 17Lands tools are registered on the provider."""
         tools = await client.list_tools()
         tool_names = {t.name for t in tools}
         assert tool_names == {"card_ratings", "archetype_stats"}

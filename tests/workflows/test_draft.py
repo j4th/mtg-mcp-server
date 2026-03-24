@@ -121,6 +121,7 @@ class TestDraftPackPickBasic:
     """Normal cases: all cards found, sorted by GIH WR."""
 
     async def test_cards_sorted_by_gih_wr_descending(self):
+        """Cards sorted by GIH WR descending in output."""
         pack = ["Nameless Inversion", "Mulldrifter", "Leaf Gilder"]
         client = _make_mock_client()
 
@@ -133,6 +134,7 @@ class TestDraftPackPickBasic:
         assert mul_pos < ni_pos < lg_pos
 
     async def test_output_contains_header(self):
+        """Output includes Draft Pack Analysis header with set code and 17Lands attribution."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -143,6 +145,7 @@ class TestDraftPackPickBasic:
         assert "Data provided by [17Lands]" in result
 
     async def test_output_contains_gih_wr_as_percentage(self):
+        """GIH WR displayed as a percentage (e.g., 61.2%)."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -151,6 +154,7 @@ class TestDraftPackPickBasic:
         assert "61.2%" in result
 
     async def test_output_contains_alsa(self):
+        """ALSA (Average Last Seen At) value displayed in output."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -159,6 +163,7 @@ class TestDraftPackPickBasic:
         assert "2.8" in result
 
     async def test_output_contains_iwd_with_sign(self):
+        """Positive IWD displayed with + sign (e.g., +4.5%)."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -168,6 +173,7 @@ class TestDraftPackPickBasic:
         assert "+4.5%" in result
 
     async def test_negative_iwd_displayed_correctly(self):
+        """Negative IWD displayed with - sign (e.g., -0.2%)."""
         pack = ["Kithkin Greatheart"]
         client = _make_mock_client()
 
@@ -177,6 +183,7 @@ class TestDraftPackPickBasic:
         assert "-0.2%" in result
 
     async def test_output_contains_rarity_and_color(self):
+        """Card color and rarity included in output."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -186,6 +193,7 @@ class TestDraftPackPickBasic:
         assert "common" in result.lower()
 
     async def test_output_contains_game_count(self):
+        """Game count (sample size) displayed in output."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -194,6 +202,7 @@ class TestDraftPackPickBasic:
         assert "18000" in result
 
     async def test_calls_card_ratings_with_set_code(self):
+        """17Lands card_ratings called with the provided set code."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -202,6 +211,7 @@ class TestDraftPackPickBasic:
         client.card_ratings.assert_awaited_once_with("MKM")
 
     async def test_rank_numbers_in_output(self):
+        """Sequential rank numbers (1., 2., 3.) present in output."""
         pack = ["Nameless Inversion", "Mulldrifter", "Leaf Gilder"]
         client = _make_mock_client()
 
@@ -216,6 +226,7 @@ class TestDraftPackPickMissingData:
     """Cards not found in 17Lands data appear in 'No data' section."""
 
     async def test_missing_cards_in_no_data_section(self):
+        """Unrecognized cards listed in a separate No data section."""
         pack = ["Mulldrifter", "Totally Fake Card"]
         client = _make_mock_client()
 
@@ -225,6 +236,7 @@ class TestDraftPackPickMissingData:
         assert "No data" in result
 
     async def test_all_cards_missing(self):
+        """All pack cards in No data section when none found in 17Lands."""
         pack = ["Fake Card A", "Fake Card B"]
         client = _make_mock_client()
 
@@ -250,6 +262,7 @@ class TestDraftPackPickNoneGihWr:
     """Cards with None GIH WR go to the end of the found list."""
 
     async def test_none_gih_wr_sorted_to_end(self):
+        """Cards with None GIH WR appear after cards with valid GIH WR."""
         ratings = [*MOCK_RATINGS, RATING_NO_GIH]
         pack = ["Mystery Card", "Mulldrifter", "Leaf Gilder"]
         client = _make_mock_client(ratings)
@@ -264,6 +277,7 @@ class TestDraftPackPickNoneGihWr:
         assert lg_pos < mc_pos
 
     async def test_none_gih_wr_shows_na(self):
+        """Cards with None GIH WR display N/A instead of a percentage."""
         ratings = [*MOCK_RATINGS, RATING_NO_GIH]
         pack = ["Mystery Card"]
         client = _make_mock_client(ratings)
@@ -277,6 +291,7 @@ class TestDraftPackPickColorAnalysis:
     """When current_picks are provided, color analysis should appear."""
 
     async def test_color_distribution_shown(self):
+        """Color distribution section shown with current pick colors."""
         pack = ["Mulldrifter"]
         current_picks = ["Nameless Inversion", "Silvergill Adept", "Mulldrifter"]
         client = _make_mock_client()
@@ -290,6 +305,7 @@ class TestDraftPackPickColorAnalysis:
         assert "B" in result
 
     async def test_on_color_annotation(self):
+        """Cards matching current pick colors annotated as on-color."""
         pack = ["Silvergill Adept"]
         # Current picks are mostly blue
         current_picks = ["Mulldrifter", "Silvergill Adept", "Mulldrifter"]
@@ -302,6 +318,7 @@ class TestDraftPackPickColorAnalysis:
         assert "on-color" in result.lower()
 
     async def test_off_color_annotation(self):
+        """Cards not matching current pick colors annotated as off-color."""
         pack = ["Leaf Gilder"]
         # Current picks are mostly blue
         current_picks = ["Mulldrifter", "Silvergill Adept", "Mulldrifter"]
@@ -314,6 +331,7 @@ class TestDraftPackPickColorAnalysis:
         assert "off-color" in result.lower()
 
     async def test_no_color_analysis_without_picks(self):
+        """No color analysis section when current_picks is not provided."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -322,6 +340,7 @@ class TestDraftPackPickColorAnalysis:
         assert "Current colors" not in result
 
     async def test_no_color_analysis_with_empty_picks(self):
+        """No color analysis section when current_picks is an empty list."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -347,6 +366,7 @@ class TestDraftPackPickEdgeCases:
     """Edge cases: empty pack, single card."""
 
     async def test_empty_pack(self):
+        """Empty pack returns a message about no cards."""
         pack: list[str] = []
         client = _make_mock_client()
 
@@ -355,6 +375,7 @@ class TestDraftPackPickEdgeCases:
         assert "empty" in result.lower() or "no cards" in result.lower()
 
     async def test_single_card_pack(self):
+        """Single-card pack returns that card with its stats."""
         pack = ["Mulldrifter"]
         client = _make_mock_client()
 
@@ -364,6 +385,7 @@ class TestDraftPackPickEdgeCases:
         assert "61.2%" in result
 
     async def test_none_alsa_shows_na(self):
+        """Cards with None ALSA display N/A."""
         rating = _make_rating("No ALSA Card", avg_seen=None)
         client = _make_mock_client([rating])
 

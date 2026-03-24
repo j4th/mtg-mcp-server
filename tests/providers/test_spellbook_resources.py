@@ -17,18 +17,23 @@ BASE_URL = "https://backend.commanderspellbook.com"
 
 
 def _load_fixture(name: str) -> dict:
+    """Load a Commander Spellbook JSON fixture file by name."""
     return json.loads((FIXTURES / name).read_text())
 
 
 @pytest.fixture
 async def client():
+    """Provide an in-memory MCP client connected to the Spellbook provider."""
     async with Client(transport=spellbook_mcp) as c:
         yield c
 
 
 class TestComboResource:
+    """Spellbook mtg://combo/{combo_id} resource behavior."""
+
     @respx.mock
     async def test_returns_combo_json(self, client: Client):
+        """Combo resource returns JSON with combo ID, identity, and card list."""
         fixture = _load_fixture("combo_detail.json")
         respx.get(f"{BASE_URL}/variants/1414-2730-5131-5256/").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -42,6 +47,7 @@ class TestComboResource:
 
     @respx.mock
     async def test_combo_not_found_returns_error_json(self, client: Client):
+        """Combo resource returns error JSON for nonexistent combo IDs."""
         respx.get(f"{BASE_URL}/variants/9999-9999/").mock(
             return_value=httpx.Response(404, json={"detail": "Not found."})
         )
@@ -53,6 +59,7 @@ class TestComboResource:
 
     @respx.mock
     async def test_server_error_returns_error_json(self, client: Client):
+        """Combo resource returns error JSON on Spellbook server failure."""
         respx.get(f"{BASE_URL}/variants/1414-2730-5131-5256/").mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )
@@ -64,7 +71,10 @@ class TestComboResource:
 
 
 class TestResourceTemplateRegistration:
+    """Spellbook resource template registration."""
+
     async def test_resource_templates_registered(self, client: Client):
+        """Combo resource template is registered on the provider."""
         templates = await client.list_resource_templates()
         template_uris = {t.uriTemplate for t in templates}
         assert "mtg://combo/{combo_id}" in template_uris

@@ -15,10 +15,12 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "mtgjson"
 
 
 def _load_fixture_bytes() -> bytes:
+    """Load the gzipped MTGJSON sample fixture as raw bytes."""
     return (FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
 
 
 def _mock_httpx_response(content: bytes, status_code: int = 200) -> httpx.Response:
+    """Build a mock httpx response with the given content and status code."""
     return httpx.Response(status_code=status_code, content=content)
 
 
@@ -43,14 +45,20 @@ async def client():
 
 
 class TestToolRegistration:
+    """MTGJSON provider tool registration."""
+
     async def test_all_tools_registered(self, client: Client):
+        """Both MTGJSON tools are registered on the provider."""
         tools = await client.list_tools()
         tool_names = {t.name for t in tools}
         assert tool_names == {"card_lookup", "card_search"}
 
 
 class TestCardLookup:
+    """MTGJSON card_lookup tool behavior."""
+
     async def test_exact_lookup(self, client: Client):
+        """card_lookup returns full card data for an exact name match."""
         result = await client.call_tool("card_lookup", {"name": "Sol Ring"})
         text = result.content[0].text
         assert "Sol Ring" in text
@@ -60,6 +68,7 @@ class TestCardLookup:
         assert "Data provided by [MTGJSON]" in text
 
     async def test_legendary_creature(self, client: Client):
+        """card_lookup returns power/toughness and supertypes for legendary creatures."""
         result = await client.call_tool("card_lookup", {"name": "Muldrotha, the Gravetide"})
         text = result.content[0].text
         assert "Muldrotha, the Gravetide" in text
@@ -67,11 +76,13 @@ class TestCardLookup:
         assert "Legendary" in text
 
     async def test_case_insensitive(self, client: Client):
+        """card_lookup matches card names case-insensitively."""
         result = await client.call_tool("card_lookup", {"name": "sol ring"})
         text = result.content[0].text
         assert "Sol Ring" in text
 
     async def test_not_found_returns_error(self, client: Client):
+        """card_lookup returns an error response for nonexistent cards."""
         result = await client.call_tool(
             "card_lookup", {"name": "Nonexistent Card"}, raise_on_error=False
         )
@@ -80,6 +91,7 @@ class TestCardLookup:
         assert "not found" in text.lower()
 
     async def test_special_characters(self, client: Client):
+        """card_lookup handles special Unicode characters in card names."""
         result = await client.call_tool("card_lookup", {"name": "Jötun Grunt"})
         text = result.content[0].text
         assert "Jötun Grunt" in text
@@ -87,18 +99,23 @@ class TestCardLookup:
 
 
 class TestCardSearch:
+    """MTGJSON card_search tool behavior."""
+
     async def test_search_by_name(self, client: Client):
+        """card_search finds cards by substring match on name."""
         result = await client.call_tool("card_search", {"query": "bolt"})
         text = result.content[0].text
         assert "Lightning Bolt" in text
 
     async def test_search_by_type(self, client: Client):
+        """card_search finds cards by type line when search_field is 'type'."""
         result = await client.call_tool("card_search", {"query": "Instant", "search_field": "type"})
         text = result.content[0].text
         assert "Lightning Bolt" in text
         assert "Counterspell" in text
 
     async def test_search_by_text(self, client: Client):
+        """card_search finds cards by oracle text when search_field is 'text'."""
         result = await client.call_tool(
             "card_search", {"query": "graveyard", "search_field": "text"}
         )
@@ -106,6 +123,7 @@ class TestCardSearch:
         assert "Muldrotha" in text
 
     async def test_search_no_results(self, client: Client):
+        """card_search returns an error response when no cards match the query."""
         result = await client.call_tool(
             "card_search", {"query": "xyzzynonexistent"}, raise_on_error=False
         )
@@ -114,11 +132,13 @@ class TestCardSearch:
         assert "no cards found" in text.lower()
 
     async def test_search_with_limit(self, client: Client):
+        """card_search respects the limit parameter for result count."""
         result = await client.call_tool("card_search", {"query": "", "limit": 3})
         text = result.content[0].text
         assert "Found 3" in text
 
     async def test_invalid_search_field(self, client: Client):
+        """card_search returns a validation error for unsupported search_field values."""
         result = await client.call_tool(
             "card_search",
             {"query": "test", "search_field": "invalid"},

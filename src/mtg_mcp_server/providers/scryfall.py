@@ -40,7 +40,7 @@ async def scryfall_lifespan(server: FastMCP):
     _client = None
 
 
-scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)
+scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan, mask_error_details=True)
 
 log = structlog.get_logger(provider="scryfall")
 

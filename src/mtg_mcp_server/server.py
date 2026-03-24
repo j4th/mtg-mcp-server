@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import sys
 
+import structlog
 from fastmcp import FastMCP
+from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddleware
 from mcp.types import ToolAnnotations
 
 from mtg_mcp_server.config import Settings
@@ -28,6 +30,7 @@ from mtg_mcp_server.workflows.server import workflow_mcp
 
 mcp = FastMCP(
     "MTG",
+    mask_error_details=True,
     instructions=(
         "Magic: The Gathering data and analytics server.\n\n"
         "Tool categories:\n"
@@ -53,11 +56,20 @@ mcp = FastMCP(
     ),
 )
 
+# Ensure logging is configured before any module-level code that might log.
+# main() will reconfigure with the user's actual log level from Settings.
+configure_logging()
+
 # Always-on backends: Scryfall and Spellbook are stable public APIs.
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
 
-_settings = Settings()
+try:
+    _settings = Settings()
+except Exception:
+    structlog.get_logger(service="startup").exception("invalid_configuration")
+    sys.exit(1)
+
 if _settings.disable_cache:
     disable_all_caches()
 
@@ -74,8 +86,16 @@ if _settings.enable_mtgjson:
 # Workflow tools mounted without namespace for clean names.
 mcp.mount(workflow_mcp)
 
+# Limit response sizes to 500KB to prevent edge-case payloads from overwhelming
+# LLM context windows. Most tool outputs are well under 10KB.
+mcp.add_middleware(ResponseLimitingMiddleware(max_size=500_000))
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+
+# Ping is a local health check — no network access, so openWorldHint=False.
+_PING_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
+
+
+@mcp.tool(annotations=_PING_ANNOTATIONS)
 async def ping() -> str:
     """Health check — returns 'pong'."""
     return "pong"
@@ -83,16 +103,22 @@ async def ping() -> str:
 
 def main() -> None:  # pragma: no cover
     """Entry point: load settings, configure logging, start transport."""
-    configure_logging(_settings.log_level)
+    try:
+        configure_logging(_settings.log_level)
 
-    transport = _settings.transport
-    if len(sys.argv) > 1:
-        transport = sys.argv[1]
+        transport = _settings.transport
+        if len(sys.argv) > 1:
+            transport = sys.argv[1]
 
-    if transport == "http":
-        mcp.run(transport="streamable-http", host="127.0.0.1", port=_settings.http_port)
-    else:
-        mcp.run(transport="stdio")
+        if transport == "http":
+            mcp.run(transport="streamable-http", host="127.0.0.1", port=_settings.http_port)
+        else:
+            mcp.run(transport="stdio")
+    except KeyboardInterrupt:
+        pass
+    except Exception:
+        structlog.get_logger(service="startup").exception("fatal_startup_error")
+        sys.exit(1)
 
 
 if __name__ == "__main__":  # pragma: no cover

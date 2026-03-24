@@ -22,6 +22,7 @@ class TestPromptRegistration:
     """Verify all prompts are registered on the server."""
 
     async def test_all_prompts_listed(self, mcp_client: Client):
+        """All four prompt names present in the prompt list."""
         prompts = await mcp_client.list_prompts()
         prompt_names = {p.name for p in prompts}
         assert "evaluate_commander_swap" in prompt_names
@@ -30,6 +31,7 @@ class TestPromptRegistration:
         assert "find_upgrades" in prompt_names
 
     async def test_prompt_count(self, mcp_client: Client):
+        """Exactly 4 prompts registered on the workflow server."""
         prompts = await mcp_client.list_prompts()
         # Exactly 4 prompts registered
         assert len(prompts) == 4
@@ -44,6 +46,7 @@ class TestEvaluateCommanderSwap:
     """Test the evaluate_commander_swap prompt."""
 
     async def test_returns_instructions(self, mcp_client: Client):
+        """Returns instructions referencing both cards, commander, and tool names."""
         result = await mcp_client.get_prompt(
             "evaluate_commander_swap",
             arguments={
@@ -60,6 +63,7 @@ class TestEvaluateCommanderSwap:
         assert "SWAP" in text
 
     async def test_contains_evaluation_criteria(self, mcp_client: Client):
+        """Prompt includes synergy threshold criteria."""
         result = await mcp_client.get_prompt(
             "evaluate_commander_swap",
             arguments={"commander": "X", "adding": "Y", "cutting": "Z"},
@@ -69,6 +73,7 @@ class TestEvaluateCommanderSwap:
         assert "30%" in text
 
     async def test_references_card_comparison_tool(self, mcp_client: Client):
+        """Prompt references the card_comparison tool by name."""
         result = await mcp_client.get_prompt(
             "evaluate_commander_swap",
             arguments={"commander": "X", "adding": "Y", "cutting": "Z"},
@@ -77,6 +82,7 @@ class TestEvaluateCommanderSwap:
         assert "card_comparison" in text
 
     async def test_references_spellbook_find_combos(self, mcp_client: Client):
+        """Prompt references the spellbook_find_combos tool by name."""
         result = await mcp_client.get_prompt(
             "evaluate_commander_swap",
             arguments={"commander": "X", "adding": "Y", "cutting": "Z"},
@@ -94,6 +100,7 @@ class TestDeckHealthCheck:
     """Test the deck_health_check prompt."""
 
     async def test_returns_instructions(self, mcp_client: Client):
+        """Returns instructions referencing commander, deck_analysis, and suggest_cuts."""
         result = await mcp_client.get_prompt(
             "deck_health_check",
             arguments={"commander": "Muldrotha, the Gravetide"},
@@ -104,6 +111,7 @@ class TestDeckHealthCheck:
         assert "suggest_cuts" in text
 
     async def test_contains_analysis_guidance(self, mcp_client: Client):
+        """Prompt includes guidance about mana curve and bracket analysis."""
         result = await mcp_client.get_prompt(
             "deck_health_check",
             arguments={"commander": "Atraxa"},
@@ -122,6 +130,7 @@ class TestDraftStrategy:
     """Test the draft_strategy prompt."""
 
     async def test_returns_instructions(self, mcp_client: Client):
+        """Returns instructions referencing set code, set_overview tool, and GIH WR."""
         result = await mcp_client.get_prompt(
             "draft_strategy",
             arguments={"set_code": "LCI"},
@@ -132,6 +141,7 @@ class TestDraftStrategy:
         assert "GIH WR" in text
 
     async def test_contains_draft_heuristics(self, mcp_client: Client):
+        """Prompt includes GIH WR threshold, ALSA, and IWD heuristics."""
         result = await mcp_client.get_prompt(
             "draft_strategy",
             arguments={"set_code": "MKM"},
@@ -151,6 +161,7 @@ class TestFindUpgrades:
     """Test the find_upgrades prompt."""
 
     async def test_returns_instructions(self, mcp_client: Client):
+        """Returns instructions referencing commander, budget, and upgrade tools."""
         result = await mcp_client.get_prompt(
             "find_upgrades",
             arguments={"commander": "Muldrotha", "budget": 5.0},
@@ -162,6 +173,7 @@ class TestFindUpgrades:
         assert "evaluate_upgrade" in text
 
     async def test_contains_evaluation_criteria(self, mcp_client: Client):
+        """Prompt includes synergy and inclusion evaluation thresholds."""
         result = await mcp_client.get_prompt(
             "find_upgrades",
             arguments={"commander": "Korvold", "budget": 10.0},

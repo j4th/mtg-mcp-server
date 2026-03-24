@@ -15,10 +15,12 @@ class TestBaseClientLifecycle:
     """Verify async context manager creates and closes the httpx client."""
 
     async def test_client_created_on_enter(self):
+        """Entering the context manager initializes the httpx client."""
         async with BaseClient(base_url="https://example.com") as client:
             assert client._client is not None
 
     async def test_client_closed_on_exit(self):
+        """Exiting the context manager closes the httpx client."""
         client = BaseClient(base_url="https://example.com")
         async with client:
             inner = client._client
@@ -26,6 +28,7 @@ class TestBaseClientLifecycle:
         assert inner is not None
 
     async def test_request_outside_context_raises_runtime_error(self):
+        """Requesting before entering the context manager raises RuntimeError."""
         client = BaseClient(base_url="https://example.com")
         with pytest.raises(RuntimeError, match="not initialized"):
             await client._get("/test")
@@ -36,6 +39,7 @@ class TestBaseClientRequests:
 
     @respx.mock
     async def test_get_returns_response(self):
+        """GET request returns the mocked 200 response with JSON body."""
         respx.get("https://example.com/test").mock(
             return_value=httpx.Response(200, json={"ok": True})
         )
@@ -46,6 +50,7 @@ class TestBaseClientRequests:
 
     @respx.mock
     async def test_post_returns_response(self):
+        """POST request returns the mocked 200 response."""
         respx.post("https://example.com/submit").mock(
             return_value=httpx.Response(200, json={"created": True})
         )
@@ -59,6 +64,7 @@ class TestBaseClientErrors:
 
     @respx.mock
     async def test_4xx_raises_service_error_without_retry(self):
+        """4xx response raises ServiceError and is not retried."""
         route = respx.get("https://example.com/missing")
         route.mock(return_value=httpx.Response(404, text="Not Found"))
         async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
@@ -69,6 +75,7 @@ class TestBaseClientErrors:
 
     @respx.mock
     async def test_5xx_raises_service_error(self):
+        """5xx response raises ServiceError."""
         respx.get("https://example.com/error").mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )
@@ -78,6 +85,7 @@ class TestBaseClientErrors:
 
     @respx.mock
     async def test_timeout_raises_service_error(self):
+        """Read timeout raises ServiceError with 'Network error' message."""
         respx.get("https://example.com/slow").mock(side_effect=httpx.ReadTimeout("timed out"))
         async with BaseClient(base_url="https://example.com", rate_limit_rps=1000) as client:
             with pytest.raises(ServiceError, match="Network error"):
@@ -85,6 +93,7 @@ class TestBaseClientErrors:
 
     @respx.mock
     async def test_connect_error_raises_service_error(self):
+        """Connection error raises ServiceError with 'Network error' message."""
         respx.get("https://example.com/down").mock(
             side_effect=httpx.ConnectError("connection refused")
         )
@@ -93,6 +102,7 @@ class TestBaseClientErrors:
                 await client._get("/down")
 
     def test_zero_rate_limit_raises_value_error(self):
+        """Zero rate limit raises ValueError at construction time."""
         with pytest.raises(ValueError, match="positive"):
             BaseClient(base_url="https://example.com", rate_limit_rps=0)
 
@@ -102,6 +112,7 @@ class TestBaseClientRateLimiting:
 
     @respx.mock
     async def test_rate_limit_delay_enforced(self):
+        """Successful request sleeps for the configured rate-limit interval."""
         respx.get("https://example.com/data").mock(return_value=httpx.Response(200, json={}))
         with patch(
             "mtg_mcp_server.services.base.asyncio.sleep", new_callable=AsyncMock
@@ -114,6 +125,7 @@ class TestBaseClientRateLimiting:
 
     @respx.mock
     async def test_rate_limit_delay_enforced_on_error(self):
+        """Rate-limit sleep is applied even when the request returns an error."""
         respx.get("https://example.com/fail").mock(
             return_value=httpx.Response(404, text="Not Found")
         )
@@ -133,6 +145,7 @@ class TestBaseClientRetry:
 
     @respx.mock
     async def test_retries_on_429_then_succeeds(self):
+        """429 response triggers a retry and succeeds on the second attempt."""
         route = respx.get("https://example.com/rate-limited")
         route.side_effect = [
             httpx.Response(429, text="Too Many Requests"),
@@ -145,6 +158,7 @@ class TestBaseClientRetry:
 
     @respx.mock
     async def test_retries_on_429_respects_retry_after_header(self):
+        """429 with Retry-After header is honored before retrying."""
         route = respx.get("https://example.com/throttled")
         route.side_effect = [
             httpx.Response(429, text="Too Many Requests", headers={"Retry-After": "3"}),
@@ -157,6 +171,7 @@ class TestBaseClientRetry:
 
     @respx.mock
     async def test_retries_on_503_then_succeeds(self):
+        """503 response triggers a retry and succeeds on the second attempt."""
         route = respx.get("https://example.com/unavailable")
         route.side_effect = [
             httpx.Response(503, text="Service Unavailable"),
@@ -169,6 +184,7 @@ class TestBaseClientRetry:
 
     @respx.mock
     async def test_gives_up_after_max_retries(self):
+        """Persistent 500 errors raise ServiceError after all retries are exhausted."""
         respx.get("https://example.com/always-fail").mock(
             return_value=httpx.Response(500, text="Server Error")
         )
@@ -178,6 +194,7 @@ class TestBaseClientRetry:
 
     @respx.mock
     async def test_retries_on_network_error_then_succeeds(self):
+        """Transient network error triggers a retry and succeeds on the second attempt."""
         route = respx.get("https://example.com/flaky")
         route.side_effect = [
             httpx.ConnectError("connection refused"),

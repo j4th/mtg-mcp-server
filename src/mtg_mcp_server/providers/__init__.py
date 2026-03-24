@@ -17,6 +17,22 @@ This package exports shared constants used by all provider modules:
 
 from mcp.types import ToolAnnotations
 
+__all__ = [
+    "ATTRIBUTION_17LANDS",
+    "ATTRIBUTION_EDHREC",
+    "ATTRIBUTION_MTGJSON",
+    "ATTRIBUTION_SCRYFALL",
+    "ATTRIBUTION_SPELLBOOK",
+    "TAGS_BETA",
+    "TAGS_COMBO",
+    "TAGS_COMMANDER",
+    "TAGS_DRAFT",
+    "TAGS_LOOKUP",
+    "TAGS_PRICING",
+    "TAGS_SEARCH",
+    "TOOL_ANNOTATIONS",
+]
+
 # All tools are read-only (query external APIs, never mutate) and idempotent
 # (same inputs always produce same outputs). openWorldHint signals that tools
 # access external networks.

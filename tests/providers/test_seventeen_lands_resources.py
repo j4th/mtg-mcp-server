@@ -17,18 +17,23 @@ BASE_URL = "https://www.17lands.com"
 
 
 def _load_fixture(name: str) -> list[dict]:
+    """Load a 17Lands JSON fixture file by name."""
     return json.loads((FIXTURES / name).read_text())
 
 
 @pytest.fixture
 async def client():
+    """Provide an in-memory MCP client connected to the 17Lands provider."""
     async with Client(transport=draft_mcp) as c:
         yield c
 
 
 class TestDraftRatingsResource:
+    """17Lands mtg://draft/{set_code}/ratings resource behavior."""
+
     @respx.mock
     async def test_returns_ratings_json(self, client: Client):
+        """Draft ratings resource returns JSON list with card names and win rates."""
         fixture = _load_fixture("card_ratings_lci.json")
         respx.get(
             f"{BASE_URL}/card_ratings/data",
@@ -44,6 +49,7 @@ class TestDraftRatingsResource:
 
     @respx.mock
     async def test_server_error_returns_error_json(self, client: Client):
+        """Draft ratings resource returns error JSON on 17Lands server failure."""
         respx.get(
             f"{BASE_URL}/card_ratings/data",
             params={"expansion": "FAKE", "event_type": "PremierDraft"},
@@ -56,7 +62,10 @@ class TestDraftRatingsResource:
 
 
 class TestResourceTemplateRegistration:
+    """17Lands resource template registration."""
+
     async def test_resource_templates_registered(self, client: Client):
+        """Draft ratings resource template is registered on the provider."""
         templates = await client.list_resource_templates()
         template_uris = {t.uriTemplate for t in templates}
         assert "mtg://draft/{set_code}/ratings" in template_uris

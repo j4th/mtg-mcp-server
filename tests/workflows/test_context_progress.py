@@ -106,6 +106,7 @@ class TestProgressHelper:
     """Test the _progress helper function."""
 
     async def test_progress_calls_report(self):
+        """_progress calls ctx.report_progress with step and total."""
         from mtg_mcp_server.workflows.server import _progress
 
         mock_ctx = AsyncMock()
@@ -113,6 +114,7 @@ class TestProgressHelper:
         mock_ctx.report_progress.assert_called_once_with(progress=1, total=3)
 
     async def test_progress_passes_step_and_total(self):
+        """Step and total values forwarded correctly to report_progress."""
         from mtg_mcp_server.workflows.server import _progress
 
         mock_ctx = AsyncMock()
@@ -120,6 +122,7 @@ class TestProgressHelper:
         mock_ctx.report_progress.assert_called_once_with(progress=5, total=10)
 
     async def test_progress_zero_step(self):
+        """Zero as step value accepted and forwarded correctly."""
         from mtg_mcp_server.workflows.server import _progress
 
         mock_ctx = AsyncMock()
@@ -137,9 +140,10 @@ class TestCardComparisonValidation:
 
     @pytest.fixture(autouse=True)
     def _stubs(self, _mock_commander_stubs):
-        pass
+        """Activate commander module stubs for this test class."""
 
     async def test_too_few_cards(self, mcp_client: Client):
+        """Rejects card_comparison with fewer than 2 cards."""
         result = await mcp_client.call_tool(
             "card_comparison",
             {"cards": ["Sol Ring"], "commander_name": "Muldrotha"},
@@ -149,6 +153,7 @@ class TestCardComparisonValidation:
         assert "at least 2" in result.content[0].text.lower()
 
     async def test_too_many_cards(self, mcp_client: Client):
+        """Rejects card_comparison with more than 5 cards."""
         result = await mcp_client.call_tool(
             "card_comparison",
             {
@@ -161,6 +166,7 @@ class TestCardComparisonValidation:
         assert "maximum 5" in result.content[0].text.lower()
 
     async def test_empty_cards_list(self, mcp_client: Client):
+        """Rejects card_comparison with empty cards list."""
         result = await mcp_client.call_tool(
             "card_comparison",
             {"cards": [], "commander_name": "Muldrotha"},
@@ -180,9 +186,10 @@ class TestBudgetUpgradeValidation:
 
     @pytest.fixture(autouse=True)
     def _stubs(self, _mock_commander_stubs):
-        pass
+        """Activate commander module stubs for this test class."""
 
     async def test_negative_budget(self, mcp_client: Client):
+        """Rejects budget_upgrade with negative budget value."""
         result = await mcp_client.call_tool(
             "budget_upgrade",
             {"commander_name": "Muldrotha", "budget": -1.0},
@@ -192,6 +199,7 @@ class TestBudgetUpgradeValidation:
         assert "positive" in result.content[0].text.lower()
 
     async def test_zero_budget(self, mcp_client: Client):
+        """Rejects budget_upgrade with zero budget value."""
         result = await mcp_client.call_tool(
             "budget_upgrade",
             {"commander_name": "Muldrotha", "budget": 0.0},
@@ -211,9 +219,10 @@ class TestDeckAnalysisValidation:
 
     @pytest.fixture(autouse=True)
     def _stubs(self, _mock_analysis_stubs):
-        pass
+        """Activate analysis module stubs for this test class."""
 
     async def test_empty_decklist(self, mcp_client: Client):
+        """Rejects deck_analysis with empty decklist."""
         result = await mcp_client.call_tool(
             "deck_analysis",
             {"decklist": [], "commander_name": "Muldrotha"},
@@ -233,9 +242,10 @@ class TestSetOverviewValidation:
 
     @pytest.fixture(autouse=True)
     def _stubs(self, _mock_draft_stubs):
-        pass
+        """Activate draft module stubs for this test class."""
 
     async def test_17lands_disabled(self, mcp_client: Client):
+        """Rejects set_overview when 17Lands client is not enabled."""
         with patch("mtg_mcp_server.workflows.server._seventeen_lands", None):
             result = await mcp_client.call_tool(
                 "set_overview",
@@ -255,6 +265,7 @@ class TestNewToolsRegistered:
     """Verify all Phase 5 tools are registered."""
 
     async def test_new_tools_present(self, mcp_client: Client):
+        """All four Phase 5 tools present in the tool list."""
         tools = await mcp_client.list_tools()
         tool_names = {t.name for t in tools}
         assert "card_comparison" in tool_names

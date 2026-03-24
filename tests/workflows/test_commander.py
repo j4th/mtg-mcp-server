@@ -32,6 +32,7 @@ from mtg_mcp_server.workflows.commander import commander_overview, evaluate_upgr
 
 @pytest.fixture
 def mock_card() -> Card:
+    """Provide a Muldrotha Card with full metadata for commander overview tests."""
     return Card(
         id="test-id-muldrotha",
         name="Muldrotha, the Gravetide",
@@ -52,6 +53,7 @@ def mock_card() -> Card:
 
 @pytest.fixture
 def mock_upgrade_card() -> Card:
+    """Provide a Spore Frog Card for evaluate_upgrade tests."""
     return Card(
         id="test-id-spore-frog",
         name="Spore Frog",
@@ -70,6 +72,7 @@ def mock_upgrade_card() -> Card:
 
 @pytest.fixture
 def mock_combos() -> list[Combo]:
+    """Provide two Muldrotha combos with different results."""
     return [
         Combo(
             id="combo-1",
@@ -98,6 +101,7 @@ def mock_combos() -> list[Combo]:
 
 @pytest.fixture
 def mock_edhrec_data() -> EDHRECCommanderData:
+    """Provide EDHREC commander data with creature and enchantment cardlists."""
     return EDHRECCommanderData(
         commander_name="Muldrotha, the Gravetide",
         total_decks=19741,
@@ -144,6 +148,7 @@ def mock_edhrec_data() -> EDHRECCommanderData:
 
 @pytest.fixture
 def mock_synergy_card() -> EDHRECCard:
+    """Provide a Spore Frog EDHREC card with high synergy score."""
     return EDHRECCard(
         name="Spore Frog",
         sanitized="spore-frog",
@@ -156,16 +161,19 @@ def mock_synergy_card() -> EDHRECCard:
 
 @pytest.fixture
 def scryfall() -> AsyncMock:
+    """Provide a mock ScryfallClient."""
     return AsyncMock()
 
 
 @pytest.fixture
 def spellbook() -> AsyncMock:
+    """Provide a mock SpellbookClient."""
     return AsyncMock()
 
 
 @pytest.fixture
 def edhrec() -> AsyncMock:
+    """Provide a mock EDHRECClient."""
     return AsyncMock()
 
 

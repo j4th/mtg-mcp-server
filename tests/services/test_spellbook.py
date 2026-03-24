@@ -21,12 +21,16 @@ BASE_URL = "https://backend.commanderspellbook.com"
 
 
 def _load_fixture(name: str) -> dict:
+    """Load a Spellbook JSON fixture by filename."""
     return json.loads((FIXTURES / name).read_text())
 
 
 class TestFindCombos:
+    """Combo search by card name and optional color identity."""
+
     @respx.mock
     async def test_returns_combos(self):
+        """Card name search returns a list of Combo models with expected fields."""
         fixture = _load_fixture("combos_muldrotha.json")
         respx.get(
             f"{BASE_URL}/variants/",
@@ -46,6 +50,7 @@ class TestFindCombos:
 
     @respx.mock
     async def test_returns_combos_with_color_identity(self):
+        """Color identity filter is included in the query and returns results."""
         fixture = _load_fixture("combos_muldrotha.json")
         respx.get(
             f"{BASE_URL}/variants/",
@@ -62,6 +67,7 @@ class TestFindCombos:
 
     @respx.mock
     async def test_empty_results_returns_empty_list(self):
+        """Search for a nonexistent card returns an empty list."""
         fixture = _load_fixture("combos_not_found.json")
         respx.get(
             f"{BASE_URL}/variants/",
@@ -75,8 +81,11 @@ class TestFindCombos:
 
 
 class TestGetCombo:
+    """Single combo detail lookup by ID."""
+
     @respx.mock
     async def test_returns_combo(self):
+        """Combo ID lookup returns a fully populated Combo model."""
         fixture = _load_fixture("combo_detail.json")
         combo_id = "1414-2730-5131-5256"
         respx.get(f"{BASE_URL}/variants/{combo_id}/").mock(
@@ -95,6 +104,7 @@ class TestGetCombo:
 
     @respx.mock
     async def test_not_found_raises(self):
+        """Nonexistent combo ID raises ComboNotFoundError."""
         respx.get(f"{BASE_URL}/variants/9999-9999/").mock(
             return_value=httpx.Response(404, json={"detail": "Not found."})
         )
@@ -105,8 +115,11 @@ class TestGetCombo:
 
 
 class TestFindDecklistCombos:
+    """Combo detection within a submitted decklist."""
+
     @respx.mock
     async def test_returns_decklist_combos(self):
+        """Decklist submission returns DecklistCombos with included and almost-included."""
         fixture = _load_fixture("find_my_combos_response.json")
         respx.post(f"{BASE_URL}/find-my-combos").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -126,8 +139,11 @@ class TestFindDecklistCombos:
 
 
 class TestEstimateBracket:
+    """Commander bracket estimation for a decklist."""
+
     @respx.mock
     async def test_returns_bracket_estimate(self):
+        """Bracket estimation returns a BracketEstimate with a bracket tag."""
         fixture = _load_fixture("estimate_bracket_response.json")
         respx.post(f"{BASE_URL}/estimate-bracket").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -144,8 +160,11 @@ class TestEstimateBracket:
 
 
 class TestSpellbookServerErrors:
+    """Spellbook API server error handling."""
+
     @respx.mock
     async def test_500_raises_spellbook_error(self):
+        """500 response from Spellbook raises SpellbookError."""
         respx.get(f"{BASE_URL}/variants/", params__contains={"q": 'card:"Sol Ring"'}).mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )

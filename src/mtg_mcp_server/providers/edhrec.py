@@ -32,7 +32,7 @@ async def edhrec_lifespan(server: FastMCP):
     _client = None
 
 
-edhrec_mcp = FastMCP("EDHREC", lifespan=edhrec_lifespan)
+edhrec_mcp = FastMCP("EDHREC", lifespan=edhrec_lifespan, mask_error_details=True)
 
 log = structlog.get_logger(provider="edhrec")
 

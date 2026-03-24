@@ -34,6 +34,7 @@ COMMANDER_NAME = "Muldrotha, the Gravetide"
 
 @pytest.fixture
 def sol_ring() -> Card:
+    """Provide a Sol Ring Card with low price and high EDHREC rank."""
     return Card(
         id="test-id-sol-ring",
         name="Sol Ring",
@@ -52,6 +53,7 @@ def sol_ring() -> Card:
 
 @pytest.fixture
 def spore_frog() -> Card:
+    """Provide a Spore Frog Card with budget price and high synergy potential."""
     return Card(
         id="test-id-spore-frog",
         name="Spore Frog",
@@ -70,6 +72,7 @@ def spore_frog() -> Card:
 
 @pytest.fixture
 def animate_dead() -> Card:
+    """Provide an Animate Dead Card for combo-related comparison tests."""
     return Card(
         id="test-id-animate-dead",
         name="Animate Dead",
@@ -88,6 +91,7 @@ def animate_dead() -> Card:
 
 @pytest.fixture
 def mock_combos_sol_ring() -> list[Combo]:
+    """Provide a single Sol Ring combo (Dramatic Reversal infinite mana)."""
     return [
         Combo(
             id="combo-sr-1",
@@ -100,6 +104,7 @@ def mock_combos_sol_ring() -> list[Combo]:
 
 @pytest.fixture
 def mock_combos_spore_frog() -> list[Combo]:
+    """Provide two Spore Frog combos for combo count comparison."""
     return [
         Combo(
             id="combo-sf-1",
@@ -118,6 +123,7 @@ def mock_combos_spore_frog() -> list[Combo]:
 
 @pytest.fixture
 def synergy_sol_ring() -> EDHRECCard:
+    """Provide Sol Ring EDHREC data with negative synergy and high inclusion."""
     return EDHRECCard(
         name="Sol Ring",
         sanitized="sol-ring",
@@ -130,6 +136,7 @@ def synergy_sol_ring() -> EDHRECCard:
 
 @pytest.fixture
 def synergy_spore_frog() -> EDHRECCard:
+    """Provide Spore Frog EDHREC data with high synergy for Muldrotha."""
     return EDHRECCard(
         name="Spore Frog",
         sanitized="spore-frog",
@@ -142,6 +149,7 @@ def synergy_spore_frog() -> EDHRECCard:
 
 @pytest.fixture
 def mock_edhrec_data() -> EDHRECCommanderData:
+    """Provide EDHREC commander data with creature and artifact cardlists."""
     return EDHRECCommanderData(
         commander_name=COMMANDER_NAME,
         total_decks=19741,
@@ -192,16 +200,19 @@ def mock_edhrec_data() -> EDHRECCommanderData:
 
 @pytest.fixture
 def scryfall() -> AsyncMock:
+    """Provide a mock ScryfallClient."""
     return AsyncMock()
 
 
 @pytest.fixture
 def spellbook() -> AsyncMock:
+    """Provide a mock SpellbookClient."""
     return AsyncMock()
 
 
 @pytest.fixture
 def edhrec() -> AsyncMock:
+    """Provide a mock EDHRECClient."""
     return AsyncMock()
 
 

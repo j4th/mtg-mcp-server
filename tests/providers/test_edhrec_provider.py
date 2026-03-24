@@ -17,18 +17,23 @@ BASE_URL = "https://json.edhrec.com"
 
 
 def _load_fixture(name: str) -> dict:
+    """Load an EDHREC JSON fixture file by name."""
     return json.loads((FIXTURES / name).read_text())
 
 
 @pytest.fixture
 async def client():
+    """Provide an in-memory MCP client connected to the EDHREC provider."""
     async with Client(transport=edhrec_mcp) as c:
         yield c
 
 
 class TestCommanderStaples:
+    """EDHREC commander_staples tool behavior."""
+
     @respx.mock
     async def test_returns_formatted_results(self, client: Client):
+        """commander_staples returns formatted staples with synergy scores and deck count."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -46,6 +51,7 @@ class TestCommanderStaples:
 
     @respx.mock
     async def test_category_filter(self, client: Client):
+        """commander_staples filters results to a single card category when specified."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -63,6 +69,7 @@ class TestCommanderStaples:
 
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
+        """commander_staples returns an error response for nonexistent commanders."""
         respx.get(f"{BASE_URL}/pages/commanders/xyzzy-nonexistent.json").mock(
             return_value=httpx.Response(404, text="Not Found")
         )
@@ -76,8 +83,11 @@ class TestCommanderStaples:
 
 
 class TestCardSynergy:
+    """EDHREC card_synergy tool behavior."""
+
     @respx.mock
     async def test_returns_synergy_data(self, client: Client):
+        """card_synergy returns synergy score and classification for a card-commander pair."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -94,6 +104,7 @@ class TestCardSynergy:
 
     @respx.mock
     async def test_card_not_found_returns_message(self, client: Client):
+        """card_synergy returns a 'not found' message when the card is not in the commander's data."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -111,7 +122,10 @@ class TestCardSynergy:
 
 
 class TestToolRegistration:
+    """EDHREC provider tool registration."""
+
     async def test_all_tools_registered(self, client: Client):
+        """Both EDHREC tools are registered on the provider."""
         tools = await client.list_tools()
         tool_names = {t.name for t in tools}
         assert tool_names == {"commander_staples", "card_synergy"}
