@@ -23,7 +23,7 @@ Examples:
 1. **Identify the endpoint** from `docs/SERVICE_CONTRACTS.md` based on the service and description.
 
 2. **Make the request** using `curl` or `python -c` with httpx. Include required headers:
-   - Scryfall: `User-Agent: mtg-mcp/0.1.0` and `Accept: application/json`
+   - Scryfall: `User-Agent: mtg-mcp-server/<version>` and `Accept: application/json`
    - All others: `Accept: application/json`
 
 3. **Save the response** to `tests/fixtures/<service>/`:

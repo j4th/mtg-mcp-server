@@ -5,26 +5,27 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import (
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import (
     ATTRIBUTION_SPELLBOOK,
     TAGS_COMBO,
     TAGS_LOOKUP,
     TAGS_SEARCH,
     TOOL_ANNOTATIONS,
 )
-from mtg_mcp.services.spellbook import (
+from mtg_mcp_server.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
     SpellbookError,
 )
 
 if TYPE_CHECKING:
-    from mtg_mcp.types import Combo
+    from mtg_mcp_server.types import Combo
 
 # Spellbook API uses single-letter zone codes in combo card data.
 # Map them to human-readable names for tool output.
@@ -54,6 +55,8 @@ async def spellbook_lifespan(server: FastMCP):
 
 
 spellbook_mcp = FastMCP("Spellbook", lifespan=spellbook_lifespan)
+
+log = structlog.get_logger(provider="spellbook")
 
 
 def _get_client() -> SpellbookClient:
@@ -232,4 +235,8 @@ async def combo_resource(combo_id: str) -> str:
         combo = await client.get_combo(combo_id)
         return combo.model_dump_json()
     except ComboNotFoundError:
+        log.debug("resource.combo_not_found", combo_id=combo_id)
         return json.dumps({"error": f"Combo not found: {combo_id}"})
+    except SpellbookError as exc:
+        log.warning("resource.combo_error", combo_id=combo_id, error=str(exc))
+        return json.dumps({"error": f"Spellbook error: {exc}"})

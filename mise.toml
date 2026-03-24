@@ -41,6 +41,10 @@ run = "uv run pytest tests/services tests/providers -v"
 description = "Run integration tests only"
 run = "uv run pytest tests/integration -v"
 
+[tasks."test:quick"]
+description = "Run only tests affected by recent changes"
+run = "uv run pytest --testmon"
+
 [tasks."test:watch"]
 description = "Re-run tests on file changes"
 run = "uv run pytest --cov -x --ff -q"
@@ -71,15 +75,15 @@ run = "ty check"
 
 [tasks.dev]
 description = "Launch MCP Inspector for interactive testing"
-run = "uv run fastmcp dev inspector src/mtg_mcp/server.py"
+run = "uv run fastmcp dev inspector src/mtg_mcp_server/server.py"
 
 [tasks.serve]
 description = "Run server via stdio transport"
-run = "uv run python -m mtg_mcp.server"
+run = "uv run python -m mtg_mcp_server.server"
 
 [tasks."serve:http"]
 description = "Run server via streamable HTTP transport"
-run = "uv run python -m mtg_mcp.server http"
+run = "uv run python -m mtg_mcp_server.server http"
 
 # --- Fixtures ---
 

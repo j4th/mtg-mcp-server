@@ -15,6 +15,7 @@ Prerequisites: [mise](https://mise.jdx.dev) must be installed. Then `mise instal
 mise run setup          # Install deps, create venv
 mise run check          # Lint + format + typecheck + test (the full gate)
 mise run test           # pytest with coverage
+mise run test:quick     # pytest --testmon (only tests affected by changes)
 mise run lint           # ruff check + ruff format --check
 mise run typecheck      # ty check
 mise run dev            # fastmcp dev inspector (MCP Inspector on :6274)
@@ -22,14 +23,19 @@ mise run serve          # Run server via stdio
 mise run fix            # Auto-fix lint and format issues
 ```
 
+### Testing strategy
+
+- **Iterating**: Use `mise run test:quick` (pytest-testmon) after edits for fast feedback — only runs tests affected by your changes.
+- **Quality gate**: Use `mise run check` before commits and PRs — full lint + typecheck + test suite with coverage.
+
 ## Architecture
 
 See @docs/ARCHITECTURE.md for full details.
 
-- **`src/mtg_mcp/services/`** — Pure async API clients. No MCP awareness. Return Pydantic models.
-- **`src/mtg_mcp/providers/`** — FastMCP sub-servers. Each independently runnable. Register tools that call services.
-- **`src/mtg_mcp/workflows/`** — Composed tools calling multiple services. Mounted without namespace.
-- **`src/mtg_mcp/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `mtgjson_`.
+- **`src/mtg_mcp_server/services/`** — Pure async API clients. No MCP awareness. Return Pydantic models.
+- **`src/mtg_mcp_server/providers/`** — FastMCP sub-servers. Each independently runnable. Register tools that call services.
+- **`src/mtg_mcp_server/workflows/`** — Composed tools calling multiple services. Mounted without namespace.
+- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `mtgjson_`.
 
 ## Conventions
 
@@ -59,7 +65,7 @@ When PR review comments come in:
 
 - FastMCP 3.x import: `from fastmcp import FastMCP` (NOT `from mcp.server.fastmcp`).
 - FastMCP 3.x CLI: `fastmcp dev inspector <file>` (NOT `fastmcp dev <file>` — the `inspector` subcommand is required).
-- Tool annotations: use shared `TOOL_ANNOTATIONS` from `mtg_mcp.providers` (NOT inline `ToolAnnotations()` per tool).
+- Tool annotations: use shared `TOOL_ANNOTATIONS` from `mtg_mcp_server.providers` (NOT inline `ToolAnnotations()` per tool).
 - Error responses: raise `ToolError` from `fastmcp.exceptions`, don't manually construct `is_error` responses. Always use `from exc` in except blocks (B904).
 - Service clients: managed via lifespan + module-level `_client` variable (NOT `Depends()`/`ctx.lifespan_context` — these don't propagate through `mount()`).
 - Service clients are constructed with `Settings()` in the lifespan so `MTG_MCP_*_BASE_URL` env vars are honored.

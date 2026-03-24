@@ -10,7 +10,7 @@ import pytest
 import respx
 from fastmcp import Client
 
-from mtg_mcp.providers.spellbook import spellbook_mcp
+from mtg_mcp_server.providers.spellbook import spellbook_mcp
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "spellbook"
 BASE_URL = "https://backend.commanderspellbook.com"
@@ -50,6 +50,17 @@ class TestComboResource:
         data = json.loads(result[0].text)
         assert "error" in data
         assert "Combo not found" in data["error"]
+
+    @respx.mock
+    async def test_server_error_returns_error_json(self, client: Client):
+        respx.get(f"{BASE_URL}/variants/1414-2730-5131-5256/").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.read_resource("mtg://combo/1414-2730-5131-5256")
+        data = json.loads(result[0].text)
+        assert "error" in data
+        assert "Spellbook error" in data["error"]
 
 
 class TestResourceTemplateRegistration:

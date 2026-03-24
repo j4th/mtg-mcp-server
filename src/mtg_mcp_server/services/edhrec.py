@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING
 
 from cachetools import TTLCache
 
-from mtg_mcp.services.base import BaseClient, ServiceError
-from mtg_mcp.services.cache import _method_key, async_cached
-from mtg_mcp.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
+from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, BaseClient, ServiceError
+from mtg_mcp_server.services.cache import _method_key, async_cached
+from mtg_mcp_server.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
 
 # Pre-compiled regexes for URL slug generation (_slugify).
 # EDHREC slugs are lowercase-hyphenated with no punctuation.
@@ -55,7 +55,7 @@ class EDHRECClient(BaseClient):
         self,
         base_url: str = "https://json.edhrec.com",
         rate_limit_rps: float = 0.5,
-        user_agent: str = "mtg-mcp/0.1.0",
+        user_agent: str = DEFAULT_USER_AGENT,
     ) -> None:
         super().__init__(
             base_url=base_url,

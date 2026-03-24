@@ -9,8 +9,8 @@ import httpx
 import pytest
 import respx
 
-from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
-from mtg_mcp.types import Card, CardSearchResult, Ruling
+from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
+from mtg_mcp_server.types import Card, CardSearchResult, Ruling
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "scryfall"
 BASE_URL = "https://api.scryfall.com"

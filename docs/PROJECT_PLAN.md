@@ -14,20 +14,20 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 3. Create the directory structure per ARCHITECTURE.md (all `__init__.py` files, empty modules).
 
-4. Create `src/mtg_mcp/logging.py`:
+4. Create `src/mtg_mcp_server/logging.py`:
    - Configure structlog with JSON output to stderr (MCP stdio servers must not log to stdout)
    - Provide `get_logger(service: str)` that returns a bound logger
 
-5. Create `src/mtg_mcp/config.py`:
+5. Create `src/mtg_mcp_server/config.py`:
    - `Settings` class via pydantic-settings
    - Fields: `scryfall_base_url`, `spellbook_base_url`, `seventeen_lands_base_url`, `edhrec_base_url`, `log_level`, `transport` (enum: stdio/http), `http_port`, `enable_edhrec: bool`, `enable_17lands: bool`, `cache_ttl_seconds: int`
    - Load from env vars with `MTG_MCP_` prefix and/or `.env` file
 
-6. Create `src/mtg_mcp/server.py`:
+6. Create `src/mtg_mcp_server/server.py`:
    - Build the orchestrator: `mcp = FastMCP("MTG")`
    - No backends mounted yet
    - Register a single `ping` tool that returns `"pong"` (smoke test)
-   - Entry point: `mtg_mcp.server:main`. Parse `--transport` flag, run stdio or HTTP accordingly
+   - Entry point: `mtg_mcp_server.server:main`. Parse `--transport` flag, run stdio or HTTP accordingly
 
 7. Create `tests/conftest.py` with basic fixtures.
 
@@ -61,7 +61,7 @@ This is the ordered build plan. Each phase produces a working, testable incremen
    - Hit `api.scryfall.com/cards/named?exact=Sol Ring` → `card_sol_ring.json`
    - Hit a nonexistent card to capture 404 response → `card_not_found.json`
 
-2. Create `src/mtg_mcp/services/base.py`:
+2. Create `src/mtg_mcp_server/services/base.py`:
    - `BaseClient` class wrapping `httpx.AsyncClient`
    - Constructor takes `base_url`, `rate_limit` (requests/sec), `user_agent`
    - Async context manager (`async with`)
@@ -71,13 +71,13 @@ This is the ordered build plan. Each phase produces a working, testable incremen
    - Debug log on every request: method, url, status, elapsed_ms
    - Error log on non-2xx with response body (truncated)
 
-3. Create `src/mtg_mcp/types.py`:
+3. Create `src/mtg_mcp_server/types.py`:
    - `Card` model: name, mana_cost, type_line, oracle_text, colors, color_identity, set_code, collector_number, prices (usd, usd_foil, eur), image_uris, legalities, edhrec_rank, keywords, power, toughness, rarity, scryfall_uri
    - `CardSearchResult` model: total_cards, has_more, data (list[Card])
    - Map from Scryfall's JSON response shape to these models
 
-4. Create `src/mtg_mcp/services/scryfall.py`:
-   - `ScryfallClient(BaseClient)` with `base_url = "https://api.scryfall.com"`, `user_agent = "mtg-mcp/0.1.0"`, `rate_limit = 10`
+4. Create `src/mtg_mcp_server/services/scryfall.py`:
+   - `ScryfallClient(BaseClient)` with `base_url = "https://api.scryfall.com"`, `user_agent = DEFAULT_USER_AGENT`, `rate_limit = 10`
    - Methods:
      - `async def search_cards(query: str, page: int = 1) -> CardSearchResult`
      - `async def get_card_by_name(name: str, fuzzy: bool = False) -> Card`
@@ -94,7 +94,7 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 ### 1b: Server Layer
 
-6. Create `src/mtg_mcp/providers/scryfall.py`:
+6. Create `src/mtg_mcp_server/providers/scryfall.py`:
    - Lifespan: create `ScryfallClient` once at startup via `@lifespan` decorator, store in module-level `_client`
    - Construct client with `Settings().scryfall_base_url` so env overrides work
    - `scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)`
@@ -119,7 +119,7 @@ This is the ordered build plan. Each phase produces a working, testable incremen
 
 ### 1c: Mount on Orchestrator
 
-8. Update `src/mtg_mcp/server.py`:
+8. Update `src/mtg_mcp_server/server.py`:
    - Mount `scryfall_mcp` with `namespace="scryfall"`
    - Remove the `ping` tool (or keep as health check)
 

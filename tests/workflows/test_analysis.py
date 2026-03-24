@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from mtg_mcp.services.base import ServiceError
-from mtg_mcp.types import (
+from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.types import (
     BracketEstimate,
     Card,
     CardPrices,
@@ -18,7 +18,7 @@ from mtg_mcp.types import (
     EDHRECCommanderData,
     MTGJSONCard,
 )
-from mtg_mcp.workflows.analysis import deck_analysis
+from mtg_mcp_server.workflows.analysis import deck_analysis
 
 # ---------------------------------------------------------------------------
 # Mock data helpers
@@ -132,7 +132,7 @@ def _make_scryfall(cards: dict[str, Card] | None = None) -> AsyncMock:
         key = name.lower()
         if key in lookup:
             return lookup[key]
-        from mtg_mcp.services.scryfall import CardNotFoundError
+        from mtg_mcp_server.services.scryfall import CardNotFoundError
 
         raise CardNotFoundError(f"Card not found: '{name}'", status_code=404)
 

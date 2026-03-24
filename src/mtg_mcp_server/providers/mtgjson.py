@@ -8,13 +8,14 @@ from __future__ import annotations
 import json
 from typing import Literal
 
+import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
 
-from mtg_mcp.config import Settings
-from mtg_mcp.providers import ATTRIBUTION_MTGJSON, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
-from mtg_mcp.services.mtgjson import MTGJSONClient, MTGJSONError
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.providers import ATTRIBUTION_MTGJSON, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
+from mtg_mcp_server.services.mtgjson import MTGJSONClient, MTGJSONError
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: MTGJSONClient | None = None
@@ -40,6 +41,8 @@ async def mtgjson_lifespan(server: FastMCP):
 
 
 mtgjson_mcp = FastMCP("MTGJSON", lifespan=mtgjson_lifespan)
+
+log = structlog.get_logger(provider="mtgjson")
 
 
 def _get_client() -> MTGJSONClient:
@@ -129,7 +132,12 @@ async def card_search(
 async def card_data_resource(name: str) -> str:
     """Get card data from MTGJSON bulk data as JSON."""
     client = _get_client()
-    card = await client.get_card(name)
+    try:
+        card = await client.get_card(name)
+    except MTGJSONError as exc:
+        log.warning("resource.card_data_error", name=name, error=str(exc))
+        return json.dumps({"error": f"MTGJSON error: {exc}"})
     if card is None:
+        log.debug("resource.card_data_not_found", name=name)
         return json.dumps({"error": f"Card not found: {name}"})
     return card.model_dump_json()

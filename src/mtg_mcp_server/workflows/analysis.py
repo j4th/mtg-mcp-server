@@ -9,17 +9,16 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from mtg_mcp.services.base import ServiceError
-from mtg_mcp.workflows.deck import build_synergy_lookup
+from mtg_mcp_server.workflows.deck import build_synergy_lookup
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from mtg_mcp.services.edhrec import EDHRECClient
-    from mtg_mcp.services.mtgjson import MTGJSONClient
-    from mtg_mcp.services.scryfall import ScryfallClient
-    from mtg_mcp.services.spellbook import SpellbookClient
-    from mtg_mcp.types import (
+    from mtg_mcp_server.services.edhrec import EDHRECClient
+    from mtg_mcp_server.services.mtgjson import MTGJSONClient
+    from mtg_mcp_server.services.scryfall import ScryfallClient
+    from mtg_mcp_server.services.spellbook import SpellbookClient
+    from mtg_mcp_server.types import (
         BracketEstimate,
         Card,
         DecklistCombos,
@@ -88,8 +87,8 @@ class _ColorPips:
 
 def _get_cmc(card: Card | MTGJSONCard) -> float:
     """Extract CMC from a resolved card."""
-    from mtg_mcp.types import Card as _Card
-    from mtg_mcp.types import MTGJSONCard as _MTGJSONCard
+    from mtg_mcp_server.types import Card as _Card
+    from mtg_mcp_server.types import MTGJSONCard as _MTGJSONCard
 
     if isinstance(card, _Card):
         return card.cmc
@@ -105,7 +104,7 @@ def _get_mana_cost(card: Card | MTGJSONCard) -> str | None:
 
 def _get_price_usd(card: Card | MTGJSONCard) -> str | None:
     """Extract USD price — only available from Scryfall Card objects."""
-    from mtg_mcp.types import Card as _Card
+    from mtg_mcp_server.types import Card as _Card
 
     if isinstance(card, _Card):
         return card.prices.usd
@@ -250,7 +249,7 @@ async def _resolve_cards(
     scryfall: ScryfallClient,
 ) -> tuple[list[_ResolvedCard], list[str]]:
     """Resolve all cards in the decklist using MTGJSON-first fallback."""
-    from mtg_mcp.workflows.card_resolver import resolve_card
+    from mtg_mcp_server.workflows.card_resolver import resolve_card
 
     # Cap concurrent Scryfall lookups to avoid overwhelming the connection pool.
     sem = asyncio.Semaphore(10)
@@ -268,7 +267,12 @@ async def _resolve_cards(
 
     for name, result in zip(decklist, results, strict=True):
         if isinstance(result, BaseException):
-            log.warning("deck_analysis.resolve_failed", card=name, error=str(result))
+            log.warning(
+                "deck_analysis.resolve_failed",
+                card=name,
+                error=str(result),
+                error_type=type(result).__name__,
+            )
             failures.append(name)
             # Add with defaults so curve still counts it
             resolved.append(_ResolvedCard(name=name))
@@ -303,14 +307,22 @@ async def _fetch_spellbook_data(
 
     bracket_result = results[0]
     if isinstance(bracket_result, BaseException):
-        log.warning("deck_analysis.bracket_failed", error=str(bracket_result))
+        log.warning(
+            "deck_analysis.bracket_failed",
+            error=str(bracket_result),
+            error_type=type(bracket_result).__name__,
+        )
         sources.spellbook_error = str(bracket_result)
     else:
         bracket = bracket_result
 
     combo_result = results[1]
     if isinstance(combo_result, BaseException):
-        log.warning("deck_analysis.combos_failed", error=str(combo_result))
+        log.warning(
+            "deck_analysis.combos_failed",
+            error=str(combo_result),
+            error_type=type(combo_result).__name__,
+        )
         if sources.spellbook_error is None:
             sources.spellbook_error = str(combo_result)
     else:
@@ -334,8 +346,8 @@ async def _fetch_edhrec_data(
 
     try:
         data = await edhrec.commander_top_cards(commander_name)
-    except ServiceError as exc:
-        log.warning("deck_analysis.edhrec_failed", error=str(exc))
+    except Exception as exc:
+        log.warning("deck_analysis.edhrec_failed", error=str(exc), error_type=type(exc).__name__)
         sources.edhrec_error = str(exc)
         return None
 

@@ -10,7 +10,7 @@ import pytest
 import respx
 from fastmcp import Client
 
-from mtg_mcp.providers.spellbook import spellbook_mcp
+from mtg_mcp_server.providers.spellbook import spellbook_mcp
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "spellbook"
 BASE_URL = "https://backend.commanderspellbook.com"

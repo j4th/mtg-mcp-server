@@ -16,10 +16,10 @@ import structlog
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from mtg_mcp.services.edhrec import EDHRECClient
-    from mtg_mcp.services.scryfall import ScryfallClient
-    from mtg_mcp.services.spellbook import SpellbookClient
-    from mtg_mcp.types import Card, Combo, EDHRECCard, EDHRECCommanderData
+    from mtg_mcp_server.services.edhrec import EDHRECClient
+    from mtg_mcp_server.services.scryfall import ScryfallClient
+    from mtg_mcp_server.services.spellbook import SpellbookClient
+    from mtg_mcp_server.types import Card, Combo, EDHRECCard, EDHRECCommanderData
 
 log = structlog.get_logger(service="workflow.commander")
 
@@ -458,8 +458,8 @@ async def card_comparison(
     Raises:
         CardNotFoundError: If a card is not found on Scryfall (propagated).
     """
-    from mtg_mcp.types import Card as ScryfallCard
-    from mtg_mcp.types import MTGJSONCard
+    from mtg_mcp_server.types import Card as ScryfallCard
+    from mtg_mcp_server.types import MTGJSONCard
 
     log.info("card_comparison.start", cards=cards, commander=commander_name)
 
@@ -517,6 +517,7 @@ async def card_comparison(
                 "card_comparison.edhrec_failed",
                 card=card.name,
                 error=str(syn_result),
+                error_type=type(syn_result).__name__,
             )
             synergy_str = "N/A"
             inclusion_str = "N/A"
@@ -534,6 +535,7 @@ async def card_comparison(
                 "card_comparison.spellbook_failed",
                 card=card.name,
                 error=str(cmb_result),
+                error_type=type(cmb_result).__name__,
             )
             combo_str = "N/A"
         else:
@@ -649,9 +651,11 @@ async def budget_upgrade(
 
     # Build candidates: pair EDHREC data with Scryfall prices
     candidates: list[tuple[EDHRECCard, float, float]] = []  # (edhrec, price, synergy_per_dollar)
+    price_failures = 0
     for ecard, price_result in zip(all_edhrec_cards, price_results, strict=True):
         if isinstance(price_result, BaseException):
             log.debug("budget_upgrade.price_failed", card=ecard.name, error=str(price_result))
+            price_failures += 1
             continue
         scryfall_card: Card = price_result
         if scryfall_card.prices.usd is None:
@@ -664,10 +668,11 @@ async def budget_upgrade(
         candidates.append((ecard, price, synergy_per_dollar))
 
     if not candidates:
-        return (
-            f"No cards found under ${budget:.2f} for {commander_name}.\n\n"
-            "Try increasing the budget ceiling."
-        )
+        msg = f"No cards found under ${budget:.2f} for {commander_name}.\n\n"
+        if price_failures:
+            msg += f"Note: {price_failures} card(s) could not be priced due to Scryfall errors.\n"
+        msg += "Try increasing the budget ceiling."
+        return msg
 
     # Sort by synergy-per-dollar descending
     candidates.sort(key=lambda c: c[2], reverse=True)

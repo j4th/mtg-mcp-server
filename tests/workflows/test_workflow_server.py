@@ -9,10 +9,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
-from mtg_mcp.services.base import ServiceError
-from mtg_mcp.services.scryfall import CardNotFoundError, ScryfallError
-from mtg_mcp.services.seventeen_lands import SeventeenLandsError
-from mtg_mcp.services.spellbook import SpellbookError
+from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallError
+from mtg_mcp_server.services.seventeen_lands import SeventeenLandsError
+from mtg_mcp_server.services.spellbook import SpellbookError
 
 if TYPE_CHECKING:
     from fastmcp import Client
@@ -56,9 +56,9 @@ class TestCommanderOverviewToolError:
         mock_spellbook.find_combos = AsyncMock(return_value=[])
 
         with (
-            patch("mtg_mcp.workflows.server._scryfall", mock_scryfall),
-            patch("mtg_mcp.workflows.server._spellbook", mock_spellbook),
-            patch("mtg_mcp.workflows.server._edhrec", None),
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
         ):
             result = await mcp_client.call_tool(
                 "commander_overview",
@@ -83,9 +83,9 @@ class TestCommanderOverviewToolError:
         mock_spellbook.find_combos = AsyncMock(return_value=[])
 
         with (
-            patch("mtg_mcp.workflows.server._scryfall", mock_scryfall),
-            patch("mtg_mcp.workflows.server._spellbook", mock_spellbook),
-            patch("mtg_mcp.workflows.server._edhrec", None),
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
         ):
             result = await mcp_client.call_tool(
                 "commander_overview",
@@ -117,9 +117,9 @@ class TestEvaluateUpgradeToolError:
         mock_spellbook.find_combos = AsyncMock(return_value=[])
 
         with (
-            patch("mtg_mcp.workflows.server._scryfall", mock_scryfall),
-            patch("mtg_mcp.workflows.server._spellbook", mock_spellbook),
-            patch("mtg_mcp.workflows.server._edhrec", None),
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
         ):
             result = await mcp_client.call_tool(
                 "evaluate_upgrade",
@@ -145,7 +145,7 @@ class TestDraftPackPickToolError:
         mcp_client: Client,
     ):
         """17Lands not enabled → ToolError."""
-        with patch("mtg_mcp.workflows.server._seventeen_lands", None):
+        with patch("mtg_mcp_server.workflows.server._seventeen_lands", None):
             result = await mcp_client.call_tool(
                 "draft_pack_pick",
                 {"pack": ["Mulldrifter"], "set_code": "LRW"},
@@ -164,7 +164,7 @@ class TestDraftPackPickToolError:
             side_effect=SeventeenLandsError("rate limited", status_code=429)
         )
 
-        with patch("mtg_mcp.workflows.server._seventeen_lands", mock_17lands):
+        with patch("mtg_mcp_server.workflows.server._seventeen_lands", mock_17lands):
             result = await mcp_client.call_tool(
                 "draft_pack_pick",
                 {"pack": ["Mulldrifter"], "set_code": "LRW"},
@@ -193,8 +193,8 @@ class TestSuggestCutsToolError:
         )
 
         with (
-            patch("mtg_mcp.workflows.server._spellbook", mock_spellbook),
-            patch("mtg_mcp.workflows.server._edhrec", None),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
         ):
             result = await mcp_client.call_tool(
                 "suggest_cuts",
@@ -243,10 +243,10 @@ class TestCardComparisonToolError:
         mock_spellbook = AsyncMock()
 
         with (
-            patch("mtg_mcp.workflows.server._scryfall", mock_scryfall),
-            patch("mtg_mcp.workflows.server._spellbook", mock_spellbook),
-            patch("mtg_mcp.workflows.server._edhrec", None),
-            patch("mtg_mcp.workflows.server._mtgjson", None),
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
+            patch("mtg_mcp_server.workflows.server._mtgjson", None),
         ):
             result = await mcp_client.call_tool(
                 "card_comparison",
@@ -262,10 +262,10 @@ class TestCardComparisonToolError:
         mock_spellbook = AsyncMock()
 
         with (
-            patch("mtg_mcp.workflows.server._scryfall", mock_scryfall),
-            patch("mtg_mcp.workflows.server._spellbook", mock_spellbook),
-            patch("mtg_mcp.workflows.server._edhrec", None),
-            patch("mtg_mcp.workflows.server._mtgjson", None),
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
+            patch("mtg_mcp_server.workflows.server._mtgjson", None),
         ):
             result = await mcp_client.call_tool(
                 "card_comparison",
@@ -294,7 +294,7 @@ class TestBudgetUpgradeToolError:
         assert "positive" in result.content[0].text.lower()
 
     async def test_edhrec_disabled_becomes_tool_error(self, mcp_client: Client):
-        with patch("mtg_mcp.workflows.server._edhrec", None):
+        with patch("mtg_mcp_server.workflows.server._edhrec", None):
             result = await mcp_client.call_tool(
                 "budget_upgrade",
                 {"commander_name": "Muldrotha", "budget": 5.0},
@@ -329,10 +329,10 @@ class TestDeckAnalysisToolError:
         mock_spellbook = AsyncMock()
 
         with (
-            patch("mtg_mcp.workflows.server._scryfall", mock_scryfall),
-            patch("mtg_mcp.workflows.server._spellbook", mock_spellbook),
-            patch("mtg_mcp.workflows.server._edhrec", None),
-            patch("mtg_mcp.workflows.server._mtgjson", None),
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
+            patch("mtg_mcp_server.workflows.server._mtgjson", None),
         ):
             result = await mcp_client.call_tool(
                 "deck_analysis",
@@ -352,7 +352,7 @@ class TestSetOverviewToolError:
     """Verify set_overview converts service exceptions to ToolError."""
 
     async def test_17lands_disabled_becomes_tool_error(self, mcp_client: Client):
-        with patch("mtg_mcp.workflows.server._seventeen_lands", None):
+        with patch("mtg_mcp_server.workflows.server._seventeen_lands", None):
             result = await mcp_client.call_tool(
                 "set_overview",
                 {"set_code": "LCI"},
@@ -370,7 +370,7 @@ class TestSetOverviewToolError:
             side_effect=SeventeenLandsError("rate limited", status_code=429)
         )
 
-        with patch("mtg_mcp.workflows.server._seventeen_lands", mock_17lands):
+        with patch("mtg_mcp_server.workflows.server._seventeen_lands", mock_17lands):
             result = await mcp_client.call_tool(
                 "set_overview",
                 {"set_code": "LCI"},

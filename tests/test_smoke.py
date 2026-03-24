@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from mtg_mcp.config import Settings
-from mtg_mcp.logging import configure_logging, get_logger
-from mtg_mcp.server import mcp
+from mtg_mcp_server.config import Settings
+from mtg_mcp_server.logging import configure_logging, get_logger
+from mtg_mcp_server.server import mcp
 
 if TYPE_CHECKING:
     from fastmcp import Client

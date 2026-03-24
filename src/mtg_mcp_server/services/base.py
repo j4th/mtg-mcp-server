@@ -7,7 +7,6 @@ rate limiting, retry logic, and observability.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import time
 from typing import TYPE_CHECKING, Self
 
@@ -19,6 +18,10 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+from mtg_mcp_server import __version__
+
+DEFAULT_USER_AGENT = f"mtg-mcp-server/{__version__}"
 
 if TYPE_CHECKING:
     from typing import Any
@@ -101,7 +104,7 @@ class BaseClient:
         self,
         base_url: str,
         rate_limit_rps: float = 10.0,
-        user_agent: str = "mtg-mcp/0.1.0",
+        user_agent: str = DEFAULT_USER_AGENT,
         timeout: float = 30.0,
     ) -> None:
         if rate_limit_rps <= 0:
@@ -135,7 +138,7 @@ class BaseClient:
             try:
                 await self._client.aclose()
             except Exception:
-                self._log.warning("client_close_error")
+                self._log.warning("client_close_error", exc_info=True)
             finally:
                 self._client = None
 
@@ -187,8 +190,14 @@ class BaseClient:
                     if response.status_code == 429:
                         raw = response.headers.get("Retry-After")
                         if raw is not None:
-                            with contextlib.suppress(ValueError):
+                            try:
                                 retry_after = float(raw)
+                            except ValueError:
+                                self._log.warning(
+                                    "retry_after_parse_failed",
+                                    raw_value=raw,
+                                    status=response.status_code,
+                                )
                     self._log.error(
                         "http_error",
                         method=method,

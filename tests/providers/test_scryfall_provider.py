@@ -10,7 +10,7 @@ import pytest
 import respx
 from fastmcp import Client
 
-from mtg_mcp.providers.scryfall import scryfall_mcp
+from mtg_mcp_server.providers.scryfall import scryfall_mcp
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "scryfall"
 BASE_URL = "https://api.scryfall.com"

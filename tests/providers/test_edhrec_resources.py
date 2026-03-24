@@ -10,7 +10,7 @@ import pytest
 import respx
 from fastmcp import Client
 
-from mtg_mcp.providers.edhrec import edhrec_mcp
+from mtg_mcp_server.providers.edhrec import edhrec_mcp
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "edhrec"
 BASE_URL = "https://json.edhrec.com"
@@ -50,6 +50,17 @@ class TestCommanderStaplesResource:
         data = json.loads(result[0].text)
         assert "error" in data
         assert "Commander not found" in data["error"]
+
+    @respx.mock
+    async def test_server_error_returns_error_json(self, client: Client):
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.read_resource("mtg://commander/Muldrotha, the Gravetide/staples")
+        data = json.loads(result[0].text)
+        assert "error" in data
+        assert "EDHREC error" in data["error"]
 
 
 class TestResourceTemplateRegistration:

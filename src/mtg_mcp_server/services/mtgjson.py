@@ -20,8 +20,8 @@ import httpx
 import structlog
 from pydantic import ValidationError
 
-from mtg_mcp.services.base import ServiceError
-from mtg_mcp.types import MTGJSONCard
+from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.types import MTGJSONCard
 
 log = structlog.get_logger(service="MTGJSONClient")
 
@@ -238,6 +238,7 @@ class MTGJSONClient:
         data = raw["data"]
         cards: dict[str, MTGJSONCard] = {}
         unique: list[MTGJSONCard] = []
+        skipped = 0
 
         for card_name, printings in data.items():
             if not isinstance(printings, list) or len(printings) == 0:
@@ -268,6 +269,7 @@ class MTGJSONClient:
                 )
             except (ValidationError, ValueError, TypeError) as exc:
                 log.warning("mtgjson.card_parse_error", card_name=card_name, error=str(exc))
+                skipped += 1
                 continue
 
             unique.append(card)
@@ -277,6 +279,9 @@ class MTGJSONClient:
             # just "Front". Add the full "//" key so both lookup forms work.
             if card_name.lower() != card.name.lower():
                 cards[card_name.lower()] = card
+
+        if skipped:
+            log.warning("mtgjson.parse_summary", skipped=skipped, loaded=len(unique))
 
         self._cards = cards
         self._unique_cards = unique

@@ -8,12 +8,10 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from mtg_mcp.services.base import ServiceError
-
 if TYPE_CHECKING:
-    from mtg_mcp.services.edhrec import EDHRECClient
-    from mtg_mcp.services.spellbook import SpellbookClient
-    from mtg_mcp.types import DecklistCombos, EDHRECCard, EDHRECCommanderData
+    from mtg_mcp_server.services.edhrec import EDHRECClient
+    from mtg_mcp_server.services.spellbook import SpellbookClient
+    from mtg_mcp_server.types import DecklistCombos, EDHRECCard, EDHRECCommanderData
 
 log = structlog.get_logger(service="workflow.deck")
 
@@ -93,7 +91,7 @@ async def _fetch_spellbook(
     """Fetch Spellbook data, returning the exception on failure."""
     try:
         return await spellbook.find_decklist_combos([commander_name], decklist)
-    except ServiceError as exc:
+    except Exception as exc:
         return exc
 
 
@@ -104,7 +102,7 @@ async def _fetch_edhrec(
     """Fetch EDHREC data, returning the exception on failure."""
     try:
         return await edhrec.commander_top_cards(commander_name)
-    except ServiceError as exc:
+    except Exception as exc:
         return exc
 
 

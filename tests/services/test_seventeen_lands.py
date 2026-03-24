@@ -9,8 +9,8 @@ import httpx
 import pytest
 import respx
 
-from mtg_mcp.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
-from mtg_mcp.types import ArchetypeRating, DraftCardRating
+from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
+from mtg_mcp_server.types import ArchetypeRating, DraftCardRating
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "seventeen_lands"
 BASE_URL = "https://www.17lands.com"
