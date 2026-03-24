@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Backend Tools (15 tools across 5 data sources)
+#### Backend Tools (14 tools across 5 data sources)
 
 **Scryfall** (namespace: `scryfall`)
 - `scryfall_search_cards` -- Search for cards using Scryfall's full query syntax
@@ -72,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Progress reporting for long-running workflow tools
 - Tool tagging for categorization and filtering
 - stdio and streamable HTTP transport support
+- Error detail masking on all provider servers (`mask_error_details`)
+- Response size limiting (500KB max) to protect LLM context windows
 - structlog JSON logging to stderr
 - Configuration via `MTG_MCP_`-prefixed environment variables
 

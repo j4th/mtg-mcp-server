@@ -33,7 +33,7 @@ What actually happened. Include error messages or tool output if available.
 
 ## Relevant Configuration
 
-List any non-default environment variables set (e.g., `MTG_MCP_ENABLE_EDHREC=false`).
+List any non-default environment variables set (e.g., `MTG_MCP_ENABLE_EDHREC=false`, `MTG_MCP_ENABLE_MTGJSON=false`). See `.env.example` for the full list.
 
 ## Additional Context
 

@@ -43,6 +43,40 @@ class TestServer:
         assert mcp._mask_error_details is True
 
 
+class TestSubServerMaskErrorDetails:
+    """Verify mask_error_details is set on all sub-servers."""
+
+    def test_scryfall_mask_error_details(self):
+        from mtg_mcp_server.providers.scryfall import scryfall_mcp
+
+        assert scryfall_mcp._mask_error_details is True
+
+    def test_spellbook_mask_error_details(self):
+        from mtg_mcp_server.providers.spellbook import spellbook_mcp
+
+        assert spellbook_mcp._mask_error_details is True
+
+    def test_seventeen_lands_mask_error_details(self):
+        from mtg_mcp_server.providers.seventeen_lands import draft_mcp
+
+        assert draft_mcp._mask_error_details is True
+
+    def test_edhrec_mask_error_details(self):
+        from mtg_mcp_server.providers.edhrec import edhrec_mcp
+
+        assert edhrec_mcp._mask_error_details is True
+
+    def test_mtgjson_mask_error_details(self):
+        from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
+
+        assert mtgjson_mcp._mask_error_details is True
+
+    def test_workflow_mask_error_details(self):
+        from mtg_mcp_server.workflows.server import workflow_mcp
+
+        assert workflow_mcp._mask_error_details is True
+
+
 class TestConfig:
     """Verify Settings loads with sensible defaults."""
 

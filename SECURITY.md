@@ -44,7 +44,7 @@ There are no API keys, OAuth tokens, or credentials stored or transmitted by thi
 ## Dependency Auditing
 
 This project uses `pip-audit` to check for known vulnerabilities in dependencies.
-Run it locally with:
+Run it locally (requires dev dependencies, installed by default with `uv sync`):
 
 ```bash
 uv run pip-audit

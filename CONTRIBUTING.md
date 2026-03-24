@@ -43,6 +43,7 @@ This project follows test-driven development (TDD):
 | `mise run typecheck` | ty check                                     |
 | `mise run fix`       | Auto-fix lint and format issues              |
 | `mise run dev`       | MCP Inspector on :6274                       |
+| `mise run serve`     | Run server via stdio transport                |
 
 ## Code Style
 

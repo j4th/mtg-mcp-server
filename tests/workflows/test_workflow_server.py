@@ -131,6 +131,28 @@ class TestEvaluateUpgradeToolError:
         assert "not found" in text.lower()
         assert "Nonexistent" in text
 
+    async def test_service_error_becomes_tool_error(
+        self,
+        mcp_client: Client,
+    ):
+        """Generic ServiceError → ToolError with tool name."""
+        mock_scryfall = AsyncMock()
+        mock_scryfall.get_card_by_name = AsyncMock(side_effect=ServiceError("timeout"))
+        mock_spellbook = AsyncMock()
+
+        with (
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
+            patch("mtg_mcp_server.workflows.server._edhrec", None),
+        ):
+            result = await mcp_client.call_tool(
+                "evaluate_upgrade",
+                {"card_name": "Sol Ring", "commander_name": "Muldrotha"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+        assert "evaluate_upgrade failed" in result.content[0].text.lower()
+
 
 # ---------------------------------------------------------------------------
 # ToolError conversion — draft_pack_pick
@@ -207,6 +229,26 @@ class TestSuggestCutsToolError:
         # suggest_cuts handles SpellbookError internally (graceful degradation),
         # so this should succeed with partial data, not error
         assert not result.is_error
+
+    async def test_service_error_becomes_tool_error(
+        self,
+        mcp_client: Client,
+    ):
+        """ServiceError from _require_spellbook → ToolError with tool name."""
+        with patch(
+            "mtg_mcp_server.workflows.server._require_spellbook",
+            side_effect=ServiceError("client not available"),
+        ):
+            result = await mcp_client.call_tool(
+                "suggest_cuts",
+                {
+                    "decklist": ["Sol Ring", "Spore Frog"],
+                    "commander_name": "Muldrotha",
+                },
+                raise_on_error=False,
+            )
+        assert result.is_error
+        assert "suggest_cuts failed" in result.content[0].text.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +346,24 @@ class TestBudgetUpgradeToolError:
         assert "edhrec" in result.content[0].text.lower()
         assert "not enabled" in result.content[0].text.lower()
 
+    async def test_service_error_becomes_tool_error(self, mcp_client: Client):
+        """Generic ServiceError → ToolError with tool name."""
+        mock_edhrec = AsyncMock()
+        mock_edhrec.commander_top_cards = AsyncMock(side_effect=ServiceError("timeout"))
+        mock_scryfall = AsyncMock()
+
+        with (
+            patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
+            patch("mtg_mcp_server.workflows.server._edhrec", mock_edhrec),
+        ):
+            result = await mcp_client.call_tool(
+                "budget_upgrade",
+                {"commander_name": "Muldrotha", "budget": 5.0},
+                raise_on_error=False,
+            )
+        assert result.is_error
+        assert "budget_upgrade failed" in result.content[0].text.lower()
+
 
 # ---------------------------------------------------------------------------
 # ToolError conversion — deck_analysis
@@ -341,6 +401,20 @@ class TestDeckAnalysisToolError:
             )
         # Graceful degradation — returns partial results, not an error
         assert not result.is_error
+
+    async def test_service_error_becomes_tool_error(self, mcp_client: Client):
+        """Generic ServiceError from _require_scryfall → ToolError with tool name."""
+        with patch(
+            "mtg_mcp_server.workflows.server._require_scryfall",
+            side_effect=ServiceError("client not available"),
+        ):
+            result = await mcp_client.call_tool(
+                "deck_analysis",
+                {"decklist": ["Sol Ring"], "commander_name": "Muldrotha"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+        assert "deck_analysis failed" in result.content[0].text.lower()
 
 
 # ---------------------------------------------------------------------------
