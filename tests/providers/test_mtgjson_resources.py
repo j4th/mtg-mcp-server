@@ -58,6 +58,26 @@ class TestCardDataResource:
         assert "Card not found" in data["error"]
 
 
+class TestCardDataServerError:
+    async def test_mtgjson_error_returns_error_json(self):
+        """Simulate a download failure triggering MTGJSONError."""
+        mock_http = AsyncMock()
+        mock_http.get = AsyncMock(
+            return_value=httpx.Response(status_code=500, content=b"Server Error")
+        )
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
+            mock_cls.return_value = mock_http
+
+            async with Client(transport=mtgjson_mcp) as c:
+                result = await c.read_resource("mtg://card-data/Sol Ring")
+                data = json.loads(result[0].text)
+                assert "error" in data
+                assert "MTGJSON error" in data["error"]
+
+
 class TestResourceTemplateRegistration:
     async def test_resource_templates_registered(self, client: Client):
         templates = await client.list_resource_templates()

@@ -84,6 +84,30 @@ class TestCardRulingsResource:
         assert "error" in data
         assert "Card not found" in data["error"]
 
+    @respx.mock
+    async def test_server_error_returns_error_json(self, client: Client):
+        respx.get(f"{BASE_URL}/cards/named", params={"exact": "Sol Ring"}).mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.read_resource("mtg://card/Sol Ring")
+        data = json.loads(result[0].text)
+        assert "error" in data
+        assert "Scryfall error" in data["error"]
+
+
+class TestCardRulingsServerError:
+    @respx.mock
+    async def test_server_error_returns_error_json(self, client: Client):
+        respx.get(f"{BASE_URL}/cards/named", params={"exact": "Sol Ring"}).mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.read_resource("mtg://card/Sol Ring/rulings")
+        data = json.loads(result[0].text)
+        assert "error" in data
+        assert "Scryfall error" in data["error"]
+
 
 class TestResourceTemplateRegistration:
     async def test_resource_templates_registered(self, client: Client):

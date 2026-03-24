@@ -651,9 +651,11 @@ async def budget_upgrade(
 
     # Build candidates: pair EDHREC data with Scryfall prices
     candidates: list[tuple[EDHRECCard, float, float]] = []  # (edhrec, price, synergy_per_dollar)
+    price_failures = 0
     for ecard, price_result in zip(all_edhrec_cards, price_results, strict=True):
         if isinstance(price_result, BaseException):
             log.debug("budget_upgrade.price_failed", card=ecard.name, error=str(price_result))
+            price_failures += 1
             continue
         scryfall_card: Card = price_result
         if scryfall_card.prices.usd is None:
@@ -666,10 +668,11 @@ async def budget_upgrade(
         candidates.append((ecard, price, synergy_per_dollar))
 
     if not candidates:
-        return (
-            f"No cards found under ${budget:.2f} for {commander_name}.\n\n"
-            "Try increasing the budget ceiling."
-        )
+        msg = f"No cards found under ${budget:.2f} for {commander_name}.\n\n"
+        if price_failures:
+            msg += f"Note: {price_failures} card(s) could not be priced due to Scryfall errors.\n"
+        msg += "Try increasing the budget ceiling."
+        return msg
 
     # Sort by synergy-per-dollar descending
     candidates.sort(key=lambda c: c[2], reverse=True)

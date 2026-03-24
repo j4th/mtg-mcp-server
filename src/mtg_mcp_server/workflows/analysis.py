@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.workflows.deck import build_synergy_lookup
 
 if TYPE_CHECKING:
@@ -347,8 +346,8 @@ async def _fetch_edhrec_data(
 
     try:
         data = await edhrec.commander_top_cards(commander_name)
-    except ServiceError as exc:
-        log.warning("deck_analysis.edhrec_failed", error=str(exc))
+    except Exception as exc:
+        log.warning("deck_analysis.edhrec_failed", error=str(exc), error_type=type(exc).__name__)
         sources.edhrec_error = str(exc)
         return None
 
