@@ -1,7 +1,7 @@
 runtime: "python"
 
 startCommand:
-  type: stdio
+  type: "http"
   configSchema:
     type: object
     properties:
@@ -40,16 +40,3 @@ startCommand:
         default: 24
         minimum: 1
         maximum: 168
-  commandFunction: |-
-    (config) => ({
-      command: 'uvx',
-      args: ['mtg-mcp-server'],
-      env: {
-        MTG_MCP_ENABLE_17LANDS: config.MTG_MCP_ENABLE_17LANDS !== undefined ? String(config.MTG_MCP_ENABLE_17LANDS) : undefined,
-        MTG_MCP_ENABLE_EDHREC: config.MTG_MCP_ENABLE_EDHREC !== undefined ? String(config.MTG_MCP_ENABLE_EDHREC) : undefined,
-        MTG_MCP_ENABLE_MTGJSON: config.MTG_MCP_ENABLE_MTGJSON !== undefined ? String(config.MTG_MCP_ENABLE_MTGJSON) : undefined,
-        MTG_MCP_LOG_LEVEL: config.MTG_MCP_LOG_LEVEL || undefined,
-        MTG_MCP_SCRYFALL_RATE_LIMIT_MS: config.MTG_MCP_SCRYFALL_RATE_LIMIT_MS !== undefined ? String(config.MTG_MCP_SCRYFALL_RATE_LIMIT_MS) : undefined,
-        MTG_MCP_MTGJSON_REFRESH_HOURS: config.MTG_MCP_MTGJSON_REFRESH_HOURS !== undefined ? String(config.MTG_MCP_MTGJSON_REFRESH_HOURS) : undefined
-      }
-    })
