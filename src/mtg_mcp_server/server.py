@@ -16,10 +16,10 @@ import sys
 import structlog
 from fastmcp import FastMCP
 from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddleware
+from mcp.types import ToolAnnotations
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.logging import configure_logging
-from mtg_mcp_server.providers import TOOL_ANNOTATIONS
 from mtg_mcp_server.providers.edhrec import edhrec_mcp
 from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
 from mtg_mcp_server.providers.scryfall import scryfall_mcp
@@ -64,7 +64,12 @@ configure_logging()
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
 
-_settings = Settings()
+try:
+    _settings = Settings()
+except Exception:
+    structlog.get_logger(service="startup").exception("invalid_configuration")
+    sys.exit(1)
+
 if _settings.disable_cache:
     disable_all_caches()
 
@@ -86,7 +91,11 @@ mcp.mount(workflow_mcp)
 mcp.add_middleware(ResponseLimitingMiddleware(max_size=500_000))
 
 
-@mcp.tool(annotations=TOOL_ANNOTATIONS)
+# Ping is a local health check — no network access, so openWorldHint=False.
+_PING_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
+
+
+@mcp.tool(annotations=_PING_ANNOTATIONS)
 async def ping() -> str:
     """Health check — returns 'pong'."""
     return "pong"
