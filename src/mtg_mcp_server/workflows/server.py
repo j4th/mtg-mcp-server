@@ -147,7 +147,7 @@ async def commander_overview(commander_name: str) -> str:
             f"Commander not found: '{commander_name}'. Check spelling or try a different name."
         ) from exc
     except ServiceError as exc:
-        raise ToolError(f"Service error: {exc}") from exc
+        raise ToolError(f"commander_overview failed: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
@@ -172,7 +172,7 @@ async def evaluate_upgrade(card_name: str, commander_name: str) -> str:
             f"Card not found: '{card_name}'. Check spelling or try a different name."
         ) from exc
     except ServiceError as exc:
-        raise ToolError(f"Service error: {exc}") from exc
+        raise ToolError(f"evaluate_upgrade failed: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
@@ -221,7 +221,7 @@ async def suggest_cuts(
             num_cuts=num_cuts,
         )
     except ServiceError as exc:
-        raise ToolError(f"Service error: {exc}") from exc
+        raise ToolError(f"suggest_cuts failed: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
@@ -254,7 +254,7 @@ async def card_comparison(
     except CardNotFoundError as exc:
         raise ToolError(f"Card not found: {exc}. Check spelling.") from exc
     except ServiceError as exc:
-        raise ToolError(f"Service error: {exc}") from exc
+        raise ToolError(f"card_comparison failed: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER | TAGS_PRICING)
@@ -287,7 +287,7 @@ async def budget_upgrade(
     except CommanderNotFoundError as exc:
         raise ToolError(f"Commander not found: '{commander_name}'.") from exc
     except ServiceError as exc:
-        raise ToolError(f"Service error: {exc}") from exc
+        raise ToolError(f"budget_upgrade failed: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
@@ -318,7 +318,7 @@ async def deck_analysis(
             on_progress=lambda step, total: _progress(ctx, step, total),
         )
     except ServiceError as exc:
-        raise ToolError(f"Service error: {exc}") from exc
+        raise ToolError(f"deck_analysis failed: {exc}") from exc
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)

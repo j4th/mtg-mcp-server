@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import sys
 
+import structlog
 from fastmcp import FastMCP
 from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddleware
 
@@ -55,6 +56,10 @@ mcp = FastMCP(
     ),
 )
 
+# Ensure logging is configured before any module-level code that might log.
+# main() will reconfigure with the user's actual log level from Settings.
+configure_logging()
+
 # Always-on backends: Scryfall and Spellbook are stable public APIs.
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
@@ -89,16 +94,22 @@ async def ping() -> str:
 
 def main() -> None:  # pragma: no cover
     """Entry point: load settings, configure logging, start transport."""
-    configure_logging(_settings.log_level)
+    try:
+        configure_logging(_settings.log_level)
 
-    transport = _settings.transport
-    if len(sys.argv) > 1:
-        transport = sys.argv[1]
+        transport = _settings.transport
+        if len(sys.argv) > 1:
+            transport = sys.argv[1]
 
-    if transport == "http":
-        mcp.run(transport="streamable-http", host="127.0.0.1", port=_settings.http_port)
-    else:
-        mcp.run(transport="stdio")
+        if transport == "http":
+            mcp.run(transport="streamable-http", host="127.0.0.1", port=_settings.http_port)
+        else:
+            mcp.run(transport="stdio")
+    except KeyboardInterrupt:
+        pass
+    except Exception:
+        structlog.get_logger(service="startup").exception("fatal_startup_error")
+        sys.exit(1)
 
 
 if __name__ == "__main__":  # pragma: no cover

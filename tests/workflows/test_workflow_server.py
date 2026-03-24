@@ -93,7 +93,7 @@ class TestCommanderOverviewToolError:
                 raise_on_error=False,
             )
         assert result.is_error
-        assert "service error" in result.content[0].text.lower()
+        assert "commander_overview failed" in result.content[0].text.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ class TestCardComparisonToolError:
                 raise_on_error=False,
             )
         assert result.is_error
-        assert "service error" in result.content[0].text.lower()
+        assert "card_comparison failed" in result.content[0].text.lower()
 
 
 # ---------------------------------------------------------------------------
