@@ -15,12 +15,18 @@ Prerequisites: [mise](https://mise.jdx.dev) must be installed. Then `mise instal
 mise run setup          # Install deps, create venv
 mise run check          # Lint + format + typecheck + test (the full gate)
 mise run test           # pytest with coverage
+mise run test:quick     # pytest --testmon (only tests affected by changes)
 mise run lint           # ruff check + ruff format --check
 mise run typecheck      # ty check
 mise run dev            # fastmcp dev inspector (MCP Inspector on :6274)
 mise run serve          # Run server via stdio
 mise run fix            # Auto-fix lint and format issues
 ```
+
+### Testing strategy
+
+- **Iterating**: Use `mise run test:quick` (pytest-testmon) after edits for fast feedback — only runs tests affected by your changes.
+- **Quality gate**: Use `mise run check` before commits and PRs — full lint + typecheck + test suite with coverage.
 
 ## Architecture
 
