@@ -31,6 +31,7 @@ from mtg_mcp_server.workflows.server import workflow_mcp
 mcp = FastMCP(
     "MTG",
     mask_error_details=True,
+    website_url="https://github.com/j4th/mtg-mcp-server",
     icons=[Icon(src="https://raw.githubusercontent.com/j4th/mtg-mcp-server/main/icon.svg")],
     instructions=(
         "Magic: The Gathering data and analytics server.\n\n"

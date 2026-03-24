@@ -378,7 +378,11 @@ async def set_overview(
 
 
 @workflow_mcp.prompt()
-def evaluate_commander_swap(commander: str, adding: str, cutting: str) -> str:
+def evaluate_commander_swap(
+    commander: Annotated[str, Field(description="Commander the deck is built around")],
+    adding: Annotated[str, Field(description="Card name being added to the deck")],
+    cutting: Annotated[str, Field(description="Card name being cut from the deck")],
+) -> str:
     """Evaluate swapping a card in a Commander deck."""
     return f"""Evaluate this Commander deck change:
 Commander: {commander}
@@ -401,7 +405,9 @@ Give a clear recommendation: SWAP, KEEP, or CONSIDER with detailed reasoning."""
 
 
 @workflow_mcp.prompt()
-def deck_health_check(commander: str) -> str:
+def deck_health_check(
+    commander: Annotated[str, Field(description="Commander card name for the deck to analyze")],
+) -> str:
     """Guide a comprehensive deck health assessment."""
     return f"""Run a full health check on the {commander} Commander deck.
 
@@ -424,7 +430,9 @@ Provide a prioritized list of recommendations."""
 
 
 @workflow_mcp.prompt()
-def draft_strategy(set_code: str) -> str:
+def draft_strategy(
+    set_code: Annotated[str, Field(description="Three-letter set code (e.g. 'LCI', 'MKM', 'OTJ')")],
+) -> str:
     """Guide a draft format preparation session."""
     return f"""Prepare a draft strategy guide for {set_code}.
 
@@ -448,7 +456,10 @@ Summarize as a concise cheat sheet for use during a draft."""
 
 
 @workflow_mcp.prompt()
-def find_upgrades(commander: str, budget: float) -> str:
+def find_upgrades(
+    commander: Annotated[str, Field(description="Commander card name for upgrade suggestions")],
+    budget: Annotated[float, Field(description="Maximum price per card in USD")],
+) -> str:
     """Guide a budget upgrade session for a Commander deck."""
     return f"""Find budget upgrades for the {commander} Commander deck under ${budget:.2f} per card.
 
