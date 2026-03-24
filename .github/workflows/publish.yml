@@ -41,6 +41,21 @@ jobs:
           curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           chmod +x mcp-publisher
 
+      - name: Wait for PyPI index propagation
+        run: |
+          PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "Waiting for mtg-mcp-server==${PKG_VERSION} on PyPI..."
+          for i in $(seq 1 12); do
+            if curl -sf "https://pypi.org/pypi/mtg-mcp-server/${PKG_VERSION}/json" > /dev/null 2>&1; then
+              echo "Package available on PyPI after ~$((i * 10))s"
+              exit 0
+            fi
+            echo "Attempt $i/12 — not yet indexed, waiting 10s..."
+            sleep 10
+          done
+          echo "::warning::PyPI index propagation took longer than 2 minutes"
+          exit 1
+
       - name: Publish to MCP Registry
         run: |
           ./mcp-publisher login github-oidc
