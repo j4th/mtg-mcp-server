@@ -45,15 +45,17 @@ jobs:
         run: |
           PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           echo "Waiting for mtg-mcp-server==${PKG_VERSION} on PyPI..."
-          for i in $(seq 1 12); do
+          for i in $(seq 1 30); do
             if curl -sf "https://pypi.org/pypi/mtg-mcp-server/${PKG_VERSION}/json" > /dev/null 2>&1; then
-              echo "Package available on PyPI after ~$((i * 10))s"
+              echo "Package found on PyPI after ~$((i * 10))s, waiting 30s for CDN propagation..."
+              sleep 30
+              echo "Ready."
               exit 0
             fi
-            echo "Attempt $i/12 — not yet indexed, waiting 10s..."
+            echo "Attempt $i/30 — not yet indexed, waiting 10s..."
             sleep 10
           done
-          echo "::warning::PyPI index propagation took longer than 2 minutes"
+          echo "::warning::PyPI index propagation took longer than 5 minutes"
           exit 1
 
       - name: Publish to MCP Registry
