@@ -47,8 +47,8 @@ jobs:
           echo "Waiting for mtg-mcp-server==${PKG_VERSION} on PyPI..."
           for i in $(seq 1 30); do
             if curl -sf "https://pypi.org/pypi/mtg-mcp-server/${PKG_VERSION}/json" > /dev/null 2>&1; then
-              echo "Package found on PyPI after ~$((i * 10))s, waiting 30s for CDN propagation..."
-              sleep 30
+              echo "Package found on PyPI after ~$((i * 10))s, waiting 90s for CDN propagation..."
+              sleep 90
               echo "Ready."
               exit 0
             fi
