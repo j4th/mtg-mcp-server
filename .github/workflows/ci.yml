@@ -57,11 +57,11 @@ jobs:
         run: uv run --with dist/*.whl --no-project -- python -c "from mtg_mcp_server import __version__; print(f'mtg-mcp-server {__version__}')"
 
       - name: Verify entry point
-        run: uv run --with dist/*.whl --no-project -- mtg-mcp-server --help 2>&1 || true
+        run: uv run --with dist/*.whl --no-project -- mtg-mcp-server --help 2>&1
 
       - name: Verify MCP tool registration
         run: |
-          uv run python -c "
+          uv run --with dist/*.whl --no-project -- python -c "
           import asyncio
           from fastmcp import Client
           from mtg_mcp_server.server import mcp
