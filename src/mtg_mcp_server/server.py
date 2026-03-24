@@ -16,7 +16,7 @@ import sys
 import structlog
 from fastmcp import FastMCP
 from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddleware
-from mcp.types import ToolAnnotations
+from mcp.types import Icon, ToolAnnotations
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.logging import configure_logging
@@ -31,6 +31,7 @@ from mtg_mcp_server.workflows.server import workflow_mcp
 mcp = FastMCP(
     "MTG",
     mask_error_details=True,
+    icons=[Icon(src="https://raw.githubusercontent.com/j4th/mtg-mcp-server/main/icon.svg")],
     instructions=(
         "Magic: The Gathering data and analytics server.\n\n"
         "Tool categories:\n"

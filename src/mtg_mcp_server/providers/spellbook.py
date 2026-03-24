@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from pydantic import Field
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import (
@@ -68,9 +69,16 @@ def _get_client() -> SpellbookClient:
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH | TAGS_COMBO)
 async def find_combos(
-    card_name: str,
-    color_identity: str | None = None,
-    limit: int = 10,
+    card_name: Annotated[
+        str, Field(description="Card name to search for combos (e.g. 'Muldrotha, the Gravetide')")
+    ],
+    color_identity: Annotated[
+        str | None,
+        Field(
+            description="Filter by color identity — name ('sultai'), letters ('BUG'), or 'wubrg'"
+        ),
+    ] = None,
+    limit: Annotated[int, Field(description="Maximum number of combos to return")] = 10,
 ) -> str:
     """Search for known combos involving a specific card.
 
@@ -98,7 +106,12 @@ async def find_combos(
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP | TAGS_COMBO)
 async def combo_details(
-    combo_id: str,
+    combo_id: Annotated[
+        str,
+        Field(
+            description="Spellbook combo ID from find_combos results (e.g. '1414-2730-5131-5256')"
+        ),
+    ],
 ) -> str:
     """Get detailed steps for a specific combo by its Spellbook ID.
 
@@ -139,8 +152,10 @@ async def combo_details(
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
 async def find_decklist_combos(
-    commanders: list[str],
-    decklist: list[str],
+    commanders: Annotated[
+        list[str], Field(description="Commander card name(s) (e.g. ['Muldrotha, the Gravetide'])")
+    ],
+    decklist: Annotated[list[str], Field(description="List of card names in the main deck")],
 ) -> str:
     """Find combos present in (or nearly present in) a Commander decklist.
 
@@ -172,8 +187,10 @@ async def find_decklist_combos(
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
 async def estimate_bracket(
-    commanders: list[str],
-    decklist: list[str],
+    commanders: Annotated[
+        list[str], Field(description="Commander card name(s) (e.g. ['Muldrotha, the Gravetide'])")
+    ],
+    decklist: Annotated[list[str], Field(description="List of card names in the main deck")],
 ) -> str:
     """Estimate the Commander bracket (power level) for a decklist.
 

@@ -6,12 +6,13 @@ Uses the MTGJSON AtomicCards bulk file for in-memory card data.
 from __future__ import annotations
 
 import json
-from typing import Literal
+from typing import Annotated, Literal
 
 import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from pydantic import Field
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import ATTRIBUTION_MTGJSON, TAGS_LOOKUP, TAGS_SEARCH, TOOL_ANNOTATIONS
@@ -53,7 +54,11 @@ def _get_client() -> MTGJSONClient:
 
 
 @mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
-async def card_lookup(name: str) -> str:
+async def card_lookup(
+    name: Annotated[
+        str, Field(description="Card name for exact lookup, case-insensitive (e.g. 'Sol Ring')")
+    ],
+) -> str:
     """Look up a Magic card by exact name using MTGJSON bulk data.
 
     Returns full card details including mana cost, type, oracle text,
@@ -90,9 +95,14 @@ async def card_lookup(name: str) -> str:
 
 @mtgjson_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
 async def card_search(
-    query: str,
-    search_field: Literal["name", "type", "text"] = "name",
-    limit: int = 20,
+    query: Annotated[str, Field(description="Substring to search for, case-insensitive")],
+    search_field: Annotated[
+        Literal["name", "type", "text"],
+        Field(
+            description="Field to search in — 'name' (card name), 'type' (type line), or 'text' (oracle text)"
+        ),
+    ] = "name",
+    limit: Annotated[int, Field(description="Maximum number of results to return")] = 20,
 ) -> str:
     """Search for Magic cards in MTGJSON bulk data.
 

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from typing import Annotated
 
 import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from pydantic import Field
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import (
@@ -54,8 +56,13 @@ def _get_client() -> ScryfallClient:
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
 async def search_cards(
-    query: str,
-    page: int = 1,
+    query: Annotated[
+        str,
+        Field(
+            description="Scryfall search query (e.g. 'f:commander id:sultai t:creature cmc<=3'). See scryfall.com/docs/syntax"
+        ),
+    ],
+    page: Annotated[int, Field(description="Page number for paginated results, 1-indexed")] = 1,
 ) -> str:
     """Search for Magic cards using Scryfall syntax.
 
@@ -81,8 +88,16 @@ async def search_cards(
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
 async def card_details(
-    name: str,
-    fuzzy: bool = False,
+    name: Annotated[
+        str,
+        Field(description="Card name — exact match by default (e.g. 'Muldrotha, the Gravetide')"),
+    ],
+    fuzzy: Annotated[
+        bool,
+        Field(
+            description="Use fuzzy matching for approximate names (e.g. 'muldrotha' finds 'Muldrotha, the Gravetide')"
+        ),
+    ] = False,
 ) -> str:
     """Get full details for a Magic card by exact or fuzzy name."""
     client = _get_client()
@@ -115,7 +130,7 @@ async def card_details(
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_PRICING)
 async def card_price(
-    name: str,
+    name: Annotated[str, Field(description="Card name for price lookup (exact match)")],
 ) -> str:
     """Get current prices for a Magic card. Prices update once per day."""
     client = _get_client()
@@ -140,7 +155,7 @@ async def card_price(
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
 async def card_rulings(
-    name: str,
+    name: Annotated[str, Field(description="Card name to get official rulings for (exact match)")],
 ) -> str:
     """Get official rulings and clarifications for a Magic card."""
     client = _get_client()

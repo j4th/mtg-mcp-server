@@ -1,0 +1,36 @@
+name: mtg-mcp-server
+description: >
+  Magic: The Gathering toolkit for AI agents — 23 tools spanning Scryfall card
+  search, Commander Spellbook combo detection, 17Lands draft analytics, EDHREC
+  commander metagame data, and MTGJSON bulk card lookups. Includes 8 workflow
+  tools for deck analysis, budget upgrades, draft pick evaluation, and card
+  comparison across all sources. All APIs are public — no credentials required.
+configSchema:
+  type: object
+  properties:
+    MTG_MCP_ENABLE_17LANDS:
+      type: boolean
+      description: "Enable 17Lands draft analytics backend for card ratings and archetype stats"
+      default: true
+    MTG_MCP_ENABLE_EDHREC:
+      type: boolean
+      description: "Enable EDHREC commander metagame backend (uses undocumented endpoints)"
+      default: true
+    MTG_MCP_ENABLE_MTGJSON:
+      type: boolean
+      description: "Enable MTGJSON bulk card data for rate-limit-free lookups (~100MB download on first use)"
+      default: true
+    MTG_MCP_LOG_LEVEL:
+      type: string
+      description: "Server logging level"
+      default: "INFO"
+      enum: ["DEBUG", "INFO", "WARNING", "ERROR"]
+    MTG_MCP_SCRYFALL_RATE_LIMIT_MS:
+      type: number
+      description: "Minimum delay between Scryfall API calls in milliseconds"
+      default: 100
+    MTG_MCP_MTGJSON_REFRESH_HOURS:
+      type: number
+      description: "Hours between MTGJSON bulk data refreshes"
+      default: 24
+  required: []

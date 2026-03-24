@@ -6,11 +6,13 @@ Uses undocumented EDHREC endpoints. Behind the MTG_MCP_ENABLE_EDHREC feature fla
 from __future__ import annotations
 
 import json
+from typing import Annotated
 
 import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from pydantic import Field
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import ATTRIBUTION_EDHREC, TAGS_BETA, TOOL_ANNOTATIONS
@@ -46,8 +48,15 @@ def _get_client() -> EDHRECClient:
 
 @edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BETA)
 async def commander_staples(
-    commander_name: str,
-    category: str | None = None,
+    commander_name: Annotated[
+        str, Field(description="Full commander name (e.g. 'Muldrotha, the Gravetide')")
+    ],
+    category: Annotated[
+        str | None,
+        Field(
+            description="Filter by card type: 'creatures', 'enchantments', 'artifacts', 'instants', 'sorceries', 'lands', 'planeswalkers'"
+        ),
+    ] = None,
 ) -> str:
     """Get the most-played cards for a commander with synergy scores and inclusion rates.
 
@@ -89,8 +98,11 @@ async def commander_staples(
 
 @edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BETA)
 async def card_synergy(
-    card_name: str,
-    commander_name: str,
+    card_name: Annotated[str, Field(description="Card to check synergy for (e.g. 'Spore Frog')")],
+    commander_name: Annotated[
+        str,
+        Field(description="Commander to check synergy against (e.g. 'Muldrotha, the Gravetide')"),
+    ],
 ) -> str:
     """Get synergy data for a specific card with a specific commander.
 

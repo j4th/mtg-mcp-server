@@ -14,7 +14,7 @@ from mtg_mcp_server.workflows.server import workflow_mcp
 
 
 @pytest.mark.parametrize(
-    "server,server_name",
+    ("server", "server_name"),
     [
         (scryfall_mcp, "scryfall"),
         (spellbook_mcp, "spellbook"),

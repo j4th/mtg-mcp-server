@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#e8d374"/>
+    </linearGradient>
+  </defs>
+  <!-- Card shape background -->
+  <rect x="56" y="32" width="400" height="448" rx="24" ry="24" fill="url(#bg)" stroke="url(#ring)" stroke-width="6"/>
+  <!-- Inner card border -->
+  <rect x="80" y="56" width="352" height="400" rx="16" ry="16" fill="none" stroke="#c9a227" stroke-width="2" opacity="0.5"/>
+  <!-- Pentagon (mana symbol shape) -->
+  <polygon points="256,120 340,178 308,272 204,272 172,178" fill="none" stroke="url(#ring)" stroke-width="4" stroke-linejoin="round"/>
+  <!-- MTG text -->
+  <text x="256" y="360" text-anchor="middle" font-family="Georgia,serif" font-size="72" font-weight="bold" fill="url(#ring)" letter-spacing="8">MTG</text>
+  <!-- MCP subtitle -->
+  <text x="256" y="410" text-anchor="middle" font-family="Georgia,serif" font-size="32" fill="#c9a227" opacity="0.7" letter-spacing="12">MCP</text>
+</svg>
