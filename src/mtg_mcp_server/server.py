@@ -32,7 +32,13 @@ mcp = FastMCP(
     "MTG",
     mask_error_details=True,
     website_url="https://github.com/j4th/mtg-mcp-server",
-    icons=[Icon(src="https://raw.githubusercontent.com/j4th/mtg-mcp-server/main/icon.svg")],
+    icons=[
+        Icon(
+            src="https://raw.githubusercontent.com/j4th/mtg-mcp-server/main/icon.svg",
+            mimeType="image/svg+xml",
+            sizes=["512x512"],
+        )
+    ],
     instructions=(
         "Magic: The Gathering data and analytics server.\n\n"
         "Tool categories:\n"
