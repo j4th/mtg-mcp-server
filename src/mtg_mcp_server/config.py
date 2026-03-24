@@ -15,6 +15,8 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings
 
+__all__ = ["Settings"]
+
 
 class Settings(BaseSettings):
     """MTG MCP server settings loaded from environment variables.
