@@ -41,6 +41,10 @@ run = "uv run pytest tests/services tests/providers -v"
 description = "Run integration tests only"
 run = "uv run pytest tests/integration -v"
 
+[tasks."test:quick"]
+description = "Run only tests affected by recent changes"
+run = "uv run pytest --testmon"
+
 [tasks."test:watch"]
 description = "Re-run tests on file changes"
 run = "uv run pytest --cov -x --ff -q"
