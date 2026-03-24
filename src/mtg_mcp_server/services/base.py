@@ -21,7 +21,7 @@ from tenacity import (
 
 from mtg_mcp_server import __version__
 
-__all__ = ["BaseClient", "ServiceError", "DEFAULT_USER_AGENT"]
+__all__ = ["DEFAULT_USER_AGENT", "BaseClient", "ServiceError"]
 
 DEFAULT_USER_AGENT = f"mtg-mcp-server/{__version__}"
 
