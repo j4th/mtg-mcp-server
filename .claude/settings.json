@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path' | { read -r f; [ -n \"$f\" ] && ruff format --quiet \"$f\"; } 2>/dev/null || true",
+            "command": "jq -r '.tool_input.file_path' | { read -r f; [ -n \"$f\" ] && echo \"$f\" | grep -qE '\\.py$' && ruff format --quiet \"$f\"; } 2>/dev/null || true",
             "statusMessage": "Formatting..."
           }
         ]

@@ -10,7 +10,7 @@
             "registryType": "pypi",
             "identifier": "mtg-mcp-server",
             "version": "1.0.0",
-            "transport": {"type": "stdio"},
+            "transport": {"type": "stdio"}
         }
-    ],
+    ]
 }
