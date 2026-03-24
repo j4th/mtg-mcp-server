@@ -54,7 +54,7 @@ async def spellbook_lifespan(server: FastMCP):
     _client = None
 
 
-spellbook_mcp = FastMCP("Spellbook", lifespan=spellbook_lifespan)
+spellbook_mcp = FastMCP("Spellbook", lifespan=spellbook_lifespan, mask_error_details=True)
 
 log = structlog.get_logger(provider="spellbook")
 

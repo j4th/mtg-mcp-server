@@ -40,7 +40,7 @@ async def mtgjson_lifespan(server: FastMCP):
     _client = None
 
 
-mtgjson_mcp = FastMCP("MTGJSON", lifespan=mtgjson_lifespan)
+mtgjson_mcp = FastMCP("MTGJSON", lifespan=mtgjson_lifespan, mask_error_details=True)
 
 log = structlog.get_logger(provider="mtgjson")
 

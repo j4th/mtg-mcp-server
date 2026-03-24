@@ -37,6 +37,10 @@ class TestServer:
         ping_tool = next(t for t in tools if t.name == "ping")
         assert ping_tool.annotations.readOnlyHint is True
         assert ping_tool.annotations.idempotentHint is True
+        assert ping_tool.annotations.openWorldHint is True
+
+    def test_mask_error_details_enabled(self):
+        assert mcp._mask_error_details is True
 
 
 class TestConfig:

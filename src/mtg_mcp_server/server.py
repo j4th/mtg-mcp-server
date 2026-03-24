@@ -14,10 +14,11 @@ from __future__ import annotations
 import sys
 
 from fastmcp import FastMCP
-from mcp.types import ToolAnnotations
+from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddleware
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.logging import configure_logging
+from mtg_mcp_server.providers import TOOL_ANNOTATIONS
 from mtg_mcp_server.providers.edhrec import edhrec_mcp
 from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
 from mtg_mcp_server.providers.scryfall import scryfall_mcp
@@ -28,6 +29,7 @@ from mtg_mcp_server.workflows.server import workflow_mcp
 
 mcp = FastMCP(
     "MTG",
+    mask_error_details=True,
     instructions=(
         "Magic: The Gathering data and analytics server.\n\n"
         "Tool categories:\n"
@@ -74,8 +76,12 @@ if _settings.enable_mtgjson:
 # Workflow tools mounted without namespace for clean names.
 mcp.mount(workflow_mcp)
 
+# Limit response sizes to 500KB to prevent edge-case payloads from overwhelming
+# LLM context windows. Most tool outputs are well under 10KB.
+mcp.add_middleware(ResponseLimitingMiddleware(max_size=500_000))
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def ping() -> str:
     """Health check — returns 'pong'."""
     return "pong"

@@ -84,7 +84,7 @@ async def workflow_lifespan(server: FastMCP):
     _mtgjson = None
 
 
-workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)
+workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan, mask_error_details=True)
 
 
 def _require_scryfall() -> ScryfallClient:
