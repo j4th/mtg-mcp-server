@@ -48,6 +48,7 @@ dependencies = [
 Homepage = "https://github.com/j4th/mtg-mcp-server"
 Repository = "https://github.com/j4th/mtg-mcp-server"
 Issues = "https://github.com/j4th/mtg-mcp-server/issues"
+Changelog = "https://github.com/j4th/mtg-mcp-server/blob/main/CHANGELOG.md"
 
 [project.scripts]
 mtg-mcp-server = "mtg_mcp_server.server:main"
