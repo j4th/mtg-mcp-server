@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from typing import Annotated
 
 import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from pydantic import Field
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import ATTRIBUTION_17LANDS, TAGS_DRAFT, TOOL_ANNOTATIONS
@@ -43,8 +45,12 @@ def _get_client() -> SeventeenLandsClient:
 
 @draft_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
 async def card_ratings(
-    set_code: str,
-    event_type: str = "PremierDraft",
+    set_code: Annotated[
+        str, Field(description="Three-letter set code (e.g. 'LCI', 'MKM', 'OTJ', 'BLB')")
+    ],
+    event_type: Annotated[
+        str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
+    ] = "PremierDraft",
 ) -> str:
     """Get win rate and draft performance data for cards in a set.
 
@@ -89,10 +95,18 @@ async def card_ratings(
 
 @draft_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
 async def archetype_stats(
-    set_code: str,
-    start_date: str,
-    end_date: str,
-    event_type: str = "PremierDraft",
+    set_code: Annotated[
+        str, Field(description="Three-letter set code (e.g. 'LCI', 'MKM', 'OTJ', 'BLB')")
+    ],
+    start_date: Annotated[
+        str, Field(description="Start date in YYYY-MM-DD format (required by 17Lands API)")
+    ],
+    end_date: Annotated[
+        str, Field(description="End date in YYYY-MM-DD format (required by 17Lands API)")
+    ],
+    event_type: Annotated[
+        str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
+    ] = "PremierDraft",
 ) -> str:
     """Get win rates by color pair/archetype for a draft set.
 

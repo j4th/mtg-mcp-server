@@ -1,6 +1,6 @@
 [project]
 name = "mtg-mcp-server"
-version = "1.0.1"
+version = "1.1.0"
 description = "Unified MCP server providing Magic: The Gathering data to AI assistants"
 readme = "README.md"
 license = "MIT"

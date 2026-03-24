@@ -13,11 +13,13 @@ so tool names stay clean (e.g. ``commander_overview``, not
 from __future__ import annotations
 
 from contextlib import AsyncExitStack
+from typing import Annotated
 
 import structlog
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from pydantic import Field
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import (
@@ -127,7 +129,11 @@ async def _progress(ctx: Context, step: int, total: int) -> None:
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
-async def commander_overview(commander_name: str) -> str:
+async def commander_overview(
+    commander_name: Annotated[
+        str, Field(description="Commander card name (e.g. 'Muldrotha, the Gravetide')")
+    ],
+) -> str:
     """Comprehensive commander profile combining data from all available sources.
 
     Returns card details, top combos, EDHREC staples, and synergy scores.
@@ -151,7 +157,12 @@ async def commander_overview(commander_name: str) -> str:
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
-async def evaluate_upgrade(card_name: str, commander_name: str) -> str:
+async def evaluate_upgrade(
+    card_name: Annotated[
+        str, Field(description="Card to evaluate for the deck (e.g. 'Spore Frog')")
+    ],
+    commander_name: Annotated[str, Field(description="Commander the deck is built around")],
+) -> str:
     """Assess whether a card is worth adding to a specific commander deck.
 
     Returns card details, price, synergy score, and combos enabled for the caller to assess.
@@ -177,9 +188,14 @@ async def evaluate_upgrade(card_name: str, commander_name: str) -> str:
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
 async def draft_pack_pick(
-    pack: list[str],
-    set_code: str,
-    current_picks: list[str] | None = None,
+    pack: Annotated[list[str], Field(description="List of card names currently in the draft pack")],
+    set_code: Annotated[
+        str, Field(description="Three-letter set code for the draft format (e.g. 'LCI', 'MKM')")
+    ],
+    current_picks: Annotated[
+        list[str] | None,
+        Field(description="Cards already drafted — enables color fit analysis when provided"),
+    ] = None,
 ) -> str:
     """Rank cards in a draft pack using 17Lands win rate data.
 
@@ -201,9 +217,9 @@ async def draft_pack_pick(
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
 async def suggest_cuts(
-    decklist: list[str],
-    commander_name: str,
-    num_cuts: int = 5,
+    decklist: Annotated[list[str], Field(description="List of card names in the deck")],
+    commander_name: Annotated[str, Field(description="Commander the deck is built around")],
+    num_cuts: Annotated[int, Field(description="Number of cut candidates to suggest")] = 5,
 ) -> str:
     """Identify the weakest cards to cut from a commander decklist.
 
@@ -226,8 +242,8 @@ async def suggest_cuts(
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
 async def card_comparison(
-    cards: list[str],
-    commander_name: str,
+    cards: Annotated[list[str], Field(description="2-5 card names to compare side-by-side")],
+    commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     ctx: Context,
 ) -> str:
     """Compare 2-5 cards side-by-side for a specific commander deck.
@@ -259,9 +275,13 @@ async def card_comparison(
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER | TAGS_PRICING)
 async def budget_upgrade(
-    commander_name: str,
-    budget: float,
-    num_suggestions: int = 10,
+    commander_name: Annotated[str, Field(description="Commander the deck is built around")],
+    budget: Annotated[
+        float, Field(description="Maximum price per card in USD (e.g. 5.0 for cards under $5)")
+    ],
+    num_suggestions: Annotated[
+        int, Field(description="Number of upgrade suggestions to return")
+    ] = 10,
     *,
     ctx: Context,
 ) -> str:
@@ -292,8 +312,10 @@ async def budget_upgrade(
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
 async def deck_analysis(
-    decklist: list[str],
-    commander_name: str,
+    decklist: Annotated[
+        list[str], Field(description="List of card names in the deck (99 cards for Commander)")
+    ],
+    commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     ctx: Context,
 ) -> str:
     """Full decklist health check — mana curve, colors, combos, bracket, budget, synergy.
@@ -323,8 +345,12 @@ async def deck_analysis(
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
 async def set_overview(
-    set_code: str,
-    event_type: str = "PremierDraft",
+    set_code: Annotated[
+        str, Field(description="Three-letter set code for the draft format (e.g. 'LCI', 'MKM')")
+    ],
+    event_type: Annotated[
+        str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
+    ] = "PremierDraft",
     *,
     ctx: Context,
 ) -> str:
