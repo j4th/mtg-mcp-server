@@ -51,6 +51,19 @@ jobs:
 
       - uses: jdx/mise-action@v4
 
+      - name: Verify server.json version matches pyproject.toml
+        run: |
+          PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          SERVER_VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['version'])")
+          PACKAGE_VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['version'])")
+          echo "pyproject.toml: $PKG_VERSION"
+          echo "server.json version: $SERVER_VERSION"
+          echo "server.json packages[0].version: $PACKAGE_VERSION"
+          if [ "$PKG_VERSION" != "$SERVER_VERSION" ] || [ "$PKG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "::error::Version mismatch! Update server.json to match pyproject.toml ($PKG_VERSION)"
+            exit 1
+          fi
+
       - name: Build package
         run: uv build
 

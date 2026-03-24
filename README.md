@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.j4th/mtg-mcp-server -->
 # mtg-mcp-server
 
 [![CI](https://github.com/j4th/mtg-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/j4th/mtg-mcp-server/actions/workflows/ci.yml)
@@ -6,6 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![codecov](https://codecov.io/gh/j4th/mtg-mcp-server/graph/badge.svg)](https://codecov.io/gh/j4th/mtg-mcp-server)
 [![CodeQL](https://github.com/j4th/mtg-mcp-server/workflows/CodeQL/badge.svg)](https://github.com/j4th/mtg-mcp-server/actions/workflows/codeql.yml)
+[![Smithery](https://smithery.ai/badge/@j4th/mtg-mcp-server)](https://smithery.ai/server/@j4th/mtg-mcp-server)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-blue?logo=dependabot)](https://github.com/j4th/mtg-mcp-server/security/dependabot)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
