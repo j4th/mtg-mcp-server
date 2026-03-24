@@ -55,6 +55,7 @@ class TestLazyLoading:
             assert client._loaded_at == 0.0
 
     async def test_first_access_triggers_download(self):
+        """First card lookup triggers the bulk data download."""
         fixture_bytes = _load_fixture_bytes()
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
@@ -76,6 +77,7 @@ class TestDownloadAndParse:
     """Test the download, decompress, and parse pipeline."""
 
     async def test_downloads_and_parses(self):
+        """Successful download decompresses gzip and parses all card entries."""
         fixture_bytes = _load_fixture_bytes()
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
@@ -93,6 +95,7 @@ class TestDownloadAndParse:
                 assert len(client._cards) == 9
 
     async def test_download_error_raises(self):
+        """HTTP 500 during download raises MTGJSONDownloadError."""
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(b"", status_code=500)
@@ -107,6 +110,7 @@ class TestDownloadAndParse:
                     await client.ensure_loaded()
 
     async def test_network_error_raises(self):
+        """Network connection failure during download raises MTGJSONDownloadError."""
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
@@ -120,6 +124,7 @@ class TestDownloadAndParse:
                     await client.ensure_loaded()
 
     async def test_corrupt_gzip_raises(self):
+        """Corrupted gzip data raises MTGJSONError during decompression."""
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
             mock_response = _mock_httpx_response(b"not-gzip-data")
@@ -138,6 +143,7 @@ class TestRefreshLogic:
     """Test that stale data triggers a re-download."""
 
     async def test_stale_data_triggers_refresh(self):
+        """Data older than refresh_hours triggers a re-download."""
         fixture_bytes = _load_fixture_bytes()
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=1)
         async with client:
@@ -161,6 +167,7 @@ class TestRefreshLogic:
                 assert mock_http.get.call_count == 2
 
     async def test_fresh_data_does_not_re_download(self):
+        """Data within refresh_hours is not re-downloaded."""
         fixture_bytes = _load_fixture_bytes()
         client = MTGJSONClient(data_url=_DATA_URL, refresh_hours=24)
         async with client:
@@ -276,6 +283,7 @@ class TestGetCard:
     """Test exact card lookup."""
 
     async def test_exact_lookup(self, loaded_client: MTGJSONClient):
+        """Exact name lookup returns a fully populated MTGJSONCard model."""
         result = await loaded_client.get_card("Sol Ring")
         assert result is not None
         assert result.name == "Sol Ring"
@@ -285,20 +293,24 @@ class TestGetCard:
         assert result.mana_value == 1.0
 
     async def test_case_insensitive(self, loaded_client: MTGJSONClient):
+        """Lookup is case-insensitive."""
         result = await loaded_client.get_card("sol ring")
         assert result is not None
         assert result.name == "Sol Ring"
 
     async def test_mixed_case(self, loaded_client: MTGJSONClient):
+        """All-uppercase input resolves to the correct card."""
         result = await loaded_client.get_card("SOL RING")
         assert result is not None
         assert result.name == "Sol Ring"
 
     async def test_not_found_returns_none(self, loaded_client: MTGJSONClient):
+        """Nonexistent card name returns None."""
         result = await loaded_client.get_card("Nonexistent Card")
         assert result is None
 
     async def test_legendary_creature(self, loaded_client: MTGJSONClient):
+        """Legendary creature lookup includes power, toughness, supertypes, and subtypes."""
         result = await loaded_client.get_card("Muldrotha, the Gravetide")
         assert result is not None
         assert result.name == "Muldrotha, the Gravetide"
@@ -309,6 +321,7 @@ class TestGetCard:
         assert result.mana_value == 6.0
 
     async def test_double_faced_card_uses_front_face(self, loaded_client: MTGJSONClient):
+        """Double-faced card lookup by full name returns front face data."""
         result = await loaded_client.get_card("Delver of Secrets // Insectile Aberration")
         assert result is not None
         assert result.name == "Delver of Secrets"
@@ -316,6 +329,7 @@ class TestGetCard:
         assert result.toughness == "1"
 
     async def test_basic_land(self, loaded_client: MTGJSONClient):
+        """Basic land has no colors and no power/toughness."""
         result = await loaded_client.get_card("Forest")
         assert result is not None
         assert result.name == "Forest"
@@ -325,6 +339,7 @@ class TestGetCard:
         assert result.toughness is None
 
     async def test_special_characters(self, loaded_client: MTGJSONClient):
+        """Card with non-ASCII characters in the name is found correctly."""
         result = await loaded_client.get_card("Jötun Grunt")
         assert result is not None
         assert result.name == "Jötun Grunt"
@@ -348,6 +363,7 @@ class TestDFCDedup:
         assert names.count("Delver of Secrets") == 1
 
     async def test_text_search_no_duplicates(self, loaded_client: MTGJSONClient):
+        """Text search does not duplicate DFC entries."""
         results = await loaded_client.search_by_text("transform")
         names = [r.name for r in results]
         # "Delver of Secrets" has transform text — should appear exactly once
@@ -376,16 +392,19 @@ class TestSearchCards:
     """Test name substring search."""
 
     async def test_search_by_name(self, loaded_client: MTGJSONClient):
+        """Substring match on card name returns matching cards."""
         results = await loaded_client.search_cards("ring")
         assert len(results) == 1
         assert results[0].name == "Sol Ring"
 
     async def test_search_case_insensitive(self, loaded_client: MTGJSONClient):
+        """Name search is case-insensitive."""
         results = await loaded_client.search_cards("BOLT")
         assert len(results) == 1
         assert results[0].name == "Lightning Bolt"
 
     async def test_search_multiple_results(self, loaded_client: MTGJSONClient):
+        """Search query matching multiple cards returns all matches."""
         # "frog" appears in Spore Frog
         results = await loaded_client.search_cards("frog")
         assert len(results) >= 1
@@ -393,15 +412,18 @@ class TestSearchCards:
         assert "Spore Frog" in names
 
     async def test_search_no_results(self, loaded_client: MTGJSONClient):
+        """Search with no matches returns an empty list."""
         results = await loaded_client.search_cards("xyzzynonexistent")
         assert results == []
 
     async def test_search_limit(self, loaded_client: MTGJSONClient):
+        """Limit parameter caps the number of returned results."""
         # Search for something that matches many cards
         results = await loaded_client.search_cards("", limit=3)
         assert len(results) == 3
 
     async def test_search_partial_match(self, loaded_client: MTGJSONClient):
+        """Partial name substring matches cards containing that text."""
         results = await loaded_client.search_cards("counter")
         assert len(results) >= 1
         names = [r.name for r in results]
@@ -412,6 +434,7 @@ class TestSearchByType:
     """Test type line substring search."""
 
     async def test_search_creature(self, loaded_client: MTGJSONClient):
+        """Type search for 'Creature' includes creatures and excludes non-creatures."""
         results = await loaded_client.search_by_type("Creature")
         names = [r.name for r in results]
         assert "Spore Frog" in names
@@ -421,18 +444,21 @@ class TestSearchByType:
         assert "Lightning Bolt" not in names
 
     async def test_search_instant(self, loaded_client: MTGJSONClient):
+        """Type search for 'Instant' returns instants."""
         results = await loaded_client.search_by_type("Instant")
         names = [r.name for r in results]
         assert "Lightning Bolt" in names
         assert "Counterspell" in names
 
     async def test_search_legendary(self, loaded_client: MTGJSONClient):
+        """Type search for 'Legendary' returns only legendary cards."""
         results = await loaded_client.search_by_type("Legendary")
         names = [r.name for r in results]
         assert "Muldrotha, the Gravetide" in names
         assert len(results) == 1
 
     async def test_search_no_match(self, loaded_client: MTGJSONClient):
+        """Type search with no matching cards returns an empty list."""
         results = await loaded_client.search_by_type("Planeswalker")
         assert results == []
 
@@ -441,22 +467,26 @@ class TestSearchByText:
     """Test oracle text substring search."""
 
     async def test_search_by_text(self, loaded_client: MTGJSONClient):
+        """Oracle text search for 'damage' returns cards mentioning damage."""
         results = await loaded_client.search_by_text("damage")
         names = [r.name for r in results]
         assert "Lightning Bolt" in names
         assert "Spore Frog" in names  # "combat damage" in its text
 
     async def test_search_counter(self, loaded_client: MTGJSONClient):
+        """Oracle text search for 'Counter target spell' finds counterspells."""
         results = await loaded_client.search_by_text("Counter target spell")
         names = [r.name for r in results]
         assert "Counterspell" in names
 
     async def test_search_graveyard(self, loaded_client: MTGJSONClient):
+        """Oracle text search for 'graveyard' finds cards referencing the graveyard."""
         results = await loaded_client.search_by_text("graveyard")
         assert len(results) >= 1
         names = [r.name for r in results]
         assert "Muldrotha, the Gravetide" in names
 
     async def test_search_no_match(self, loaded_client: MTGJSONClient):
+        """Text search with no matches returns an empty list."""
         results = await loaded_client.search_by_text("xyzzynonexistent")
         assert results == []

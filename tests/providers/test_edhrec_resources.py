@@ -17,18 +17,23 @@ BASE_URL = "https://json.edhrec.com"
 
 
 def _load_fixture(name: str) -> dict:
+    """Load an EDHREC JSON fixture file by name."""
     return json.loads((FIXTURES / name).read_text())
 
 
 @pytest.fixture
 async def client():
+    """Provide an in-memory MCP client connected to the EDHREC provider."""
     async with Client(transport=edhrec_mcp) as c:
         yield c
 
 
 class TestCommanderStaplesResource:
+    """EDHREC mtg://commander/{name}/staples resource behavior."""
+
     @respx.mock
     async def test_returns_staples_json(self, client: Client):
+        """Staples resource returns JSON with commander name, cardlists, and deck count."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -42,6 +47,7 @@ class TestCommanderStaplesResource:
 
     @respx.mock
     async def test_commander_not_found_returns_error_json(self, client: Client):
+        """Staples resource returns error JSON for nonexistent commanders."""
         respx.get(f"{BASE_URL}/pages/commanders/xyzzy-nonexistent.json").mock(
             return_value=httpx.Response(404, text="Not Found")
         )
@@ -53,6 +59,7 @@ class TestCommanderStaplesResource:
 
     @respx.mock
     async def test_server_error_returns_error_json(self, client: Client):
+        """Staples resource returns error JSON on EDHREC server failure."""
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )
@@ -64,7 +71,10 @@ class TestCommanderStaplesResource:
 
 
 class TestResourceTemplateRegistration:
+    """EDHREC resource template registration."""
+
     async def test_resource_templates_registered(self, client: Client):
+        """Commander staples resource template is registered on the provider."""
         templates = await client.list_resource_templates()
         template_uris = {t.uriTemplate for t in templates}
         assert "mtg://commander/{name}/staples" in template_uris

@@ -17,6 +17,7 @@ BASE_URL = "https://json.edhrec.com"
 
 
 def _load_fixture(name: str) -> dict:
+    """Load an EDHREC JSON fixture by filename."""
     return json.loads((FIXTURES / name).read_text())
 
 
@@ -24,33 +25,42 @@ class TestSlugify:
     """Test the name-to-slug conversion for EDHREC URLs."""
 
     def test_basic_name(self):
+        """Simple two-word name converts to lowercase hyphenated slug."""
         client = EDHRECClient.__new__(EDHRECClient)
         assert client._slugify("Sol Ring") == "sol-ring"
 
     def test_comma_removed(self):
+        """Commas are stripped from the slug."""
         client = EDHRECClient.__new__(EDHRECClient)
         assert client._slugify("Muldrotha, the Gravetide") == "muldrotha-the-gravetide"
 
     def test_apostrophe_removed(self):
+        """Apostrophes are stripped from the slug."""
         client = EDHRECClient.__new__(EDHRECClient)
         assert client._slugify("Kaya's Ghostform") == "kayas-ghostform"
 
     def test_multiple_special_chars(self):
+        """Multiple special characters are all stripped from the slug."""
         client = EDHRECClient.__new__(EDHRECClient)
         assert client._slugify("Urza's Saga") == "urzas-saga"
 
     def test_multiple_spaces(self):
+        """Consecutive spaces are collapsed into a single hyphen."""
         client = EDHRECClient.__new__(EDHRECClient)
         assert client._slugify("The  Gitrog   Monster") == "the-gitrog-monster"
 
     def test_period_removed(self):
+        """Periods are stripped from the slug."""
         client = EDHRECClient.__new__(EDHRECClient)
         assert client._slugify("Dr. Julius Jumblemorph") == "dr-julius-jumblemorph"
 
 
 class TestCommanderTopCards:
+    """Commander top cards and staples retrieval."""
+
     @respx.mock
     async def test_returns_commander_data(self):
+        """Commander page returns EDHRECCommanderData with cardlists and synergy scores."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -76,6 +86,7 @@ class TestCommanderTopCards:
 
     @respx.mock
     async def test_category_filter(self):
+        """Category filter narrows results to only the specified card type."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -91,6 +102,7 @@ class TestCommanderTopCards:
 
     @respx.mock
     async def test_category_filter_no_match(self):
+        """Category filter with no matching cardlist returns empty results."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -104,6 +116,7 @@ class TestCommanderTopCards:
 
     @respx.mock
     async def test_not_found_raises(self):
+        """404 response raises CommanderNotFoundError."""
         respx.get(f"{BASE_URL}/pages/commanders/xyzzy-nonexistent.json").mock(
             return_value=httpx.Response(404, text="Not Found")
         )
@@ -137,8 +150,11 @@ class TestCommanderTopCards:
 
 
 class TestCardSynergy:
+    """Card synergy score lookup for a specific commander."""
+
     @respx.mock
     async def test_finds_card_in_commander(self):
+        """Known card returns its EDHRECCard with synergy score and deck count."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -153,6 +169,7 @@ class TestCardSynergy:
 
     @respx.mock
     async def test_card_not_in_commander(self):
+        """Unknown card returns None instead of raising."""
         fixture = _load_fixture("commander_muldrotha.json")
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -166,8 +183,11 @@ class TestCardSynergy:
 
 
 class TestServerErrors:
+    """EDHREC API server error handling."""
+
     @respx.mock
     async def test_500_raises_edhrec_error(self):
+        """500 response from EDHREC raises EDHRECError."""
         respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )

@@ -73,8 +73,11 @@ def async_cached(cache: TTLCache, key: _KeyFunc = _method_key):
     """
 
     def decorator(func):
+        """Attach a TTL cache to *func* and expose it as ``func.cache``."""
+
         @functools.wraps(func)
         async def wrapper(*args: object, **kwargs: object) -> object:
+            """Return cached result if available; otherwise call *func* and cache it."""
             if _disabled:
                 return await func(*args, **kwargs)
             k = key(*args, **kwargs)

@@ -34,6 +34,7 @@ EDHREC_URL = "https://json.edhrec.com"
 
 
 def _load_json(path: Path) -> dict | list:
+    """Load a JSON fixture file from the given path."""
     return json.loads(path.read_text())
 
 
@@ -46,6 +47,7 @@ class TestAsyncCachedDecorator:
     """Tests for the ``async_cached`` decorator itself."""
 
     async def test_returns_cached_result_on_second_call(self):
+        """Repeated call with same args returns cached result without re-invoking."""
         cache: TTLCache = TTLCache(maxsize=10, ttl=300)
         call_count = 0
 
@@ -64,6 +66,7 @@ class TestAsyncCachedDecorator:
         assert call_count == 1  # only called once
 
     async def test_cache_miss_calls_wrapped_function(self):
+        """Different arguments produce cache misses and invoke the function each time."""
         cache: TTLCache = TTLCache(maxsize=10, ttl=300)
         call_count = 0
 
@@ -80,6 +83,7 @@ class TestAsyncCachedDecorator:
         assert call_count == 2  # different keys = different calls
 
     async def test_cache_attribute_is_accessible(self):
+        """Decorated function exposes the underlying TTLCache via .cache attribute."""
         cache: TTLCache = TTLCache(maxsize=10, ttl=300)
 
         @async_cached(cache)
@@ -89,6 +93,7 @@ class TestAsyncCachedDecorator:
         assert fetch.cache is cache
 
     async def test_cache_clear_forces_re_fetch(self):
+        """Clearing the cache forces the next call to re-invoke the wrapped function."""
         cache: TTLCache = TTLCache(maxsize=10, ttl=300)
         call_count = 0
 
@@ -107,6 +112,7 @@ class TestAsyncCachedDecorator:
         assert call_count == 2  # had to re-fetch after clear
 
     async def test_disabled_flag_bypasses_cache(self):
+        """Global disable flag bypasses the cache entirely, calling the function every time."""
         cache: TTLCache = TTLCache(maxsize=10, ttl=300)
         call_count = 0
 
@@ -132,6 +138,7 @@ class TestMethodKey:
     """Tests for ``_method_key`` — skips self, hashes the rest."""
 
     def test_skips_self_argument(self):
+        """Different self objects produce the same cache key."""
         sentinel = object()
         key1 = _method_key(sentinel, "card_name", fuzzy=True)
         key2 = _method_key(object(), "card_name", fuzzy=True)
@@ -140,12 +147,14 @@ class TestMethodKey:
         assert key1 == key2
 
     def test_different_args_produce_different_keys(self):
+        """Different positional arguments produce distinct cache keys."""
         s = object()
         key1 = _method_key(s, "card_a")
         key2 = _method_key(s, "card_b")
         assert key1 != key2
 
     def test_keyword_args_affect_key(self):
+        """Different keyword argument values produce distinct cache keys."""
         s = object()
         key1 = _method_key(s, "name", fuzzy=True)
         key2 = _method_key(s, "name", fuzzy=False)
@@ -170,24 +179,28 @@ class TestDecklistKey:
     """Tests for ``_decklist_key`` — converts list args to tuples."""
 
     def test_converts_lists_to_tuples(self):
+        """List arguments are converted to tuples so they are hashable."""
         s = object()
         # Should not raise TypeError (lists are unhashable)
         key = _decklist_key(s, ["Commander A"], ["Card 1", "Card 2"])
         assert key is not None
 
     def test_same_lists_produce_same_key(self):
+        """Identical list contents produce the same cache key."""
         s = object()
         key1 = _decklist_key(s, ["A"], ["B", "C"])
         key2 = _decklist_key(s, ["A"], ["B", "C"])
         assert key1 == key2
 
     def test_different_lists_produce_different_keys(self):
+        """Different list contents produce distinct cache keys."""
         s = object()
         key1 = _decklist_key(s, ["A"], ["B", "C"])
         key2 = _decklist_key(s, ["A"], ["B", "D"])
         assert key1 != key2
 
     def test_skips_self(self):
+        """Different self objects produce the same cache key."""
         key1 = _decklist_key(object(), ["A"], ["B"])
         key2 = _decklist_key(object(), ["A"], ["B"])
         assert key1 == key2
@@ -199,6 +212,7 @@ class TestDecklistKey:
         assert key is not None
 
     def test_kwargs_same_lists_produce_same_key(self):
+        """Identical keyword list arguments produce the same cache key."""
         s = object()
         key1 = _decklist_key(s, commanders=["A"], decklist=["B"])
         key2 = _decklist_key(s, commanders=["A"], decklist=["B"])
@@ -215,6 +229,7 @@ class TestScryfallCaching:
 
     @respx.mock
     async def test_get_card_by_name_cached(self):
+        """Second name lookup returns cached result without a second HTTP call."""
         fixture = _load_json(SCRYFALL_FIXTURES / "card_muldrotha.json")
         route = respx.get(
             f"{SCRYFALL_URL}/cards/named",
@@ -230,6 +245,7 @@ class TestScryfallCaching:
 
     @respx.mock
     async def test_get_card_by_name_fuzzy_separate_from_exact(self):
+        """Fuzzy and exact lookups for the same name are cached separately."""
         fixture = _load_json(SCRYFALL_FIXTURES / "card_muldrotha.json")
         exact_route = respx.get(
             f"{SCRYFALL_URL}/cards/named",
@@ -249,6 +265,7 @@ class TestScryfallCaching:
 
     @respx.mock
     async def test_search_cards_cached(self):
+        """Second search with same query returns cached result without HTTP call."""
         fixture = _load_json(SCRYFALL_FIXTURES / "search_sultai_commander.json")
         route = respx.get(
             f"{SCRYFALL_URL}/cards/search",
@@ -263,6 +280,7 @@ class TestScryfallCaching:
 
     @respx.mock
     async def test_get_card_by_id_cached(self):
+        """Second ID lookup returns cached result without a second HTTP call."""
         fixture = _load_json(SCRYFALL_FIXTURES / "card_sol_ring.json")
         card_id = fixture["id"]
         route = respx.get(f"{SCRYFALL_URL}/cards/{card_id}").mock(
@@ -277,6 +295,7 @@ class TestScryfallCaching:
 
     @respx.mock
     async def test_get_rulings_cached(self):
+        """Second rulings lookup returns cached result without a second HTTP call."""
         fixture = _load_json(SCRYFALL_FIXTURES / "rulings_muldrotha.json")
         card_id = "705b4d97-2f50-47f7-9053-d748f4337553"
         route = respx.get(f"{SCRYFALL_URL}/cards/{card_id}/rulings").mock(
@@ -291,6 +310,7 @@ class TestScryfallCaching:
 
     @respx.mock
     async def test_cache_clear_forces_refetch(self):
+        """Clearing the name cache forces the next lookup to make a new HTTP call."""
         fixture = _load_json(SCRYFALL_FIXTURES / "card_muldrotha.json")
         route = respx.get(
             f"{SCRYFALL_URL}/cards/named",
@@ -305,6 +325,7 @@ class TestScryfallCaching:
         assert route.call_count == 2
 
     def test_cache_attributes_accessible(self):
+        """Each cached method exposes the correct underlying TTLCache instance."""
         assert ScryfallClient.get_card_by_name.cache is ScryfallClient._card_name_cache
         assert ScryfallClient.get_card_by_id.cache is ScryfallClient._card_id_cache
         assert ScryfallClient.search_cards.cache is ScryfallClient._search_cache
@@ -316,6 +337,7 @@ class TestSpellbookCaching:
 
     @respx.mock
     async def test_find_combos_cached(self):
+        """Second combo search returns cached result without a second HTTP call."""
         fixture = _load_json(SPELLBOOK_FIXTURES / "combos_muldrotha.json")
         route = respx.get(
             f"{SPELLBOOK_URL}/variants/",
@@ -330,6 +352,7 @@ class TestSpellbookCaching:
 
     @respx.mock
     async def test_get_combo_cached(self):
+        """Second combo detail lookup returns cached result without a second HTTP call."""
         fixture = _load_json(SPELLBOOK_FIXTURES / "combo_detail.json")
         combo_id = "1414-2730-5131-5256"
         route = respx.get(f"{SPELLBOOK_URL}/variants/{combo_id}/").mock(
@@ -344,6 +367,7 @@ class TestSpellbookCaching:
 
     @respx.mock
     async def test_find_decklist_combos_cached(self):
+        """Second decklist combo search returns cached result without a second HTTP call."""
         fixture = _load_json(SPELLBOOK_FIXTURES / "find_my_combos_response.json")
         route = respx.post(f"{SPELLBOOK_URL}/find-my-combos").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -363,6 +387,7 @@ class TestSpellbookCaching:
 
     @respx.mock
     async def test_estimate_bracket_cached(self):
+        """Second bracket estimation returns cached result without a second HTTP call."""
         fixture = _load_json(SPELLBOOK_FIXTURES / "estimate_bracket_response.json")
         route = respx.post(f"{SPELLBOOK_URL}/estimate-bracket").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -382,6 +407,7 @@ class TestSpellbookCaching:
 
     @respx.mock
     async def test_different_decklists_are_separate_cache_entries(self):
+        """Different decklist contents produce separate cache entries."""
         fixture = _load_json(SPELLBOOK_FIXTURES / "find_my_combos_response.json")
         route = respx.post(f"{SPELLBOOK_URL}/find-my-combos").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -400,6 +426,7 @@ class TestSpellbookCaching:
         assert route.call_count == 2  # different decklist = different cache key
 
     def test_cache_attributes_accessible(self):
+        """Each cached method exposes the correct underlying TTLCache instance."""
         assert SpellbookClient.find_combos.cache is SpellbookClient._combos_cache
         assert SpellbookClient.get_combo.cache is SpellbookClient._combo_cache
         assert SpellbookClient.find_decklist_combos.cache is SpellbookClient._decklist_combos_cache
@@ -411,6 +438,7 @@ class TestSeventeenLandsCaching:
 
     @respx.mock
     async def test_card_ratings_cached(self):
+        """Second card ratings call returns cached result without a second HTTP call."""
         fixture = _load_json(SEVENTEEN_LANDS_FIXTURES / "card_ratings_lci.json")
         route = respx.get(
             f"{SEVENTEEN_LANDS_URL}/card_ratings/data",
@@ -425,6 +453,7 @@ class TestSeventeenLandsCaching:
 
     @respx.mock
     async def test_card_ratings_different_sets_are_separate(self):
+        """Different set codes produce separate cache entries."""
         fixture = _load_json(SEVENTEEN_LANDS_FIXTURES / "card_ratings_lci.json")
         route_lci = respx.get(
             f"{SEVENTEEN_LANDS_URL}/card_ratings/data",
@@ -444,6 +473,7 @@ class TestSeventeenLandsCaching:
 
     @respx.mock
     async def test_color_ratings_cached(self):
+        """Second color ratings call returns cached result without a second HTTP call."""
         fixture = _load_json(SEVENTEEN_LANDS_FIXTURES / "color_ratings_lci.json")
         route = respx.get(
             f"{SEVENTEEN_LANDS_URL}/color_ratings/data",
@@ -462,6 +492,7 @@ class TestSeventeenLandsCaching:
         assert route.call_count == 1
 
     def test_cache_attributes_accessible(self):
+        """Each cached method exposes the correct underlying TTLCache instance."""
         assert SeventeenLandsClient.card_ratings.cache is SeventeenLandsClient._card_ratings_cache
         assert SeventeenLandsClient.color_ratings.cache is SeventeenLandsClient._color_ratings_cache
 
@@ -471,6 +502,7 @@ class TestEDHRECCaching:
 
     @respx.mock
     async def test_commander_top_cards_cached(self):
+        """Second commander top cards call returns cached result without a second HTTP call."""
         fixture = _load_json(EDHREC_FIXTURES / "commander_muldrotha.json")
         route = respx.get(f"{EDHREC_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -484,6 +516,7 @@ class TestEDHRECCaching:
 
     @respx.mock
     async def test_card_synergy_cached(self):
+        """Second synergy lookup returns cached result without a second HTTP call."""
         fixture = _load_json(EDHREC_FIXTURES / "commander_muldrotha.json")
         route = respx.get(f"{EDHREC_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
             return_value=httpx.Response(200, json=fixture)
@@ -528,5 +561,6 @@ class TestEDHRECCaching:
         assert route.call_count == 1
 
     def test_cache_attributes_accessible(self):
+        """Each cached method exposes the correct underlying TTLCache instance."""
         assert EDHRECClient.commander_top_cards.cache is EDHRECClient._commander_cache
         assert EDHRECClient.card_synergy.cache is EDHRECClient._synergy_cache

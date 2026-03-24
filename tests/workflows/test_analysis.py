@@ -60,6 +60,7 @@ def _make_mtgjson_card(
 
 
 def _make_bracket() -> BracketEstimate:
+    """Build a bracket estimate with tag E and one two-card combo."""
     return BracketEstimate(
         bracketTag="E",
         bannedCards=[],
@@ -73,6 +74,7 @@ def _make_decklist_combos(
     included: list[Combo] | None = None,
     almost_included: list[Combo] | None = None,
 ) -> DecklistCombos:
+    """Build a DecklistCombos with optional included and almost-included combos."""
     return DecklistCombos(
         identity="BGU",
         included=included or [],
@@ -93,6 +95,7 @@ SAMPLE_COMBO = Combo(
 def _make_edhrec_data(
     cardviews: list[EDHRECCard] | None = None,
 ) -> EDHRECCommanderData:
+    """Build EDHREC commander data with default creature synergy cards."""
     return EDHRECCommanderData(
         commander_name=COMMANDER,
         total_decks=19000,
@@ -162,6 +165,7 @@ def _make_spellbook(
     bracket: BracketEstimate | None = None,
     combos: DecklistCombos | None = None,
 ) -> AsyncMock:
+    """Build a mock SpellbookClient with bracket estimate and decklist combos."""
     mock = AsyncMock()
     mock.estimate_bracket = AsyncMock(return_value=bracket or _make_bracket())
     mock.find_decklist_combos = AsyncMock(
@@ -171,6 +175,7 @@ def _make_spellbook(
 
 
 def _make_edhrec(data: EDHRECCommanderData | None = None) -> AsyncMock:
+    """Build a mock EDHRECClient returning commander top cards data."""
     mock = AsyncMock()
     mock.commander_top_cards = AsyncMock(return_value=data or _make_edhrec_data())
     return mock
@@ -185,6 +190,7 @@ class TestDeckAnalysisHappyPath:
     """All backends available and returning data."""
 
     async def test_header_contains_commander_name(self) -> None:
+        """Output header includes Deck Analysis title and commander name."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -197,6 +203,7 @@ class TestDeckAnalysisHappyPath:
         assert COMMANDER in result
 
     async def test_mana_curve_section_present(self) -> None:
+        """Mana Curve section present in output."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -208,6 +215,7 @@ class TestDeckAnalysisHappyPath:
         assert "## Mana Curve" in result
 
     async def test_color_requirements_section_present(self) -> None:
+        """Color Requirements section present in output."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -219,6 +227,7 @@ class TestDeckAnalysisHappyPath:
         assert "## Color Requirements" in result
 
     async def test_combos_bracket_section_present(self) -> None:
+        """Combos and Bracket section present with bracket tag."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -231,6 +240,7 @@ class TestDeckAnalysisHappyPath:
         assert "Bracket:" in result
 
     async def test_budget_section_present(self) -> None:
+        """Budget section present with total price."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -243,6 +253,7 @@ class TestDeckAnalysisHappyPath:
         assert "Total:" in result
 
     async def test_lowest_synergy_section_present(self) -> None:
+        """Lowest Synergy Cards section present in output."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -254,6 +265,7 @@ class TestDeckAnalysisHappyPath:
         assert "## Lowest Synergy Cards" in result
 
     async def test_data_sources_footer_present(self) -> None:
+        """Data Sources footer lists all four backends with OK status."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -269,6 +281,7 @@ class TestDeckAnalysisHappyPath:
         assert "MTGJSON](https://mtgjson.com): OK" in result
 
     async def test_bracket_tag_displayed(self) -> None:
+        """Bracket tag from Spellbook displayed in output."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -280,6 +293,7 @@ class TestDeckAnalysisHappyPath:
         assert "Bracket:" in result
 
     async def test_included_combos_count(self) -> None:
+        """Included combo count shown when Spellbook finds combos."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -291,6 +305,7 @@ class TestDeckAnalysisHappyPath:
         assert "Included combos:" in result
 
     async def test_lowest_synergy_cards_listed(self) -> None:
+        """Bad Card (lowest synergy) listed in lowest synergy section."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -303,6 +318,7 @@ class TestDeckAnalysisHappyPath:
         assert "Bad Card" in result
 
     async def test_color_pips_counted(self) -> None:
+        """Color pip counts computed from mana costs (G: 1, B: 2)."""
         # Sol Ring ({1}) = no colored pips
         # Spore Frog ({G}) = 1 G
         # Bad Card ({3}{B}{B}) = 2 B
@@ -322,6 +338,7 @@ class TestDeckAnalysisMtgjsonDisabled:
     """MTGJSON is None — falls back to Scryfall for card resolution."""
 
     async def test_falls_back_to_scryfall(self) -> None:
+        """Falls back to Scryfall and shows MTGJSON as Disabled in footer."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -334,6 +351,7 @@ class TestDeckAnalysisMtgjsonDisabled:
         assert "MTGJSON](https://mtgjson.com): Disabled" in result
 
     async def test_mana_curve_still_computed(self) -> None:
+        """Mana curve computed via Scryfall fallback when MTGJSON is disabled."""
         result = await deck_analysis(
             ["Sol Ring", "Spore Frog"],
             COMMANDER,
@@ -349,6 +367,7 @@ class TestDeckAnalysisEdhrecDisabled:
     """EDHREC is None — synergy section shows disabled message."""
 
     async def test_synergy_section_shows_disabled(self) -> None:
+        """Synergy section notes EDHREC is disabled in output and footer."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -361,6 +380,7 @@ class TestDeckAnalysisEdhrecDisabled:
         assert "EDHREC](https://edhrec.com): Disabled" in result
 
     async def test_other_sections_still_present(self) -> None:
+        """Mana Curve, Budget, and Combos sections still present without EDHREC."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -378,6 +398,7 @@ class TestDeckAnalysisSpellbookFailure:
     """Spellbook raises an exception — combos/bracket section degrades."""
 
     async def test_bracket_shows_unavailable(self) -> None:
+        """Spellbook failure noted as unavailable or Failed in output."""
         spellbook = AsyncMock()
         spellbook.estimate_bracket = AsyncMock(
             side_effect=ServiceError("Spellbook is down", status_code=503)
@@ -399,6 +420,7 @@ class TestDeckAnalysisSpellbookFailure:
         )
 
     async def test_other_sections_still_present(self) -> None:
+        """Mana Curve, Budget, and Synergy sections still present despite Spellbook failure."""
         spellbook = AsyncMock()
         spellbook.estimate_bracket = AsyncMock(side_effect=ServiceError("down", status_code=503))
         spellbook.find_decklist_combos = AsyncMock(
@@ -421,6 +443,7 @@ class TestDeckAnalysisPartialCardResolution:
     """Some cards fail to resolve."""
 
     async def test_failures_noted_in_output(self) -> None:
+        """Unresolved cards listed in an Unresolved section."""
         # "Unknown Card" will fail in both MTGJSON (None) and Scryfall (not found)
         result = await deck_analysis(
             SAMPLE_DECKLIST,
@@ -434,6 +457,7 @@ class TestDeckAnalysisPartialCardResolution:
         assert "Unresolved" in result
 
     async def test_resolved_cards_still_analyzed(self) -> None:
+        """Successfully resolved cards still produce mana curve and budget data."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
@@ -451,6 +475,7 @@ class TestDeckAnalysisEmptyDecklist:
     """Empty decklist."""
 
     async def test_returns_appropriate_message(self) -> None:
+        """Empty decklist returns a 'No cards in decklist' message."""
         result = await deck_analysis(
             [],
             COMMANDER,
@@ -466,6 +491,7 @@ class TestDeckAnalysisProgressCallback:
     """Progress callback is called at the right steps."""
 
     async def test_progress_called_four_times(self) -> None:
+        """Progress callback invoked four times (steps 1/4 through 4/4)."""
         progress = AsyncMock()
         await deck_analysis(
             SAMPLE_DECKLIST,
@@ -500,6 +526,7 @@ class TestDeckAnalysisEdhrecFailure:
     """EDHREC is enabled but raises an exception."""
 
     async def test_synergy_shows_failure(self) -> None:
+        """EDHREC failure noted as Failed in output."""
         edhrec = AsyncMock()
         edhrec.commander_top_cards = AsyncMock(
             side_effect=ServiceError("EDHREC is down", status_code=503)
@@ -516,6 +543,7 @@ class TestDeckAnalysisEdhrecFailure:
         assert "Failed" in result
 
     async def test_other_sections_still_present(self) -> None:
+        """Mana Curve and Budget sections still present despite EDHREC failure."""
         edhrec = AsyncMock()
         edhrec.commander_top_cards = AsyncMock(side_effect=ServiceError("down", status_code=503))
         result = await deck_analysis(
@@ -534,6 +562,7 @@ class TestDeckAnalysisBudget:
     """Budget computation tests."""
 
     async def test_total_price_computed(self) -> None:
+        """Total deck price computed as sum of individual card prices ($3.60)."""
         # Sol Ring $3.00 + Spore Frog $0.50 + Bad Card $0.10 = $3.60
         # Unknown Card has no price
         result = await deck_analysis(
@@ -547,6 +576,7 @@ class TestDeckAnalysisBudget:
         assert "$3.60" in result
 
     async def test_average_price_shown(self) -> None:
+        """Average card price displayed in the Budget section."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,

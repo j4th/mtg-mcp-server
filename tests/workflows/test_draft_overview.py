@@ -77,6 +77,7 @@ class TestSetOverviewHappyPath:
     """Normal case with diverse ratings across rarities."""
 
     async def test_header_contains_set_code(self) -> None:
+        """Output header includes Set Overview title, set code, and 17Lands attribution."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         assert "Set Overview" in result
@@ -84,21 +85,25 @@ class TestSetOverviewHappyPath:
         assert "Data provided by [17Lands]" in result
 
     async def test_top_commons_section_present(self) -> None:
+        """Top Commons section present in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         assert "## Top Commons" in result
 
     async def test_top_uncommons_section_present(self) -> None:
+        """Top Uncommons section present in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         assert "## Top Uncommons" in result
 
     async def test_trap_rares_section_present(self) -> None:
+        """Trap Rares/Mythics section present in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         assert "## Trap Rares/Mythics" in result
 
     async def test_commons_sorted_by_gih_wr(self) -> None:
+        """Commons sorted by GIH WR descending in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         # Top Common A (62.0%) should appear before Top Common B (59.5%)
@@ -107,6 +112,7 @@ class TestSetOverviewHappyPath:
         assert pos_a < pos_b
 
     async def test_uncommons_sorted_by_gih_wr(self) -> None:
+        """Uncommons sorted by GIH WR descending in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         # Top Uncommon X (61.0%) should appear before Top Uncommon Y (58.0%)
@@ -115,6 +121,7 @@ class TestSetOverviewHappyPath:
         assert pos_x < pos_y
 
     async def test_trap_rares_below_median(self) -> None:
+        """Rares and mythics below median GIH WR listed in trap section."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         # Trap Rare (48.0%) and Bad Rare (46.0%) and Trap Mythic (49.0%)
@@ -124,6 +131,7 @@ class TestSetOverviewHappyPath:
         assert "Trap Mythic" in result
 
     async def test_good_rares_not_in_trap_section(self) -> None:
+        """Rares above median GIH WR excluded from trap section."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         # Good Rare (63.0%) and Bomb Mythic (65.0%) should NOT be traps
@@ -132,21 +140,25 @@ class TestSetOverviewHappyPath:
         assert "Bomb Mythic" not in trap_section
 
     async def test_gih_wr_displayed_as_percentage(self) -> None:
+        """GIH WR displayed as a percentage (e.g., 62.0%)."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         assert "62.0%" in result  # Top Common A
 
     async def test_median_gih_displayed(self) -> None:
+        """Median GIH WR value displayed in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         assert "Median GIH WR" in result
 
     async def test_event_type_shown(self) -> None:
+        """Custom event type displayed in output header."""
         client = _make_mock_client()
         result = await set_overview("LRW", event_type="TradDraft", seventeen_lands=client)
         assert "TradDraft" in result
 
     async def test_calls_card_ratings_with_params(self) -> None:
+        """17Lands card_ratings called with set code and event type."""
         client = _make_mock_client()
         await set_overview("MKM", event_type="TradDraft", seventeen_lands=client)
         client.card_ratings.assert_awaited_once_with("MKM", event_type="TradDraft")
@@ -156,6 +168,7 @@ class TestSetOverviewEmptyRatings:
     """17Lands returns no ratings for the set."""
 
     async def test_returns_no_data_message(self) -> None:
+        """Empty ratings produce a 'No card data available' message."""
         client = _make_mock_client(ratings=[])
         result = await set_overview("XYZ", seventeen_lands=client)
         assert "No card data available" in result
@@ -166,6 +179,7 @@ class TestSetOverviewAllNoneGihWr:
     """All cards have None GIH WR (insufficient data)."""
 
     async def test_returns_no_data_message(self) -> None:
+        """All-None GIH WR ratings produce a 'No card data available' message."""
         ratings = [
             _make_rating("Card A", rarity="common", ever_drawn_win_rate=None),
             _make_rating("Card B", rarity="uncommon", ever_drawn_win_rate=None),
@@ -180,6 +194,7 @@ class TestSetOverviewNoTrapRares:
     """All rares/mythics are above the median GIH WR."""
 
     async def test_no_trap_rares_message(self) -> None:
+        """Shows 'No trap rares found' when all rares are above median."""
         # All cards have the same high win rate
         ratings = [
             _make_rating("Common A", rarity="common", ever_drawn_win_rate=0.550),
@@ -196,6 +211,7 @@ class TestSetOverviewProgressCallback:
     """Progress callback is called at the right times."""
 
     async def test_progress_called_twice(self) -> None:
+        """Progress callback invoked twice (steps 1/2 and 2/2)."""
         client = _make_mock_client()
         progress = AsyncMock()
         await set_overview("LRW", seventeen_lands=client, on_progress=progress)
@@ -214,6 +230,7 @@ class TestSetOverviewTopNLimit:
     """Top 10 limit is respected for commons and uncommons."""
 
     async def test_at_most_ten_commons_shown(self) -> None:
+        """Commons section limited to at most 10 entries."""
         # Create 15 commons
         ratings = [
             _make_rating(f"Common {i}", rarity="common", ever_drawn_win_rate=0.5 + i * 0.01)
@@ -231,6 +248,7 @@ class TestSetOverviewTopNLimit:
         assert len(ranked_rows) <= 10
 
     async def test_at_most_ten_uncommons_shown(self) -> None:
+        """Uncommons section limited to at most 10 entries."""
         # Create 15 uncommons
         ratings = [
             _make_rating(f"Uncommon {i}", rarity="uncommon", ever_drawn_win_rate=0.5 + i * 0.01)

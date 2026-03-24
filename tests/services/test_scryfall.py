@@ -17,12 +17,16 @@ BASE_URL = "https://api.scryfall.com"
 
 
 def _load_fixture(name: str) -> dict:
+    """Load a Scryfall JSON fixture by filename."""
     return json.loads((FIXTURES / name).read_text())
 
 
 class TestGetCardByName:
+    """Card lookup by exact or fuzzy name."""
+
     @respx.mock
     async def test_exact_match(self):
+        """Exact name lookup returns a fully populated Card model."""
         fixture = _load_fixture("card_muldrotha.json")
         respx.get(f"{BASE_URL}/cards/named", params={"exact": "Muldrotha, the Gravetide"}).mock(
             return_value=httpx.Response(200, json=fixture)
@@ -44,6 +48,7 @@ class TestGetCardByName:
 
     @respx.mock
     async def test_fuzzy_match(self):
+        """Fuzzy name lookup resolves partial input to the correct card."""
         fixture = _load_fixture("card_muldrotha.json")
         respx.get(f"{BASE_URL}/cards/named", params={"fuzzy": "muldrotha"}).mock(
             return_value=httpx.Response(200, json=fixture)
@@ -55,6 +60,7 @@ class TestGetCardByName:
 
     @respx.mock
     async def test_not_found_raises(self):
+        """Nonexistent card name raises CardNotFoundError."""
         fixture = _load_fixture("card_not_found.json")
         respx.get(f"{BASE_URL}/cards/named", params={"exact": "Xyzzy"}).mock(
             return_value=httpx.Response(404, json=fixture)
@@ -65,8 +71,11 @@ class TestGetCardByName:
 
 
 class TestSearchCards:
+    """Card search using Scryfall query syntax."""
+
     @respx.mock
     async def test_returns_search_result(self):
+        """Search returns a CardSearchResult with pagination and Card models."""
         fixture = _load_fixture("search_sultai_commander.json")
         respx.get(
             f"{BASE_URL}/cards/search",
@@ -83,6 +92,7 @@ class TestSearchCards:
 
     @respx.mock
     async def test_search_not_found_raises(self):
+        """Search with no matching cards raises CardNotFoundError."""
         respx.get(f"{BASE_URL}/cards/search", params={"q": "xyzzy_nonexistent", "page": "1"}).mock(
             return_value=httpx.Response(
                 404,
@@ -100,8 +110,11 @@ class TestSearchCards:
 
 
 class TestGetCardById:
+    """Card lookup by Scryfall UUID."""
+
     @respx.mock
     async def test_returns_card(self):
+        """ID lookup returns the correct Card model."""
         fixture = _load_fixture("card_sol_ring.json")
         card_id = fixture["id"]
         respx.get(f"{BASE_URL}/cards/{card_id}").mock(
@@ -115,8 +128,11 @@ class TestGetCardById:
 
 
 class TestGetRulings:
+    """Official card rulings retrieval."""
+
     @respx.mock
     async def test_returns_rulings(self):
+        """Rulings endpoint returns a list of Ruling models with source and date."""
         fixture = _load_fixture("rulings_muldrotha.json")
         card_id = "705b4d97-2f50-47f7-9053-d748f4337553"
         respx.get(f"{BASE_URL}/cards/{card_id}/rulings").mock(
@@ -132,8 +148,11 @@ class TestGetRulings:
 
 
 class TestScryfallServerErrors:
+    """Scryfall API server error handling."""
+
     @respx.mock
     async def test_500_raises_scryfall_error(self):
+        """500 response from Scryfall raises ScryfallError."""
         respx.get(f"{BASE_URL}/cards/named", params={"exact": "Sol Ring"}).mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )

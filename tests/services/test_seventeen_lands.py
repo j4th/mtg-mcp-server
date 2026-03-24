@@ -17,12 +17,16 @@ BASE_URL = "https://www.17lands.com"
 
 
 def _load_fixture(name: str) -> list[dict]:
+    """Load a 17Lands JSON fixture by filename."""
     return json.loads((FIXTURES / name).read_text())
 
 
 class TestCardRatings:
+    """Card performance ratings retrieval by set."""
+
     @respx.mock
     async def test_returns_card_ratings(self):
+        """Card ratings returns DraftCardRating models with win rate and draft metrics."""
         fixture = _load_fixture("card_ratings_lci.json")
         respx.get(
             f"{BASE_URL}/card_ratings/data",
@@ -44,6 +48,7 @@ class TestCardRatings:
 
     @respx.mock
     async def test_passes_event_type_parameter(self):
+        """Custom event_type parameter is forwarded to the API."""
         fixture = _load_fixture("card_ratings_lci.json")
         respx.get(
             f"{BASE_URL}/card_ratings/data",
@@ -57,6 +62,7 @@ class TestCardRatings:
 
     @respx.mock
     async def test_empty_response(self):
+        """Empty API response for unknown set returns an empty list."""
         respx.get(
             f"{BASE_URL}/card_ratings/data",
             params={"expansion": "FAKE", "event_type": "PremierDraft"},
@@ -69,6 +75,7 @@ class TestCardRatings:
 
     @respx.mock
     async def test_server_error_raises(self):
+        """500 response from card ratings raises SeventeenLandsError."""
         respx.get(
             f"{BASE_URL}/card_ratings/data",
             params={"expansion": "LCI", "event_type": "PremierDraft"},
@@ -80,8 +87,11 @@ class TestCardRatings:
 
 
 class TestColorRatings:
+    """Archetype win rates by color pair."""
+
     @respx.mock
     async def test_returns_archetype_ratings(self):
+        """Color ratings returns ArchetypeRating models with summary and per-pair data."""
         fixture = _load_fixture("color_ratings_lci.json")
         respx.get(
             f"{BASE_URL}/color_ratings/data",
@@ -117,6 +127,7 @@ class TestColorRatings:
 
     @respx.mock
     async def test_passes_event_type_parameter(self):
+        """Custom event_type parameter is forwarded to the color ratings API."""
         fixture = _load_fixture("color_ratings_lci.json")
         respx.get(
             f"{BASE_URL}/color_ratings/data",
@@ -140,6 +151,7 @@ class TestColorRatings:
 
     @respx.mock
     async def test_server_error_raises(self):
+        """500 response from color ratings raises SeventeenLandsError."""
         respx.get(
             f"{BASE_URL}/color_ratings/data",
             params={
@@ -156,10 +168,14 @@ class TestColorRatings:
 
 
 class TestArchetypeRatingWinRate:
+    """Computed win_rate property on ArchetypeRating."""
+
     def test_win_rate_calculated(self):
+        """Win rate is computed as wins divided by games."""
         rating = ArchetypeRating(color_name="Azorius (WU)", wins=87307, games=150735)
         assert rating.win_rate == pytest.approx(0.5793, abs=0.001)
 
     def test_win_rate_zero_games(self):
+        """Win rate returns None when games is zero to avoid division by zero."""
         rating = ArchetypeRating(color_name="Empty", wins=0, games=0)
         assert rating.win_rate is None

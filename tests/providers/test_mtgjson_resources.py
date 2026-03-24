@@ -16,10 +16,12 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "mtgjson"
 
 
 def _load_fixture_bytes() -> bytes:
+    """Load the gzipped MTGJSON sample fixture as raw bytes."""
     return (FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
 
 
 def _mock_httpx_response(content: bytes, status_code: int = 200) -> httpx.Response:
+    """Build a mock httpx response with the given content and status code."""
     return httpx.Response(status_code=status_code, content=content)
 
 
@@ -44,7 +46,10 @@ async def client():
 
 
 class TestCardDataResource:
+    """MTGJSON mtg://card-data/{name} resource behavior."""
+
     async def test_returns_card_json(self, client: Client):
+        """Card data resource returns JSON with card name, mana cost, and type line."""
         result = await client.read_resource("mtg://card-data/Sol Ring")
         data = json.loads(result[0].text)
         assert data["name"] == "Sol Ring"
@@ -52,6 +57,7 @@ class TestCardDataResource:
         assert "type_line" in data
 
     async def test_card_not_found_returns_error_json(self, client: Client):
+        """Card data resource returns error JSON for nonexistent cards."""
         result = await client.read_resource("mtg://card-data/Nonexistent Card")
         data = json.loads(result[0].text)
         assert "error" in data
@@ -59,6 +65,8 @@ class TestCardDataResource:
 
 
 class TestCardDataServerError:
+    """MTGJSON card data resource server error handling."""
+
     async def test_mtgjson_error_returns_error_json(self):
         """Simulate a download failure triggering MTGJSONError."""
         mock_http = AsyncMock()
@@ -79,7 +87,10 @@ class TestCardDataServerError:
 
 
 class TestResourceTemplateRegistration:
+    """MTGJSON resource template registration."""
+
     async def test_resource_templates_registered(self, client: Client):
+        """Card data resource template is registered on the provider."""
         templates = await client.list_resource_templates()
         template_uris = {t.uriTemplate for t in templates}
         assert "mtg://card-data/{name}" in template_uris

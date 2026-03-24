@@ -12,6 +12,7 @@ from mtg_mcp_server.workflows.card_resolver import resolve_card
 
 @pytest.fixture
 def mock_scryfall():
+    """Provide a mock ScryfallClient with get_card_by_name method."""
     client = AsyncMock()
     client.get_card_by_name = AsyncMock()
     return client
@@ -19,13 +20,17 @@ def mock_scryfall():
 
 @pytest.fixture
 def mock_mtgjson():
+    """Provide a mock MTGJSONClient with get_card method."""
     client = AsyncMock()
     client.get_card = AsyncMock()
     return client
 
 
 class TestResolveCard:
+    """Tests for the resolve_card utility function."""
+
     async def test_mtgjson_hit_returns_mtgjson_card(self, mock_mtgjson, mock_scryfall):
+        """MTGJSON card returned directly when found, Scryfall not called."""
         mtgjson_card = AsyncMock(name="Sol Ring")
         mock_mtgjson.get_card.return_value = mtgjson_card
 
@@ -36,6 +41,7 @@ class TestResolveCard:
         mock_scryfall.get_card_by_name.assert_not_awaited()
 
     async def test_mtgjson_miss_falls_back_to_scryfall(self, mock_mtgjson, mock_scryfall):
+        """Falls back to Scryfall when MTGJSON returns None."""
         mock_mtgjson.get_card.return_value = None
         scryfall_card = AsyncMock(name="Sol Ring")
         mock_scryfall.get_card_by_name.return_value = scryfall_card
@@ -47,6 +53,7 @@ class TestResolveCard:
         mock_scryfall.get_card_by_name.assert_awaited_once_with("Sol Ring")
 
     async def test_need_prices_skips_mtgjson(self, mock_mtgjson, mock_scryfall):
+        """MTGJSON skipped entirely when need_prices=True, goes straight to Scryfall."""
         scryfall_card = AsyncMock(name="Sol Ring")
         mock_scryfall.get_card_by_name.return_value = scryfall_card
 
@@ -58,6 +65,7 @@ class TestResolveCard:
         mock_mtgjson.get_card.assert_not_awaited()
 
     async def test_mtgjson_none_uses_scryfall(self, mock_scryfall):
+        """Uses Scryfall directly when MTGJSON client is None (disabled)."""
         scryfall_card = AsyncMock(name="Sol Ring")
         mock_scryfall.get_card_by_name.return_value = scryfall_card
 
@@ -67,6 +75,7 @@ class TestResolveCard:
         mock_scryfall.get_card_by_name.assert_awaited_once_with("Sol Ring")
 
     async def test_scryfall_not_found_propagates(self, mock_scryfall):
+        """CardNotFoundError from Scryfall propagates to caller."""
         mock_scryfall.get_card_by_name.side_effect = CardNotFoundError("Not found")
 
         with pytest.raises(CardNotFoundError):

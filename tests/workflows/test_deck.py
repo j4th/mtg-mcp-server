@@ -27,6 +27,7 @@ def _make_decklist_combos(
     included: list[Combo] | None = None,
     almost_included: list[Combo] | None = None,
 ) -> DecklistCombos:
+    """Build a DecklistCombos with optional included and almost-included combos."""
     return DecklistCombos(
         identity="BGU",
         included=included or [],
@@ -37,6 +38,7 @@ def _make_decklist_combos(
 def _make_edhrec_data(
     cardviews: list[EDHRECCard] | None = None,
 ) -> EDHRECCommanderData:
+    """Build EDHREC commander data with default creature cardviews."""
     return EDHRECCommanderData(
         commander_name="Muldrotha, the Gravetide",
         total_decks=19000,
@@ -80,7 +82,7 @@ def _extract_ranked_lines(text: str) -> list[str]:
 
 
 def _find_rank_of(card_name: str, ranked_lines: list[str]) -> int | None:
-    """Find the rank number of a card in ranked output lines."""
+    """Return the numeric rank of a card in ranked output lines, or None if absent."""
     for ln in ranked_lines:
         if card_name in ln:
             return int(ln.split(".")[0])
@@ -89,6 +91,7 @@ def _find_rank_of(card_name: str, ranked_lines: list[str]) -> int | None:
 
 @pytest.fixture
 def mock_spellbook() -> AsyncMock:
+    """Provide a mock SpellbookClient with one included Spore Frog combo."""
     client = AsyncMock()
     client.find_decklist_combos = AsyncMock(
         return_value=_make_decklist_combos(included=[COMBO_WITH_SPORE_FROG])
@@ -98,6 +101,7 @@ def mock_spellbook() -> AsyncMock:
 
 @pytest.fixture
 def mock_edhrec() -> AsyncMock:
+    """Provide a mock EDHRECClient with default creature synergy data."""
     client = AsyncMock()
     client.commander_top_cards = AsyncMock(return_value=_make_edhrec_data())
     return client
@@ -114,6 +118,7 @@ class TestAllSourcesSucceed:
     async def test_returns_ranked_output(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Random Bad Card ranked first due to lowest synergy and inclusion."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -132,6 +137,7 @@ class TestAllSourcesSucceed:
     async def test_combo_piece_is_protected(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Spore Frog ranked lower than Random Bad Card because it is a combo piece."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -153,6 +159,7 @@ class TestAllSourcesSucceed:
     async def test_synergy_and_inclusion_shown(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Output contains synergy and inclusion labels for cards with EDHREC data."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -168,6 +175,7 @@ class TestAllSourcesSucceed:
     async def test_combo_piece_label_shown(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Spore Frog is labeled as a combo piece in the output."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -182,6 +190,7 @@ class TestAllSourcesSucceed:
     async def test_data_sources_status_shown(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Data Sources footer lists both Commander Spellbook and EDHREC."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -197,6 +206,7 @@ class TestAllSourcesSucceed:
     async def test_unknown_card_flagged(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Cards with no EDHREC data and no combo membership flagged as low confidence."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -213,6 +223,7 @@ class TestEdhrecIsNone:
     """EDHREC client is None (disabled via feature flag)."""
 
     async def test_ranks_by_combo_membership_only(self, mock_spellbook: AsyncMock) -> None:
+        """Combo pieces ranked lower than non-combo cards when EDHREC is disabled."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -234,6 +245,7 @@ class TestEdhrecIsNone:
         assert all(r < spore_frog_rank for r in non_combo_ranks)
 
     async def test_edhrec_unavailable_noted(self, mock_spellbook: AsyncMock) -> None:
+        """Output notes that EDHREC is unavailable or disabled."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
@@ -251,6 +263,7 @@ class TestEdhrecRaisesException:
     """EDHREC client raises an exception during the call."""
 
     async def test_ranks_by_combo_data_with_failure_note(self, mock_spellbook: AsyncMock) -> None:
+        """Still ranks cards using combo data and notes the EDHREC failure."""
         mock_edhrec = AsyncMock()
         mock_edhrec.commander_top_cards = AsyncMock(
             side_effect=ServiceError("EDHREC is down", status_code=503)
@@ -277,6 +290,7 @@ class TestSpellbookRaisesException:
     """Spellbook client raises an exception during the call."""
 
     async def test_ranks_by_edhrec_data_with_failure_note(self, mock_edhrec: AsyncMock) -> None:
+        """Still ranks by EDHREC synergy and notes the Spellbook failure."""
         mock_spellbook = AsyncMock()
         mock_spellbook.find_decklist_combos = AsyncMock(
             side_effect=ServiceError("Spellbook is down", status_code=503)
@@ -305,6 +319,7 @@ class TestBothRaiseExceptions:
     """Both Spellbook and EDHREC fail."""
 
     async def test_all_cards_flagged_low_confidence(self) -> None:
+        """Every card flagged as low confidence when both backends fail."""
         mock_spellbook = AsyncMock()
         mock_spellbook.find_decklist_combos = AsyncMock(
             side_effect=ServiceError("Spellbook is down", status_code=503)
@@ -332,6 +347,7 @@ class TestNoCombosFound:
     """Spellbook returns no combos."""
 
     async def test_synergy_data_only_drives_ranking(self, mock_edhrec: AsyncMock) -> None:
+        """Ranking driven by EDHREC synergy alone when Spellbook finds no combos."""
         mock_spellbook = AsyncMock()
         mock_spellbook.find_decklist_combos = AsyncMock(
             return_value=_make_decklist_combos(included=[])
@@ -361,6 +377,7 @@ class TestNumCutsGreaterThanDeckSize:
     async def test_caps_at_decklist_length(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Output limited to decklist size when num_cuts exceeds it."""
         small_decklist = ["Spore Frog", "Shriekmaw"]
         result = await suggest_cuts(
             small_decklist,
@@ -380,6 +397,7 @@ class TestEmptyDecklist:
     async def test_returns_appropriate_message(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Empty decklist returns a message indicating no cards to cut."""
         result = await suggest_cuts(
             [],
             "Muldrotha, the Gravetide",
@@ -397,6 +415,7 @@ class TestNumCutsZero:
     async def test_returns_empty_result(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
     ) -> None:
+        """Zero cuts requested produces header but no ranked cards."""
         result = await suggest_cuts(
             SAMPLE_DECKLIST,
             "Muldrotha, the Gravetide",
