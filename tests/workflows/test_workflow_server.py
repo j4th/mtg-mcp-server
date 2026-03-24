@@ -27,6 +27,7 @@ class TestWorkflowToolsRegistered:
     """Verify all workflow tools are registered on the workflow server."""
 
     async def test_all_workflow_tools_present(self, mcp_client: Client):
+        """All workflow tools appear in the orchestrator's tools/list."""
         tools = await mcp_client.list_tools()
         tool_names = {t.name for t in tools}
         assert "commander_overview" in tool_names
@@ -166,7 +167,7 @@ class TestDraftPackPickToolError:
         self,
         mcp_client: Client,
     ):
-        """17Lands not enabled → ToolError."""
+        """17Lands not enabled → ToolError with feature flag hint."""
         with patch("mtg_mcp_server.workflows.server._seventeen_lands", None):
             result = await mcp_client.call_tool(
                 "draft_pack_pick",
@@ -260,6 +261,7 @@ class TestCardComparisonToolError:
     """Verify card_comparison converts service exceptions to ToolError."""
 
     async def test_too_few_cards_becomes_tool_error(self, mcp_client: Client):
+        """Fewer than 2 cards → ToolError with validation message."""
         result = await mcp_client.call_tool(
             "card_comparison",
             {"cards": ["Sol Ring"], "commander_name": "Muldrotha"},
@@ -269,6 +271,7 @@ class TestCardComparisonToolError:
         assert "at least 2" in result.content[0].text.lower()
 
     async def test_too_many_cards_becomes_tool_error(self, mcp_client: Client):
+        """More than 5 cards → ToolError with validation message."""
         result = await mcp_client.call_tool(
             "card_comparison",
             {"cards": ["A", "B", "C", "D", "E", "F"], "commander_name": "Muldrotha"},
@@ -278,6 +281,7 @@ class TestCardComparisonToolError:
         assert "maximum 5" in result.content[0].text.lower()
 
     async def test_card_not_found_becomes_tool_error(self, mcp_client: Client):
+        """CardNotFoundError from Scryfall → ToolError."""
         mock_scryfall = AsyncMock()
         mock_scryfall.get_card_by_name = AsyncMock(
             side_effect=CardNotFoundError("not found", status_code=404)
@@ -299,6 +303,7 @@ class TestCardComparisonToolError:
         assert "not found" in result.content[0].text.lower()
 
     async def test_service_error_becomes_tool_error(self, mcp_client: Client):
+        """Generic ServiceError → ToolError with tool name."""
         mock_scryfall = AsyncMock()
         mock_scryfall.get_card_by_name = AsyncMock(side_effect=ServiceError("timeout"))
         mock_spellbook = AsyncMock()
@@ -327,6 +332,7 @@ class TestBudgetUpgradeToolError:
     """Verify budget_upgrade converts service exceptions to ToolError."""
 
     async def test_negative_budget_becomes_tool_error(self, mcp_client: Client):
+        """Negative budget → ToolError with validation message."""
         result = await mcp_client.call_tool(
             "budget_upgrade",
             {"commander_name": "Muldrotha", "budget": -5.0},
@@ -336,6 +342,7 @@ class TestBudgetUpgradeToolError:
         assert "positive" in result.content[0].text.lower()
 
     async def test_edhrec_disabled_becomes_tool_error(self, mcp_client: Client):
+        """EDHREC not enabled → ToolError (required backend, not optional)."""
         with patch("mtg_mcp_server.workflows.server._edhrec", None):
             result = await mcp_client.call_tool(
                 "budget_upgrade",
@@ -374,6 +381,7 @@ class TestDeckAnalysisToolError:
     """Verify deck_analysis converts service exceptions to ToolError."""
 
     async def test_empty_decklist_becomes_tool_error(self, mcp_client: Client):
+        """Empty decklist → ToolError with validation message."""
         result = await mcp_client.call_tool(
             "deck_analysis",
             {"decklist": [], "commander_name": "Muldrotha"},
@@ -426,6 +434,7 @@ class TestSetOverviewToolError:
     """Verify set_overview converts service exceptions to ToolError."""
 
     async def test_17lands_disabled_becomes_tool_error(self, mcp_client: Client):
+        """17Lands not enabled → ToolError."""
         with patch("mtg_mcp_server.workflows.server._seventeen_lands", None):
             result = await mcp_client.call_tool(
                 "set_overview",
@@ -436,6 +445,7 @@ class TestSetOverviewToolError:
         assert "not enabled" in result.content[0].text.lower()
 
     async def test_service_error_becomes_tool_error(self, mcp_client: Client):
+        """SeventeenLandsError → ToolError with backend name."""
         mock_17lands = AsyncMock()
         mock_17lands.card_ratings = AsyncMock(
             side_effect=SeventeenLandsError("rate limited", status_code=429)
