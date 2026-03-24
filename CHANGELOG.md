@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-03-24
+
+### Fixed
+- Smithery `startCommand` and `commandFunction` for proper server launch and configuration UX
+- Server `website_url` metadata for Smithery homepage detection
+- Prompt parameter descriptions (all 4 prompts now have `Field(description=...)` on every argument)
+
+[1.1.1]: https://github.com/j4th/mtg-mcp-server/compare/v1.1.0...v1.1.1
+
 ## [1.1.0] - 2026-03-24
 
 ### Added

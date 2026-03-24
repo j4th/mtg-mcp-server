@@ -1,12 +1,11 @@
-name: mtg-mcp-server
-description: >
-  Magic: The Gathering toolkit for AI agents — 23 tools spanning Scryfall card
-  search, Commander Spellbook combo detection, 17Lands draft analytics, EDHREC
-  commander metagame data, and MTGJSON bulk card lookups. Includes 8 workflow
-  tools for deck analysis, budget upgrades, draft pick evaluation, and card
-  comparison across all sources. All APIs are public — no credentials required.
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+
 configSchema:
   type: object
+  required: []
   properties:
     MTG_MCP_ENABLE_17LANDS:
       type: boolean
@@ -33,4 +32,17 @@ configSchema:
       type: number
       description: "Hours between MTGJSON bulk data refreshes"
       default: 24
-  required: []
+
+commandFunction: |-
+  (config) => ({
+    command: 'uvx',
+    args: ['mtg-mcp-server'],
+    env: {
+      MTG_MCP_ENABLE_17LANDS: config.MTG_MCP_ENABLE_17LANDS !== undefined ? String(config.MTG_MCP_ENABLE_17LANDS) : undefined,
+      MTG_MCP_ENABLE_EDHREC: config.MTG_MCP_ENABLE_EDHREC !== undefined ? String(config.MTG_MCP_ENABLE_EDHREC) : undefined,
+      MTG_MCP_ENABLE_MTGJSON: config.MTG_MCP_ENABLE_MTGJSON !== undefined ? String(config.MTG_MCP_ENABLE_MTGJSON) : undefined,
+      MTG_MCP_LOG_LEVEL: config.MTG_MCP_LOG_LEVEL || undefined,
+      MTG_MCP_SCRYFALL_RATE_LIMIT_MS: config.MTG_MCP_SCRYFALL_RATE_LIMIT_MS !== undefined ? String(config.MTG_MCP_SCRYFALL_RATE_LIMIT_MS) : undefined,
+      MTG_MCP_MTGJSON_REFRESH_HOURS: config.MTG_MCP_MTGJSON_REFRESH_HOURS !== undefined ? String(config.MTG_MCP_MTGJSON_REFRESH_HOURS) : undefined
+    }
+  })
