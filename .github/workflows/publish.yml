@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: Publish
 
 on:
   release:
@@ -8,11 +8,11 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  pypi:
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # Required for PyPI trusted publishing (OIDC)
-    environment: pypi   # Optional: add deployment protection rules in repo settings
+    environment: pypi
 
     steps:
       - uses: actions/checkout@v6
@@ -27,3 +27,21 @@ jobs:
 
       - name: Publish to PyPI
         run: uv publish --trusted-publishing always
+
+  mcp-registry:
+    runs-on: ubuntu-latest
+    needs: pypi
+    permissions:
+      id-token: write  # Required for MCP Registry OIDC
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+
+      - name: Publish to MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
