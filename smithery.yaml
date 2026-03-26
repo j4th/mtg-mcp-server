@@ -1,3 +1,8 @@
+# Smithery deployment manifest.
+# NOTE: The Smithery Python SDK does NOT read this file at runtime — it uses
+# SmitheryConfig in src/mtg_mcp_server/smithery.py via @smithery.server().
+# This YAML is consumed by Smithery's GitHub-based deployment pipeline.
+# Keep properties in sync: CI runs scripts/check_smithery_schema.py to verify.
 runtime: "python"
 
 startCommand:
