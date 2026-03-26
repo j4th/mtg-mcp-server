@@ -15,7 +15,7 @@ Backends:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 __all__ = [
     "ArchetypeRating",
@@ -88,6 +88,31 @@ class Card(BaseModel):
 
     # Allow construction via Python name (set_code=) or JSON key (set=)
     model_config = {"populate_by_name": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_from_card_faces(cls, data: dict) -> dict:  # type: ignore[type-arg]
+        """Populate top-level fields from card_faces[0] for MDFCs.
+
+        Scryfall MDFCs (Modal Double-Faced Cards) store mana_cost,
+        oracle_text, and colors only in ``card_faces``, not at the
+        top level.  This validator fills those fields from the front
+        face so downstream code doesn't need special-case handling.
+        """
+        if not isinstance(data, dict):
+            return data
+        faces = data.get("card_faces")
+        if not isinstance(faces, list) or not faces:
+            return data
+        front = faces[0]
+        if not isinstance(front, dict):
+            return data
+        for field in ("mana_cost", "oracle_text"):
+            if data.get(field) is None and front.get(field) is not None:
+                data[field] = front[field]
+        if not data.get("colors") and front.get("colors"):
+            data["colors"] = front["colors"]
+        return data
 
 
 class CardSearchResult(BaseModel):
