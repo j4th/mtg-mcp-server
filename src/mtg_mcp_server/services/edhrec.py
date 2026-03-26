@@ -8,6 +8,7 @@ endpoints that may break without notice. All access is behind a feature flag
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import TYPE_CHECKING
 
 from cachetools import TTLCache
@@ -21,6 +22,18 @@ from mtg_mcp_server.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
 _RE_SPECIAL_CHARS = re.compile(r"[,.'\"!?:;()]+")
 _RE_WHITESPACE = re.compile(r"\s+")
 _RE_MULTI_HYPHEN = re.compile(r"-+")
+
+
+def _normalize_name(name: str) -> str:
+    """Normalize a card name for matching: lowercase, strip diacritics, front face only."""
+    # Strip DFC back-face suffix ("Pinnacle Monk // Mystic Peak" → "Pinnacle Monk")
+    if " // " in name:
+        name = name.split(" // ")[0]
+    # Strip diacritics ("Glóin" → "Gloin")
+    nfkd = unicodedata.normalize("NFD", name)
+    name = "".join(c for c in nfkd if unicodedata.category(c) != "Mn")
+    return name.lower()
+
 
 if TYPE_CHECKING:
     # httpx.Response.json() returns Any; we alias for clarity in parsing helpers.
@@ -124,10 +137,10 @@ class EDHRECClient(BaseClient):
             EDHRECError: On other API errors.
         """
         result = await self.commander_top_cards(commander_name)
-        card_name_lower = card_name.lower()
+        needle = _normalize_name(card_name)
         for cardlist in result.cardlists:
             for card in cardlist.cardviews:
-                if card.name.lower() == card_name_lower:
+                if _normalize_name(card.name) == needle:
                     return card
         return None
 
