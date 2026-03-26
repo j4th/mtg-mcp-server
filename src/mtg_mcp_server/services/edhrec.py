@@ -198,15 +198,22 @@ class EDHRECClient(BaseClient):
             for raw_card in raw_views:
                 if not isinstance(raw_card, dict):
                     continue
-                # Use `or 0.0` / `or 0` to coerce None from JSON to numeric defaults
+                # Use `or 0.0` / `or 0` to coerce None from JSON to numeric defaults.
+                # The API returns ``inclusion`` as a raw deck count (same as
+                # ``num_decks``), not a percentage.  Compute the percentage
+                # from ``num_decks / potential_decks * 100`` at parse time so
+                # downstream consumers can use ``inclusion`` directly as 0-100.
+                num = int(raw_card.get("num_decks", 0) or 0)
+                pot = int(raw_card.get("potential_decks", 0) or 0)
+                pct = round(num / pot * 100) if pot > 0 else 0
                 cards.append(
                     EDHRECCard(
                         name=str(raw_card.get("name", "")),
                         sanitized=str(raw_card.get("sanitized", "")),
                         synergy=float(raw_card.get("synergy", 0.0) or 0.0),
-                        inclusion=int(raw_card.get("inclusion", 0) or 0),
-                        num_decks=int(raw_card.get("num_decks", 0) or 0),
-                        potential_decks=int(raw_card.get("potential_decks", 0) or 0),
+                        inclusion=pct,
+                        num_decks=num,
+                        potential_decks=pot,
                         label=str(raw_card.get("label", "")),
                     )
                 )

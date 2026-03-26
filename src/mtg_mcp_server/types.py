@@ -258,7 +258,9 @@ class EDHRECCard(BaseModel):
     name: str
     sanitized: str = ""  # URL slug, e.g. "spore-frog"
     synergy: float = 0.0  # -1.0 to 1.0: commander-specific popularity signal
-    inclusion: int = 0  # Percentage of decks running this card (0-100)
+    inclusion: int = (
+        0  # Percentage of decks running this card (0-100), computed from num_decks/potential_decks
+    )
     num_decks: int = 0  # Number of decks actually running the card
     potential_decks: int = 0  # Total decks analyzed for this commander
     label: str = ""  # e.g. "61% of 19,741 decks"
