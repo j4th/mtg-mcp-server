@@ -65,7 +65,7 @@ class SeventeenLandsClient(BaseClient):
         try:
             response = await self._get(
                 "/card_ratings/data",
-                params={"expansion": set_code, "event_type": event_type},
+                params={"expansion": set_code.upper(), "event_type": event_type},
             )
         except ServiceError as exc:
             raise SeventeenLandsError(exc.message, status_code=exc.status_code) from exc
@@ -97,7 +97,7 @@ class SeventeenLandsClient(BaseClient):
             response = await self._get(
                 "/color_ratings/data",
                 params={
-                    "expansion": set_code,
+                    "expansion": set_code.upper(),
                     "event_type": event_type,
                     "start_date": start_date,
                     "end_date": end_date,

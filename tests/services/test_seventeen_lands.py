@@ -61,6 +61,20 @@ class TestCardRatings:
         assert len(ratings) == 5
 
     @respx.mock
+    async def test_uppercases_set_code(self):
+        """Lowercase set codes are uppercased before hitting the API (Bug 4)."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        async with SeventeenLandsClient(base_url=BASE_URL) as client:
+            ratings = await client.card_ratings("lci")
+
+        assert len(ratings) == 5
+
+    @respx.mock
     async def test_empty_response(self):
         """Empty API response for unknown set returns an empty list."""
         respx.get(
