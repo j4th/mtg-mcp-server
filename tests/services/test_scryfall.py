@@ -69,6 +69,22 @@ class TestGetCardByName:
             with pytest.raises(CardNotFoundError, match="Xyzzy"):
                 await client.get_card_by_name("Xyzzy")
 
+    @respx.mock
+    async def test_mdfc_extracts_front_face_mana_cost(self):
+        """Modal DFCs have mana_cost in card_faces[0], not at top level."""
+        fixture = _load_fixture("card_shatterskull_smashing.json")
+        respx.get(
+            f"{BASE_URL}/cards/named",
+            params={"exact": "Shatterskull Smashing"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+        async with ScryfallClient(base_url=BASE_URL) as client:
+            card = await client.get_card_by_name("Shatterskull Smashing")
+
+        assert card.mana_cost == "{X}{R}{R}"
+        assert card.oracle_text is not None
+        assert "damage" in card.oracle_text.lower()
+        assert card.colors == ["R"]
+
 
 class TestSearchCards:
     """Card search using Scryfall query syntax."""

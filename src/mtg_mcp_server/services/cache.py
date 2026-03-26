@@ -89,7 +89,7 @@ def async_cached(cache: TTLCache, key: _KeyFunc = _method_key):
             cache[k] = result
             return result
 
-        wrapper.cache = cache  # type: ignore[attr-defined]
+        setattr(wrapper, "cache", cache)  # noqa: B010
         return wrapper
 
     return decorator

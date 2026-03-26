@@ -141,6 +141,9 @@ async def commander_overview(
     """
     from mtg_mcp_server.workflows.commander import commander_overview as impl
 
+    if not commander_name.strip():
+        raise ToolError("Commander name cannot be empty.")
+
     try:
         return await impl(
             commander_name,
@@ -169,6 +172,11 @@ async def evaluate_upgrade(
     Degrades gracefully if optional sources (EDHREC, Spellbook) are unavailable.
     """
     from mtg_mcp_server.workflows.commander import evaluate_upgrade as impl
+
+    if not card_name.strip():
+        raise ToolError("Card name cannot be empty.")
+    if not commander_name.strip():
+        raise ToolError("Commander name cannot be empty.")
 
     try:
         return await impl(
@@ -228,6 +236,9 @@ async def suggest_cuts(
     """
     from mtg_mcp_server.workflows.deck import suggest_cuts as impl
 
+    if not commander_name.strip():
+        raise ToolError("Commander name cannot be empty.")
+
     try:
         return await impl(
             decklist,
@@ -253,6 +264,11 @@ async def card_comparison(
     """
     from mtg_mcp_server.workflows.commander import card_comparison as impl
 
+    if not commander_name.strip():
+        raise ToolError("Commander name cannot be empty.")
+
+    cards = list(dict.fromkeys(cards))  # Deduplicate, preserving order
+
     if len(cards) < 2:
         raise ToolError("Provide at least 2 cards to compare.")
     if len(cards) > 5:
@@ -268,7 +284,7 @@ async def card_comparison(
             on_progress=lambda step, total: _progress(ctx, step, total),
         )
     except CardNotFoundError as exc:
-        raise ToolError(f"Card not found: {exc}. Check spelling.") from exc
+        raise ToolError(f"{exc}. Check spelling.") from exc
     except ServiceError as exc:
         raise ToolError(f"card_comparison failed: {exc}") from exc
 
@@ -292,6 +308,8 @@ async def budget_upgrade(
     """
     from mtg_mcp_server.workflows.commander import budget_upgrade as impl
 
+    if not commander_name.strip():
+        raise ToolError("Commander name cannot be empty.")
     if budget <= 0:
         raise ToolError("Budget must be a positive number.")
 

@@ -15,7 +15,7 @@ Backends:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 __all__ = [
     "ArchetypeRating",
@@ -88,6 +88,31 @@ class Card(BaseModel):
 
     # Allow construction via Python name (set_code=) or JSON key (set=)
     model_config = {"populate_by_name": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_from_card_faces(cls, data: dict) -> dict:
+        """Populate top-level fields from card_faces[0] for MDFCs.
+
+        Scryfall MDFCs (Modal Double-Faced Cards) store mana_cost,
+        oracle_text, and colors only in ``card_faces``, not at the
+        top level.  This validator fills those fields from the front
+        face so downstream code doesn't need special-case handling.
+        """
+        if not isinstance(data, dict):
+            return data
+        faces = data.get("card_faces")
+        if not isinstance(faces, list) or not faces:
+            return data
+        front = faces[0]
+        if not isinstance(front, dict):
+            return data
+        for field in ("mana_cost", "oracle_text"):
+            if data.get(field) is None and front.get(field) is not None:
+                data[field] = front[field]
+        if not data.get("colors") and front.get("colors"):
+            data["colors"] = front["colors"]
+        return data
 
 
 class CardSearchResult(BaseModel):
@@ -176,6 +201,8 @@ class BracketEstimate(BaseModel):
     """Result of ``/estimate-bracket`` — bracket estimation for a decklist.
 
     Aliases map from Spellbook's camelCase JSON to snake_case Python fields.
+    The API returns card/combo dicts in some list fields — validators coerce
+    them to readable strings.
     """
 
     bracket_tag: str | None = Field(None, alias="bracketTag")
@@ -185,6 +212,29 @@ class BracketEstimate(BaseModel):
     lock_combos: list[str] = Field(default_factory=list, alias="lockCombos")
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("banned_cards", "game_changer_cards", "lock_combos", mode="before")
+    @classmethod
+    def _extract_card_names(cls, v: list) -> list[str]:
+        """Extract card names from card dicts, keep strings as-is."""
+        return [item.get("name", str(item)) if isinstance(item, dict) else str(item) for item in v]
+
+    @field_validator("two_card_combos", mode="before")
+    @classmethod
+    def _extract_combo_descriptions(cls, v: list) -> list[str]:
+        """Extract card names from combo variant dicts, keep strings as-is."""
+        result: list[str] = []
+        for item in v:
+            if isinstance(item, dict):
+                cards = item.get("cards", [])
+                if isinstance(cards, list) and cards:
+                    names = [c.get("name", "?") if isinstance(c, dict) else str(c) for c in cards]
+                    result.append(" + ".join(names))
+                else:
+                    result.append(item.get("name", str(item)))
+            else:
+                result.append(str(item))
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +308,9 @@ class EDHRECCard(BaseModel):
     name: str
     sanitized: str = ""  # URL slug, e.g. "spore-frog"
     synergy: float = 0.0  # -1.0 to 1.0: commander-specific popularity signal
-    inclusion: int = 0  # Percentage of decks running this card (0-100)
+    inclusion: int = (
+        0  # Percentage of decks running this card (0-100), computed from num_decks/potential_decks
+    )
     num_decks: int = 0  # Number of decks actually running the card
     potential_decks: int = 0  # Total decks analyzed for this commander
     label: str = ""  # e.g. "61% of 19,741 decks"

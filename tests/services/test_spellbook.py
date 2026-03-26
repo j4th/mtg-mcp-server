@@ -158,6 +158,58 @@ class TestEstimateBracket:
         assert isinstance(result, BracketEstimate)
         assert result.bracket_tag == "E"
 
+    def test_bracket_handles_dict_game_changers(self):
+        """Game changer cards returned as dicts are coerced to card names."""
+        data = {
+            "bracketTag": "E",
+            "bannedCards": [],
+            "gameChangerCards": [
+                {"id": 4966, "name": "Chrome Mox", "oracleId": "uuid-1", "imageUri": None},
+                {"id": 123, "name": "Mana Vault", "oracleId": "uuid-2", "imageUri": None},
+            ],
+            "twoCardCombos": [],
+            "lockCombos": [],
+        }
+        result = BracketEstimate.model_validate(data)
+        assert result.game_changer_cards == ["Chrome Mox", "Mana Vault"]
+
+    def test_bracket_handles_dict_two_card_combos(self):
+        """Two-card combo entries returned as dicts are coerced to descriptions."""
+        data = {
+            "bracketTag": "E",
+            "bannedCards": [],
+            "gameChangerCards": [],
+            "twoCardCombos": [
+                {
+                    "combo": {"id": "742-129", "name": None},
+                    "cards": [
+                        {"id": 742, "name": "Thassa's Oracle"},
+                        {"id": 129, "name": "Demonic Consultation"},
+                    ],
+                },
+            ],
+            "lockCombos": [],
+        }
+        result = BracketEstimate.model_validate(data)
+        assert len(result.two_card_combos) == 1
+        assert "Thassa's Oracle" in result.two_card_combos[0]
+        assert "Demonic Consultation" in result.two_card_combos[0]
+
+    def test_bracket_handles_string_items(self):
+        """String items in bracket lists are preserved as-is."""
+        data = {
+            "bracketTag": "E",
+            "bannedCards": ["Ancestral Recall"],
+            "gameChangerCards": ["Sol Ring"],
+            "twoCardCombos": ["Some combo"],
+            "lockCombos": ["Lock combo"],
+        }
+        result = BracketEstimate.model_validate(data)
+        assert result.banned_cards == ["Ancestral Recall"]
+        assert result.game_changer_cards == ["Sol Ring"]
+        assert result.two_card_combos == ["Some combo"]
+        assert result.lock_combos == ["Lock combo"]
+
 
 class TestSpellbookServerErrors:
     """Spellbook API server error handling."""

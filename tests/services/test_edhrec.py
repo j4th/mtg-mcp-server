@@ -85,6 +85,35 @@ class TestCommanderTopCards:
         assert spore_frog.num_decks == 13416
 
     @respx.mock
+    async def test_inclusion_is_percentage_not_raw_count(self):
+        """Inclusion field is computed as percentage from num_decks/potential_decks.
+
+        The EDHREC API returns inclusion as a raw deck count (identical to
+        num_decks), not a percentage. The service must compute the percentage
+        at parse time so consumers can use it directly.
+        """
+        fixture = _load_fixture("commander_muldrotha.json")
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with EDHRECClient(base_url=BASE_URL) as client:
+            result = await client.commander_top_cards("Muldrotha, the Gravetide")
+
+        high_synergy = next(cl for cl in result.cardlists if cl.tag == "highsynergycards")
+        spore_frog = high_synergy.cardviews[0]
+        # Fixture: num_decks=13416, potential_decks=22329 → 60%
+        assert spore_frog.inclusion == 60
+        assert spore_frog.num_decks == 13416
+        assert spore_frog.potential_decks == 22329
+
+        # "New Cards" have different potential_decks than total_decks
+        new_cards = next(cl for cl in result.cardlists if cl.tag == "newcards")
+        twilight_diviner = new_cards.cardviews[0]
+        # Fixture: num_decks=770, potential_decks=4119 → 19%
+        assert twilight_diviner.inclusion == 19
+        assert twilight_diviner.num_decks == 770
+
+    @respx.mock
     async def test_category_filter(self):
         """Category filter narrows results to only the specified card type."""
         fixture = _load_fixture("commander_muldrotha.json")
@@ -99,6 +128,26 @@ class TestCommanderTopCards:
         assert len(result.cardlists) == 1
         assert result.cardlists[0].tag == "creatures"
         assert result.cardlists[0].cardviews[0].name == "Spore Frog"
+
+    @respx.mock
+    async def test_category_filter_substring_match(self):
+        """Category 'artifacts' matches both 'utilityartifacts' and 'manaartifacts' (Bug 2)."""
+        fixture = _load_fixture("commander_muldrotha.json")
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with EDHRECClient(base_url=BASE_URL) as client:
+            result = await client.commander_top_cards(
+                "Muldrotha, the Gravetide", category="artifacts"
+            )
+
+        assert len(result.cardlists) == 2
+        tags = {cl.tag for cl in result.cardlists}
+        assert tags == {"utilityartifacts", "manaartifacts"}
+        # Verify cards from both lists are included
+        all_names = [c.name for cl in result.cardlists for c in cl.cardviews]
+        assert "Mindslaver" in all_names
+        assert "Sol Ring" in all_names
 
     @respx.mock
     async def test_category_filter_no_match(self):
@@ -180,6 +229,55 @@ class TestCardSynergy:
             )
 
         assert result is None
+
+    @respx.mock
+    async def test_matches_unicode_name_without_diacritics(self):
+        """Searching 'Gloin' matches 'Glóin' in EDHREC data (Bug 6)."""
+        fixture = _load_fixture("commander_muldrotha.json")
+        # Inject a card with a diacritical name into the fixture
+        fixture["container"]["json_dict"]["cardlists"][0]["cardviews"].append(
+            {
+                "name": "Glóin, Dwarf Emissary",
+                "sanitized": "gloin-dwarf-emissary",
+                "synergy": 0.44,
+                "inclusion": 7849,
+                "num_decks": 7849,
+                "potential_decks": 22329,
+            }
+        )
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with EDHRECClient(base_url=BASE_URL) as client:
+            result = await client.card_synergy("Gloin, Dwarf Emissary", "Muldrotha, the Gravetide")
+
+        assert result is not None
+        assert result.name == "Glóin, Dwarf Emissary"
+
+    @respx.mock
+    async def test_matches_front_face_without_dfc_suffix(self):
+        """Searching 'Pinnacle Monk // Mystic Peak' matches 'Pinnacle Monk' (Bug 7)."""
+        fixture = _load_fixture("commander_muldrotha.json")
+        fixture["container"]["json_dict"]["cardlists"][0]["cardviews"].append(
+            {
+                "name": "Pinnacle Monk",
+                "sanitized": "pinnacle-monk",
+                "synergy": 0.13,
+                "inclusion": 3710,
+                "num_decks": 3710,
+                "potential_decks": 22329,
+            }
+        )
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with EDHRECClient(base_url=BASE_URL) as client:
+            result = await client.card_synergy(
+                "Pinnacle Monk // Mystic Peak", "Muldrotha, the Gravetide"
+            )
+
+        assert result is not None
+        assert result.name == "Pinnacle Monk"
 
 
 class TestServerErrors:

@@ -378,20 +378,54 @@ class TestCardComparison:
         assert len(data_lines) == 1
         assert "N/A" in data_lines[0]  # combo column
 
-    async def test_card_not_found_propagates(
+    async def test_partial_results_when_card_not_found(
+        self,
+        scryfall: AsyncMock,
+        spellbook: AsyncMock,
+        edhrec: AsyncMock,
+        sol_ring: Card,
+        synergy_sol_ring: EDHRECCard,
+        mock_combos_sol_ring: list[Combo],
+    ) -> None:
+        """One card not found — returns partial results with note about missing card."""
+
+        async def resolve_side_effect(name: str) -> Card:
+            if name == "Sol Ring":
+                return sol_ring
+            raise CardNotFoundError(f"Card not found: '{name}'", status_code=404)
+
+        scryfall.get_card_by_name = AsyncMock(side_effect=resolve_side_effect)
+        spellbook.find_combos = AsyncMock(return_value=mock_combos_sol_ring)
+        edhrec.card_synergy = AsyncMock(return_value=synergy_sol_ring)
+
+        result = await card_comparison(
+            ["Sol Ring", "Nonexistent Card"],
+            COMMANDER_NAME,
+            scryfall=scryfall,
+            spellbook=spellbook,
+            edhrec=edhrec,
+        )
+
+        # Valid card is present in result
+        assert "Sol Ring" in result
+        # Missing card noted
+        assert "Nonexistent Card" in result
+        assert "not found" in result.lower()
+
+    async def test_all_cards_not_found_raises(
         self,
         scryfall: AsyncMock,
         spellbook: AsyncMock,
         edhrec: AsyncMock,
     ) -> None:
-        """Scryfall CardNotFoundError during resolve — propagated."""
+        """All cards not found — raises CardNotFoundError."""
         scryfall.get_card_by_name = AsyncMock(
             side_effect=CardNotFoundError("Card not found: 'Nonexistent'", status_code=404)
         )
 
         with pytest.raises(CardNotFoundError):
             await card_comparison(
-                ["Nonexistent", "Sol Ring"],
+                ["Nonexistent", "Also Fake"],
                 COMMANDER_NAME,
                 scryfall=scryfall,
                 spellbook=spellbook,

@@ -61,6 +61,45 @@ class TestCardRatings:
         assert len(ratings) == 5
 
     @respx.mock
+    async def test_uppercases_set_code(self):
+        """Lowercase set codes are uppercased before hitting the API (Bug 4)."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        async with SeventeenLandsClient(base_url=BASE_URL) as client:
+            ratings = await client.card_ratings("lci")
+
+        assert len(ratings) == 5
+
+    @respx.mock
+    async def test_includes_default_date_range(self):
+        """card_ratings includes start_date and end_date so past formats return game data."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        from mtg_mcp_server.services.seventeen_lands import (
+            _DEFAULT_END_DATE,
+            _DEFAULT_START_DATE,
+        )
+
+        route = respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={
+                "expansion": "LCI",
+                "event_type": "PremierDraft",
+                "start_date": _DEFAULT_START_DATE,
+                "end_date": _DEFAULT_END_DATE,
+            },
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        async with SeventeenLandsClient(base_url=BASE_URL) as client:
+            ratings = await client.card_ratings("LCI")
+
+        assert len(ratings) == 5
+        assert route.called
+
+    @respx.mock
     async def test_empty_response(self):
         """Empty API response for unknown set returns an empty list."""
         respx.get(

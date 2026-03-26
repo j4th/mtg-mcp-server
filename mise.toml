@@ -5,6 +5,7 @@ ruff = "latest"
 ty = "latest"
 
 [env]
+_.file = ".env"
 # Auto-create .venv using uv, activate on cd
 _.python.venv = { path = ".venv", create = true }
 # Ensure uv uses mise's managed Python, not system or self-managed
