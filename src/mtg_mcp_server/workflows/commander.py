@@ -470,13 +470,21 @@ async def card_comparison(
     resolve_tasks = [scryfall.get_card_by_name(name) for name in cards]
     resolved = await asyncio.gather(*resolve_tasks, return_exceptions=True)
 
-    # Check for resolution failures — propagate first CardNotFoundError
+    # Collect resolved cards, skip failures
     card_data: list[ScryfallCard | MTGJSONCard] = []
+    not_found_names: list[str] = []
     for i, result in enumerate(resolved):
         if isinstance(result, BaseException):
-            log.error("card_comparison.resolve_failed", card=cards[i], error=str(result))
-            raise result
-        card_data.append(result)
+            log.warning("card_comparison.resolve_failed", card=cards[i], error=str(result))
+            not_found_names.append(cards[i])
+        else:
+            card_data.append(result)
+
+    # If ALL cards failed, propagate the first error
+    if not card_data:
+        for result in resolved:
+            if isinstance(result, BaseException):
+                raise result
 
     # Step 2/3: Fetch synergy + combo data
     if on_progress is not None:
@@ -567,6 +575,11 @@ async def card_comparison(
     else:
         edhrec_ok = None
         edhrec_error_msg = None
+
+    if not_found_names:
+        lines.append("")
+        names_str = ", ".join(not_found_names)
+        lines.append(f"**Not found:** {names_str}")
 
     lines.extend(
         _source_status(

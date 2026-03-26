@@ -268,7 +268,7 @@ async def card_comparison(
             on_progress=lambda step, total: _progress(ctx, step, total),
         )
     except CardNotFoundError as exc:
-        raise ToolError(f"Card not found: {exc}. Check spelling.") from exc
+        raise ToolError(f"{exc}. Check spelling.") from exc
     except ServiceError as exc:
         raise ToolError(f"card_comparison failed: {exc}") from exc
 
