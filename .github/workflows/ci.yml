@@ -101,4 +101,4 @@ jobs:
         run: mise run setup
 
       - name: Audit dependencies
-        run: uv run pip-audit
+        run: uv run pip-audit --ignore-vuln CVE-2026-4539  # pygments — no fix available yet

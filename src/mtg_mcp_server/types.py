@@ -91,7 +91,7 @@ class Card(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _fill_from_card_faces(cls, data: dict) -> dict:  # type: ignore[type-arg]
+    def _fill_from_card_faces(cls, data: dict) -> dict:
         """Populate top-level fields from card_faces[0] for MDFCs.
 
         Scryfall MDFCs (Modal Double-Faced Cards) store mana_cost,
