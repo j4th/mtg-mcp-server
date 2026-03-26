@@ -235,7 +235,12 @@ class EDHRECClient(BaseClient):
 
         if category is not None:
             category_lower = category.lower()
-            cardlists = [cl for cl in cardlists if cl.tag.lower() == category_lower]
+            # Exact match first; fall back to substring (e.g. "artifacts"
+            # matches "utilityartifacts" and "manaartifacts").
+            exact = [cl for cl in cardlists if cl.tag.lower() == category_lower]
+            cardlists = (
+                exact if exact else [cl for cl in cardlists if category_lower in cl.tag.lower()]
+            )
 
         return EDHRECCommanderData(
             commander_name=header,

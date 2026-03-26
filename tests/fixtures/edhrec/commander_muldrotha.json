@@ -163,6 +163,38 @@
           ]
         },
         {
+          "header": "Utility Artifacts",
+          "tag": "utilityartifacts",
+          "cardviews": [
+            {
+              "id": "aaa111",
+              "name": "Mindslaver",
+              "sanitized": "mindslaver",
+              "url": "/cards/mindslaver",
+              "synergy": 0.38,
+              "inclusion": 4500,
+              "num_decks": 4500,
+              "potential_decks": 22329
+            }
+          ]
+        },
+        {
+          "header": "Mana Artifacts",
+          "tag": "manaartifacts",
+          "cardviews": [
+            {
+              "id": "bbb222",
+              "name": "Sol Ring",
+              "sanitized": "sol-ring",
+              "url": "/cards/sol-ring",
+              "synergy": 0.03,
+              "inclusion": 20500,
+              "num_decks": 20500,
+              "potential_decks": 22329
+            }
+          ]
+        },
+        {
           "header": "Enchantments",
           "tag": "enchantments",
           "cardviews": [

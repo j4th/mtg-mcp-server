@@ -130,6 +130,26 @@ class TestCommanderTopCards:
         assert result.cardlists[0].cardviews[0].name == "Spore Frog"
 
     @respx.mock
+    async def test_category_filter_substring_match(self):
+        """Category 'artifacts' matches both 'utilityartifacts' and 'manaartifacts' (Bug 2)."""
+        fixture = _load_fixture("commander_muldrotha.json")
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with EDHRECClient(base_url=BASE_URL) as client:
+            result = await client.commander_top_cards(
+                "Muldrotha, the Gravetide", category="artifacts"
+            )
+
+        assert len(result.cardlists) == 2
+        tags = {cl.tag for cl in result.cardlists}
+        assert tags == {"utilityartifacts", "manaartifacts"}
+        # Verify cards from both lists are included
+        all_names = [c.name for cl in result.cardlists for c in cl.cardviews]
+        assert "Mindslaver" in all_names
+        assert "Sol Ring" in all_names
+
+    @respx.mock
     async def test_category_filter_no_match(self):
         """Category filter with no matching cardlist returns empty results."""
         fixture = _load_fixture("commander_muldrotha.json")
