@@ -17,6 +17,13 @@ class SeventeenLandsError(ServiceError):
     """17Lands API error."""
 
 
+# Default date range for card_ratings — the API only returns game data for past
+# formats when start_date/end_date are provided.  A broad static range covers
+# every set 17Lands has ever tracked without making the tests date-dependent.
+_DEFAULT_START_DATE = "2020-01-01"
+_DEFAULT_END_DATE = "2099-12-31"
+
+
 class SeventeenLandsClient(BaseClient):
     """Async client for the 17Lands draft data API.
 
@@ -52,6 +59,10 @@ class SeventeenLandsClient(BaseClient):
     ) -> list[DraftCardRating]:
         """Get card performance data for a set.
 
+        A broad default date range is always sent because the 17Lands API only
+        returns game data for past formats when ``start_date``/``end_date`` are
+        present. Without them, only the current format returns non-zero counts.
+
         Args:
             set_code: Set code (e.g. ``"LCI"``, ``"MKM"``).
             event_type: Draft format (e.g. ``"PremierDraft"``, ``"TradDraft"``).
@@ -65,7 +76,12 @@ class SeventeenLandsClient(BaseClient):
         try:
             response = await self._get(
                 "/card_ratings/data",
-                params={"expansion": set_code.upper(), "event_type": event_type},
+                params={
+                    "expansion": set_code.upper(),
+                    "event_type": event_type,
+                    "start_date": _DEFAULT_START_DATE,
+                    "end_date": _DEFAULT_END_DATE,
+                },
             )
         except ServiceError as exc:
             raise SeventeenLandsError(exc.message, status_code=exc.status_code) from exc
