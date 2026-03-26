@@ -264,6 +264,12 @@ async def commander_overview(
     lines: list[str] = []
     lines.extend(_format_card_header(card))
 
+    if card.type_line and "Legendary" not in card.type_line:
+        lines.append("")
+        lines.append(
+            "> **Note:** This card may not be a valid commander — it is not a Legendary creature."
+        )
+
     if spellbook_ok:
         lines.extend(_format_combos_section(combos))
     else:

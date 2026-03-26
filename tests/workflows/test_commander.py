@@ -394,6 +394,38 @@ class TestCommanderOverview:
         assert "Muldrotha, the Gravetide" in result
         assert "{3}{B}{G}{U}" in result
 
+    async def test_non_legendary_card_warning(
+        self,
+        scryfall: AsyncMock,
+        spellbook: AsyncMock,
+    ) -> None:
+        """Non-legendary card used as commander gets a warning note."""
+        non_legendary = Card(
+            id="test-id-sol-ring",
+            name="Sol Ring",
+            mana_cost="{1}",
+            type_line="Artifact",
+            colors=[],
+            color_identity=[],
+            set="cmd",
+            rarity="uncommon",
+            prices=CardPrices(usd="1.50"),
+        )
+        scryfall.get_card_by_name = AsyncMock(return_value=non_legendary)
+        spellbook.find_combos = AsyncMock(return_value=[])
+
+        result = await commander_overview(
+            "Sol Ring",
+            scryfall=scryfall,
+            spellbook=spellbook,
+            edhrec=None,
+        )
+
+        assert "Sol Ring" in result
+        assert (
+            "not a legendary" in result.lower() or "may not be a valid commander" in result.lower()
+        )
+
 
 # ===========================================================================
 # evaluate_upgrade tests
