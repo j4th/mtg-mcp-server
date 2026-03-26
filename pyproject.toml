@@ -1,6 +1,6 @@
 [project]
 name = "mtg-mcp-server"
-version = "1.2.1"
+version = "1.2.2"
 description = "Unified MCP server providing Magic: The Gathering data to AI assistants"
 readme = "README.md"
 license = "MIT"
@@ -65,6 +65,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pip-audit>=2.10.0",
+    "pyyaml>=6.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",

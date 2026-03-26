@@ -64,6 +64,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify smithery.yaml matches SmitheryConfig
+        run: uv run python scripts/check_smithery_schema.py
+
       - name: Build package
         run: uv build
 

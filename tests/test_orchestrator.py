@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import pytest
 import respx
 
 if TYPE_CHECKING:
@@ -212,3 +213,233 @@ class TestMtgjsonMounted:
             result = await mcp_client.call_tool("mtgjson_card_search", {"query": "bolt"})
             text = result.content[0].text
             assert "Lightning Bolt" in text
+
+
+# ---------------------------------------------------------------------------
+# Server metadata tests
+# ---------------------------------------------------------------------------
+
+
+class TestServerMetadata:
+    """Verify server-level metadata used by quality scorers (Smithery, etc.)."""
+
+    def test_server_instructions_set(self):
+        """Server instructions are non-empty and reference all tool categories."""
+        from mtg_mcp_server.server import mcp as server
+
+        assert server.instructions, "Server instructions must be set"
+        assert "scryfall_*" in server.instructions
+        assert "spellbook_*" in server.instructions
+        assert "draft_*" in server.instructions
+        assert "edhrec_*" in server.instructions
+        assert "mtgjson_*" in server.instructions
+        assert "Workflow" in server.instructions
+
+    def test_server_name(self):
+        """Server name is 'MTG'."""
+        from mtg_mcp_server.server import mcp as server
+
+        assert server.name == "MTG"
+
+    def test_server_website_url(self):
+        """Server has a website URL configured."""
+        from mtg_mcp_server.server import mcp as server
+
+        # _mcp_server is a FastMCP internal — no public API for website_url/icons
+        url = server._mcp_server.website_url
+        assert url is not None, "website_url must be set"
+        assert url.startswith("https://"), f"website_url must start with https://, got: {url}"
+
+    def test_server_icons_configured(self):
+        """Server has at least one icon with src and mimeType."""
+        from mtg_mcp_server.server import mcp as server
+
+        icons = server._mcp_server.icons
+        assert icons, "Server must have at least one icon"
+        icon = icons[0]
+        assert icon.src, "Icon must have a src attribute"
+        assert icon.mimeType, "Icon must have a mimeType attribute"
+
+
+# ---------------------------------------------------------------------------
+# Tool schema completeness tests
+# ---------------------------------------------------------------------------
+
+
+class TestToolSchemaCompleteness:
+    """Verify every tool has complete schema metadata — descriptions, annotations, etc."""
+
+    async def test_all_tools_have_descriptions(self, mcp_client: Client):
+        """Every tool must have a non-empty description."""
+        tools = await mcp_client.list_tools()
+        missing = [t.name for t in tools if not t.description]
+        assert not missing, f"Tools missing descriptions: {missing}"
+
+    async def test_all_parameters_have_descriptions(self, mcp_client: Client):
+        """Every tool parameter must have a description in its JSON schema."""
+        tools = await mcp_client.list_tools()
+        missing = []
+        for tool in tools:
+            schema = tool.inputSchema
+            properties = schema.get("properties", {})
+            for param_name, param_schema in properties.items():
+                if "description" not in param_schema:
+                    missing.append(f"{tool.name}.{param_name}")
+        if missing:
+            pytest.fail(
+                f"Parameters missing descriptions ({len(missing)}):\n"
+                + "\n".join(f"  - {m}" for m in missing)
+            )
+
+    async def test_all_tools_have_annotations(self, mcp_client: Client):
+        """Every tool must have annotations with readOnlyHint and idempotentHint."""
+        tools = await mcp_client.list_tools()
+        missing = []
+        for tool in tools:
+            if tool.annotations is None:
+                missing.append(f"{tool.name} (no annotations)")
+            else:
+                if not tool.annotations.readOnlyHint:
+                    missing.append(f"{tool.name} (readOnlyHint not True)")
+                if not tool.annotations.idempotentHint:
+                    missing.append(f"{tool.name} (idempotentHint not True)")
+        assert not missing, f"Tools with missing/wrong annotations: {missing}"
+
+    async def test_expected_tool_count(self, mcp_client: Client):
+        """Server exposes the expected number of tools."""
+        tools = await mcp_client.list_tools()
+        tool_names = sorted(t.name for t in tools)
+        assert len(tools) == 23, f"Expected 23 tools, got {len(tools)}.\nTools: {tool_names}"
+
+    async def test_no_context_parameter_exposed(self, mcp_client: Client):
+        """No tool should expose 'ctx' (Context) as a user-visible parameter."""
+        tools = await mcp_client.list_tools()
+        exposed = []
+        for tool in tools:
+            properties = tool.inputSchema.get("properties", {})
+            if "ctx" in properties:
+                exposed.append(tool.name)
+        assert not exposed, f"Tools exposing 'ctx' parameter: {exposed}"
+
+
+# ---------------------------------------------------------------------------
+# Resource propagation tests
+# ---------------------------------------------------------------------------
+
+
+class TestResourcePropagation:
+    """Verify resource templates from mounted backends are visible on the orchestrator."""
+
+    async def test_all_resource_templates_listed(self, mcp_client: Client):
+        """All 6 resource templates from backend providers are accessible."""
+        templates = await mcp_client.list_resource_templates()
+        uri_set = {t.uriTemplate for t in templates}
+
+        # When mounted with a namespace, FastMCP may transform URIs.
+        # Check that each backend's resource is represented.
+        expected_fragments = [
+            "card/{name}",  # Scryfall card
+            "rulings",  # Scryfall rulings
+            "combo/{combo_id}",  # Spellbook combo
+            "ratings",  # 17Lands ratings
+            "staples",  # EDHREC staples
+            "card-data/{name}",  # MTGJSON card-data
+        ]
+        for fragment in expected_fragments:
+            found = any(fragment in uri for uri in uri_set)
+            assert found, (
+                f"No resource template contains '{fragment}'.\nAvailable templates: {uri_set}"
+            )
+
+    async def test_resource_template_count(self, mcp_client: Client):
+        """At least 6 resource templates are registered."""
+        templates = await mcp_client.list_resource_templates()
+        assert len(templates) >= 6, (
+            f"Expected >= 6 resource templates, got {len(templates)}.\n"
+            f"Templates: {[t.uriTemplate for t in templates]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Prompt completeness tests
+# ---------------------------------------------------------------------------
+
+
+class TestPromptCompleteness:
+    """Verify all prompts are registered and have complete argument metadata."""
+
+    async def test_all_prompts_listed(self, mcp_client: Client):
+        """All 4 workflow prompts are registered."""
+        prompts = await mcp_client.list_prompts()
+        prompt_names = {p.name for p in prompts}
+        expected = {
+            "evaluate_commander_swap",
+            "deck_health_check",
+            "draft_strategy",
+            "find_upgrades",
+        }
+        assert expected.issubset(prompt_names), (
+            f"Missing prompts: {expected - prompt_names}.\nAvailable: {prompt_names}"
+        )
+
+    async def test_prompt_arguments_have_descriptions(self, mcp_client: Client):
+        """Every prompt argument must have a non-empty description."""
+        prompts = await mcp_client.list_prompts()
+        missing = []
+        for prompt in prompts:
+            if prompt.arguments:
+                for arg in prompt.arguments:
+                    if not arg.description:
+                        missing.append(f"{prompt.name}.{arg.name}")
+        assert not missing, f"Prompt arguments missing descriptions: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# Tool naming convention tests
+# ---------------------------------------------------------------------------
+
+
+class TestToolNamingConventions:
+    """Verify tool naming follows the namespace conventions."""
+
+    async def test_backend_tools_namespaced(self, mcp_client: Client):
+        """Tools from mounted backends use their namespace prefix."""
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+
+        # Expected namespace prefixes and at least one tool per backend
+        backend_prefixes = {
+            "scryfall_": ["scryfall_search_cards", "scryfall_card_details"],
+            "spellbook_": ["spellbook_find_combos", "spellbook_combo_details"],
+            "draft_": ["draft_card_ratings", "draft_archetype_stats"],
+            "edhrec_": ["edhrec_commander_staples", "edhrec_card_synergy"],
+            "mtgjson_": ["mtgjson_card_lookup", "mtgjson_card_search"],
+        }
+        for prefix, expected_tools in backend_prefixes.items():
+            for tool_name in expected_tools:
+                assert tool_name in tool_names, (
+                    f"Expected namespaced tool '{tool_name}' (prefix '{prefix}') not found"
+                )
+
+    async def test_workflow_tools_not_namespaced(self, mcp_client: Client):
+        """Workflow tools are mounted without a namespace prefix."""
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        workflow_tools = [
+            "commander_overview",
+            "evaluate_upgrade",
+            "card_comparison",
+            "budget_upgrade",
+            "deck_analysis",
+            "set_overview",
+            "draft_pack_pick",
+            "suggest_cuts",
+        ]
+        for tool_name in workflow_tools:
+            assert tool_name in tool_names, f"Workflow tool '{tool_name}' not found"
+
+    async def test_ping_is_standalone(self, mcp_client: Client):
+        """Ping tool is registered directly on the orchestrator (no prefix)."""
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        assert "ping" in tool_names

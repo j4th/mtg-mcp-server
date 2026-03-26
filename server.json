@@ -3,14 +3,83 @@
     "name": "io.github.j4th/mtg-mcp-server",
     "title": "MTG MCP Server",
     "description": "Magic: The Gathering data for AI — cards, combos, draft analytics, and Commander tools.",
-    "repository": {"url": "https://github.com/j4th/mtg-mcp-server", "source": "github"},
-    "version": "1.2.1",
+    "websiteUrl": "https://github.com/j4th/mtg-mcp-server",
+    "icons": [
+        {
+            "src": "https://raw.githubusercontent.com/j4th/mtg-mcp-server/main/icon.svg",
+            "mimeType": "image/svg+xml",
+            "sizes": ["512x512"]
+        }
+    ],
+    "repository": {
+        "url": "https://github.com/j4th/mtg-mcp-server",
+        "source": "github",
+        "id": "1187666627"
+    },
+    "version": "1.2.2",
     "packages": [
         {
             "registryType": "pypi",
             "identifier": "mtg-mcp-server",
-            "version": "1.2.1",
-            "transport": {"type": "stdio"}
+            "version": "1.2.2",
+            "transport": {"type": "stdio"},
+            "runtimeHint": "uvx",
+            "environmentVariables": [
+                {
+                    "name": "MTG_MCP_TRANSPORT",
+                    "description": "Server transport — 'stdio' (default) or 'http'",
+                    "default": "stdio",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_HTTP_PORT",
+                    "description": "HTTP port when transport is 'http'",
+                    "default": "8000",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_LOG_LEVEL",
+                    "description": "Logging level — DEBUG, INFO, WARNING, or ERROR",
+                    "default": "INFO",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_ENABLE_17LANDS",
+                    "description": "Enable 17Lands draft analytics backend",
+                    "default": "true",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_ENABLE_EDHREC",
+                    "description": "Enable EDHREC commander metagame backend (uses undocumented endpoints)",
+                    "default": "true",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_ENABLE_MTGJSON",
+                    "description": "Enable MTGJSON bulk card data for rate-limit-free lookups (~100 MB download)",
+                    "default": "true",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_SCRYFALL_RATE_LIMIT_MS",
+                    "description": "Minimum delay between Scryfall API calls in milliseconds",
+                    "default": "100",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_MTGJSON_REFRESH_HOURS",
+                    "description": "Hours between MTGJSON bulk data refreshes",
+                    "default": "24",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_DISABLE_CACHE",
+                    "description": "Disable in-memory TTL caching (useful for testing)",
+                    "default": "false",
+                    "isSecret": false
+                }
+            ]
         }
     ]
 }
