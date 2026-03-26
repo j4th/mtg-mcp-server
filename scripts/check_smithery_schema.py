@@ -2,8 +2,8 @@
 """Verify smithery.yaml configSchema properties match SmitheryConfig Pydantic model.
 
 Catches drift between the YAML manifest (read by Smithery's deployment pipeline)
-and the Pydantic model (used by the Python SDK at runtime). CI runs this check
-alongside the server.json version reconciliation.
+and the Pydantic model (used by the Python SDK at runtime). CI runs this as a
+separate build step (see .github/workflows/ci.yml).
 """
 
 from __future__ import annotations
@@ -11,14 +11,25 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# pyyaml is a dev dependency
 import yaml
 
 from mtg_mcp_server.smithery import SmitheryConfig
 
 yaml_path = Path("smithery.yaml")
+if not yaml_path.exists():
+    print(f"::error::smithery.yaml not found in {Path.cwd()}", file=sys.stderr)
+    sys.exit(1)
+
 yaml_data = yaml.safe_load(yaml_path.read_text())
-yaml_schema = yaml_data["startCommand"]["configSchema"]
+try:
+    yaml_schema = yaml_data["startCommand"]["configSchema"]
+except (KeyError, TypeError) as exc:
+    print(
+        f"::error::smithery.yaml missing expected key 'startCommand.configSchema': {exc}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 yaml_props = set(yaml_schema.get("properties", {}).keys())
 
 pydantic_schema = SmitheryConfig.model_json_schema()

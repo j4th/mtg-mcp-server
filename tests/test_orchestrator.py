@@ -224,12 +224,15 @@ class TestServerMetadata:
     """Verify server-level metadata used by quality scorers (Smithery, etc.)."""
 
     def test_server_instructions_set(self):
-        """Server instructions are non-empty and reference tool categories."""
+        """Server instructions are non-empty and reference all tool categories."""
         from mtg_mcp_server.server import mcp as server
 
         assert server.instructions, "Server instructions must be set"
         assert "scryfall_*" in server.instructions
         assert "spellbook_*" in server.instructions
+        assert "draft_*" in server.instructions
+        assert "edhrec_*" in server.instructions
+        assert "mtgjson_*" in server.instructions
         assert "Workflow" in server.instructions
 
     def test_server_name(self):
@@ -242,6 +245,7 @@ class TestServerMetadata:
         """Server has a website URL configured."""
         from mtg_mcp_server.server import mcp as server
 
+        # _mcp_server is a FastMCP internal — no public API for website_url/icons
         url = server._mcp_server.website_url
         assert url is not None, "website_url must be set"
         assert url.startswith("https://"), f"website_url must start with https://, got: {url}"
@@ -288,18 +292,21 @@ class TestToolSchemaCompleteness:
             )
 
     async def test_all_tools_have_annotations(self, mcp_client: Client):
-        """Every tool must have annotations with readOnlyHint=True."""
+        """Every tool must have annotations with readOnlyHint and idempotentHint."""
         tools = await mcp_client.list_tools()
         missing = []
         for tool in tools:
             if tool.annotations is None:
-                missing.append(tool.name)
-            elif not tool.annotations.readOnlyHint:
-                missing.append(f"{tool.name} (readOnlyHint not True)")
+                missing.append(f"{tool.name} (no annotations)")
+            else:
+                if not tool.annotations.readOnlyHint:
+                    missing.append(f"{tool.name} (readOnlyHint not True)")
+                if not tool.annotations.idempotentHint:
+                    missing.append(f"{tool.name} (idempotentHint not True)")
         assert not missing, f"Tools with missing/wrong annotations: {missing}"
 
     async def test_expected_tool_count(self, mcp_client: Client):
-        """Server exposes exactly 23 tools (14 backend + 8 workflow + 1 ping)."""
+        """Server exposes the expected number of tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
         assert len(tools) == 23, f"Expected 23 tools, got {len(tools)}.\nTools: {tool_names}"
