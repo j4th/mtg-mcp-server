@@ -90,11 +90,21 @@ jobs:
           HORIZON_URL="https://mtg-mcp-server.fastmcp.app/mcp"
           echo "Waiting for Horizon to serve version ${PKG_VERSION}..."
           for i in $(seq 1 30); do
-            RESP=$(curl -sS -X POST "$HORIZON_URL" \
+            # Horizon uses MCP Streamable HTTP (SSE) — parse version from data: lines
+            SERVER_VER=$(curl -sS -X POST "$HORIZON_URL" \
               -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
               -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}' \
-              2>/dev/null || true)
-            SERVER_VER=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('result',{}).get('serverInfo',{}).get('version',''))" 2>/dev/null || true)
+              2>/dev/null | grep '^data: ' | sed 's/^data: //' | python3 -c "
+          import sys, json
+          for line in sys.stdin:
+              line = line.strip()
+              if not line: continue
+              try:
+                  ver = json.loads(line).get('result', {}).get('serverInfo', {}).get('version', '')
+                  if ver: print(ver); break
+              except (json.JSONDecodeError, AttributeError): pass
+          " 2>/dev/null || true)
             if [ "$SERVER_VER" = "$PKG_VERSION" ]; then
               echo "Horizon serving version ${PKG_VERSION} after ~$((i * 15))s"
               exit 0
