@@ -1,7 +1,7 @@
 [project]
 name = "mtg-mcp-server"
 version = "1.2.3"
-description = "Unified MCP server providing Magic: The Gathering data to AI assistants"
+description = "Magic: The Gathering card search, combo lookup, draft analytics, and Commander tools."
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Justin Forth", email = "justinforth@gmail.com" }]

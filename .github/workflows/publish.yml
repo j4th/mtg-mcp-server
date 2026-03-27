@@ -121,3 +121,8 @@ jobs:
           npx -y @smithery/cli mcp publish "https://mtg-mcp-server.fastmcp.app/mcp" \
             -n @j4th/mtg-mcp-server \
             --config-schema /tmp/smithery-config-schema.json
+
+      - name: Sync registry metadata from pyproject.toml
+        env:
+          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
+        run: bash scripts/update_smithery_metadata.sh

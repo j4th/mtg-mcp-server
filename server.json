@@ -2,7 +2,7 @@
     "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
     "name": "io.github.j4th/mtg-mcp-server",
     "title": "MTG MCP Server",
-    "description": "Magic: The Gathering data for AI — cards, combos, draft analytics, and Commander tools.",
+    "description": "Magic: The Gathering card search, combo lookup, draft analytics, and Commander tools.",
     "websiteUrl": "https://github.com/j4th/mtg-mcp-server",
     "icons": [
         {

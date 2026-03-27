@@ -51,18 +51,27 @@ jobs:
 
       - uses: jdx/mise-action@v4
 
-      - name: Verify server.json version matches pyproject.toml
+      - name: Verify server.json matches pyproject.toml
         run: |
-          PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          SERVER_VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['version'])")
-          PACKAGE_VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['version'])")
-          echo "pyproject.toml: $PKG_VERSION"
-          echo "server.json version: $SERVER_VERSION"
-          echo "server.json packages[0].version: $PACKAGE_VERSION"
-          if [ "$PKG_VERSION" != "$SERVER_VERSION" ] || [ "$PKG_VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "::error::Version mismatch! Update server.json to match pyproject.toml ($PKG_VERSION)"
-            exit 1
-          fi
+          python3 -c "
+          import json, tomllib, sys
+          proj = tomllib.load(open('pyproject.toml', 'rb'))['project']
+          sj = json.load(open('server.json'))
+          errors = []
+          # Version check
+          for path, val in [('version', sj['version']), ('packages[0].version', sj['packages'][0]['version'])]:
+              if val != proj['version']:
+                  errors.append(f'server.json {path} ({val}) != pyproject.toml ({proj[\"version\"]})')
+          # Description check
+          if sj.get('description', '') != proj['description']:
+              errors.append(f'server.json description does not match pyproject.toml')
+              errors.append(f'  server.json:   {sj.get(\"description\", \"\")}')
+              errors.append(f'  pyproject.toml: {proj[\"description\"]}')
+          if errors:
+              for e in errors: print(f'::error::{e}')
+              sys.exit(1)
+          print(f'OK: version={proj[\"version\"]}, description matches')
+          "
 
       - name: Verify smithery.yaml matches SmitheryConfig
         run: uv run python scripts/check_smithery_schema.py
