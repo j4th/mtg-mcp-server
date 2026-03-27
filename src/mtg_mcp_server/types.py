@@ -77,6 +77,7 @@ class Card(BaseModel):
     set_code: str = Field(alias="set", default="")  # Aliased: Scryfall JSON uses "set"
     collector_number: str = ""
     rarity: str = ""
+    layout: str = ""  # Scryfall layout (e.g. "normal", "transform", "modal_dfc")
     prices: CardPrices = Field(default_factory=CardPrices)
     legalities: dict[str, str] = Field(default_factory=dict)  # format -> "legal"/"not_legal"/etc.
     image_uris: CardImageUris | None = None

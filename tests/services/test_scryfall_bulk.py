@@ -321,7 +321,7 @@ class TestParsing:
     """Test that the bulk data is parsed correctly into Card models."""
 
     async def test_correct_card_count(self, loaded_client: ScryfallBulkClient):
-        """8 unique cards, 9 entries in _cards due to DFC double-keying."""
+        """8 playable cards (4 non-playable layouts filtered), 9 dict entries for DFC."""
         assert len(loaded_client._unique_cards) == 8
         # 8 normal keys + 1 extra for DFC front-face-only key
         assert len(loaded_client._cards) == 9
@@ -351,6 +351,69 @@ class TestParsing:
         card = await loaded_client.get_card("Forest")
         assert card is not None
         assert card.edhrec_rank is None
+
+
+class TestLayoutFiltering:
+    """Test that non-playable card layouts are excluded from parsed data."""
+
+    async def test_minigame_excluded(self, loaded_client: ScryfallBulkClient):
+        """Minigame Sol Ring (acmm) is filtered; real Sol Ring returned."""
+        card = await loaded_client.get_card("Sol Ring")
+        assert card is not None
+        assert card.set_code != "acmm"
+        assert card.layout == "normal"
+        assert card.type_line == "Artifact"
+
+    async def test_art_series_excluded(self, loaded_client: ScryfallBulkClient):
+        """Art series Lightning Bolt is filtered; real Lightning Bolt returned."""
+        card = await loaded_client.get_card("Lightning Bolt")
+        assert card is not None
+        assert card.set_code != "sld"
+        assert card.layout == "normal"
+        assert card.type_line == "Instant"
+
+    async def test_token_excluded(self, loaded_client: ScryfallBulkClient):
+        """Token Forest is filtered; real Basic Land returned."""
+        card = await loaded_client.get_card("Forest")
+        assert card is not None
+        assert "Basic Land" in card.type_line
+
+    async def test_emblem_excluded(self, loaded_client: ScryfallBulkClient):
+        """Emblem cards are filtered and not searchable."""
+        results = await loaded_client.search_cards("Emblem")
+        assert len(results) == 0
+
+    async def test_real_card_preserved_despite_collision(self, loaded_client: ScryfallBulkClient):
+        """Sol Ring retains correct data despite minigame entry later in fixture."""
+        card = await loaded_client.get_card("Sol Ring")
+        assert card is not None
+        assert card.prices.usd == "1.50"
+        assert card.legalities["commander"] == "legal"
+        assert card.edhrec_rank == 1
+
+    async def test_excluded_layouts_constant(self):
+        """All 6 non-playable layouts are in the exclusion set."""
+        from mtg_mcp_server.services.scryfall_bulk import _EXCLUDED_LAYOUTS
+
+        expected = {
+            "art_series",
+            "double_faced_token",
+            "emblem",
+            "minigame",
+            "placeholder",
+            "token",
+        }
+        assert expected == _EXCLUDED_LAYOUTS
+
+    async def test_layout_field_populated(self, loaded_client: ScryfallBulkClient):
+        """Parsed cards have the layout field populated from Scryfall data."""
+        card = await loaded_client.get_card("Sol Ring")
+        assert card is not None
+        assert card.layout == "normal"
+
+        dfc = await loaded_client.get_card("Delver of Secrets")
+        assert dfc is not None
+        assert dfc.layout == "transform"
 
 
 class TestDFC:

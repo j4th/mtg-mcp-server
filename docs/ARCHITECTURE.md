@@ -154,9 +154,11 @@ mtg-mcp/
 │   ├── conftest.py                 # Shared fixtures, mock clients
 │   ├── services/
 │   │   ├── test_scryfall.py
+│   │   ├── test_scryfall_bulk.py   # Bulk data service + layout filtering
 │   │   └── ...
 │   ├── providers/
 │   │   ├── test_scryfall_provider.py
+│   │   ├── test_scryfall_bulk_provider.py
 │   │   └── ...
 │   ├── workflows/
 │   │   ├── test_commander.py       # commander_overview, evaluate_upgrade, card_comparison, budget_upgrade
@@ -164,8 +166,16 @@ mtg-mcp/
 │   │   ├── test_deck.py            # suggest_cuts
 │   │   ├── test_analysis.py        # deck_analysis
 │   │   └── test_workflow_server.py # Integration: tool registration + prompt registration
+│   ├── integration/                # Fixture-mocked cross-component E2E tests
+│   │   ├── conftest.py             # Bulk client + orchestrator fixtures (respx-mocked)
+│   │   ├── test_bulk_data_e2e.py   # Bulk data pipeline: lookup, search, resources
+│   │   └── test_orchestrator_e2e.py# Full orchestrator: tool registration, scryfall, ping
+│   ├── live/                       # Real server + real API smoke tests
+│   │   ├── conftest.py             # Server subprocess lifecycle fixtures
+│   │   └── test_smoke.py           # Health, bulk data, scryfall (marked @pytest.mark.live)
 │   └── fixtures/                   # Real API responses, captured once
 │       ├── scryfall/               # Card data, search results, rulings
+│       ├── scryfall_bulk/          # Oracle Cards sample with adversarial entries
 │       ├── spellbook/              # Combos, bracket estimates, decklist combos
 │       ├── seventeen_lands/        # Card ratings, color ratings
 │       ├── edhrec/                 # Commander pages, card synergy
@@ -392,8 +402,16 @@ if __name__ == "__main__":
 
 ### Testing
 
-FastMCP servers are tested using `fastmcp.Client` with the server instance as the transport.
-This creates an in-memory connection — no network, no stdio.
+Four test tiers, each with a specific purpose. CI runs all tiers on PRs to main.
+
+**Unit tests** (`tests/services/`, `tests/providers/`): Test individual services and providers in isolation. HTTP mocked via respx with fixture data. FastMCP servers tested using `fastmcp.Client` with the server instance as transport (in-memory, no network). `~2.5min`
+
+**Integration tests** (`tests/integration/`): Test the full MCP pipeline end-to-end with all backends fixture-mocked via respx. Catches cross-component issues like tool registration, namespacing, and data flow through the orchestrator. Marked `@pytest.mark.integration`. `~2s`
+
+**Live smoke tests** (`tests/live/`): Start a real server subprocess on an ephemeral port, connect via `Client("http://127.0.0.1:PORT/mcp")`, and hit real APIs. Catches real-world data issues that fixtures miss (e.g. Scryfall bulk data containing non-playable card layouts that overwrite real cards). Marked `@pytest.mark.live`, skipped by default. `~1-2min`
+
+**Full suite** (`mise run check`): lint + typecheck + all tests except live. `~3min`
+**Complete gate** (`mise run check:full`): Full suite + live smoke tests. `~4-5min`. CI runs this on PRs.
 
 `Client.call_tool()` returns a `CallToolResult` — use `.content[0].text` to access the response
 string. For testing error responses, pass `raise_on_error=False`.

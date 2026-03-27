@@ -318,5 +318,140 @@
         "scryfall_uri": "https://scryfall.com/card/pcy/126/spore-frog",
         "edhrec_rank": 300,
         "rulings_uri": "https://api.scryfall.com/cards/dddd4444/rulings"
+    },
+    {
+        "object": "card",
+        "id": "eeee5555-6666-7777-8888-999900001111",
+        "oracle_id": "ffff5555-6666-7777-8888-999900001111",
+        "name": "Sol Ring // Sol Ring",
+        "lang": "en",
+        "layout": "minigame",
+        "cmc": 0.0,
+        "type_line": "Card // Card",
+        "oracle_text": "",
+        "colors": [],
+        "color_identity": [],
+        "keywords": [],
+        "set": "acmm",
+        "collector_number": "1",
+        "rarity": "common",
+        "card_faces": [
+            {
+                "object": "card_face",
+                "name": "Sol Ring",
+                "type_line": "Card",
+                "oracle_text": ""
+            },
+            {
+                "object": "card_face",
+                "name": "Sol Ring",
+                "type_line": "Card",
+                "oracle_text": ""
+            }
+        ],
+        "prices": {
+            "usd": null,
+            "usd_foil": null,
+            "eur": null
+        },
+        "legalities": {
+            "standard": "not_legal",
+            "commander": "not_legal",
+            "modern": "not_legal",
+            "legacy": "not_legal",
+            "vintage": "not_legal"
+        },
+        "scryfall_uri": "https://scryfall.com/card/acmm/1/sol-ring-sol-ring"
+    },
+    {
+        "object": "card",
+        "id": "ffff6666-7777-8888-9999-000011112222",
+        "oracle_id": "aaa06666-7777-8888-9999-000011112222",
+        "name": "Lightning Bolt",
+        "lang": "en",
+        "layout": "art_series",
+        "cmc": 0.0,
+        "type_line": "Card",
+        "colors": ["R"],
+        "color_identity": ["R"],
+        "keywords": [],
+        "set": "sld",
+        "collector_number": "1",
+        "rarity": "common",
+        "prices": {
+            "usd": null,
+            "usd_foil": null,
+            "eur": null
+        },
+        "legalities": {
+            "standard": "not_legal",
+            "commander": "not_legal",
+            "modern": "not_legal",
+            "legacy": "not_legal",
+            "vintage": "not_legal"
+        },
+        "scryfall_uri": "https://scryfall.com/card/sld/1/lightning-bolt"
+    },
+    {
+        "object": "card",
+        "id": "aaa17777-8888-9999-0000-111122223333",
+        "oracle_id": "bbb17777-8888-9999-0000-111122223333",
+        "name": "Forest",
+        "lang": "en",
+        "layout": "token",
+        "cmc": 0.0,
+        "type_line": "Token Creature \u2014 Treefolk",
+        "oracle_text": "",
+        "colors": ["G"],
+        "color_identity": ["G"],
+        "keywords": [],
+        "power": "0",
+        "toughness": "0",
+        "set": "tlea",
+        "collector_number": "T1",
+        "rarity": "common",
+        "prices": {
+            "usd": null,
+            "usd_foil": null,
+            "eur": null
+        },
+        "legalities": {
+            "standard": "not_legal",
+            "commander": "not_legal",
+            "modern": "not_legal",
+            "legacy": "not_legal",
+            "vintage": "not_legal"
+        },
+        "scryfall_uri": "https://scryfall.com/card/tlea/T1/forest"
+    },
+    {
+        "object": "card",
+        "id": "bbb28888-9999-0000-1111-222233334444",
+        "oracle_id": "ccc28888-9999-0000-1111-222233334444",
+        "name": "Jace, Vryn's Prodigy Emblem",
+        "lang": "en",
+        "layout": "emblem",
+        "cmc": 0.0,
+        "type_line": "Emblem \u2014 Jace",
+        "oracle_text": "Whenever you cast a spell, you may copy it. You may choose new targets for the copy.",
+        "colors": [],
+        "color_identity": ["U"],
+        "keywords": [],
+        "set": "tori",
+        "collector_number": "E1",
+        "rarity": "common",
+        "prices": {
+            "usd": null,
+            "usd_foil": null,
+            "eur": null
+        },
+        "legalities": {
+            "standard": "not_legal",
+            "commander": "not_legal",
+            "modern": "not_legal",
+            "legacy": "not_legal",
+            "vintage": "not_legal"
+        },
+        "scryfall_uri": "https://scryfall.com/card/tori/E1/jace-vryns-prodigy-emblem"
     }
 ]

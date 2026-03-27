@@ -36,6 +36,20 @@ __all__ = ["ScryfallBulkClient", "ScryfallBulkDownloadError", "ScryfallBulkError
 
 log = structlog.get_logger(service="ScryfallBulkClient")
 
+# Scryfall Oracle Cards includes non-playable entries (minigames, art series,
+# tokens, emblems) that can share names with real cards. Filter these out during
+# parsing. Uses a deny-list so new playable layouts are included by default.
+_EXCLUDED_LAYOUTS: frozenset[str] = frozenset(
+    {
+        "art_series",
+        "double_faced_token",
+        "emblem",
+        "minigame",
+        "placeholder",
+        "token",
+    }
+)
+
 
 class ScryfallBulkError(ServiceError):
     """Base exception for Scryfall bulk data service errors.
@@ -370,6 +384,11 @@ class ScryfallBulkClient:
                 skipped += 1
                 continue
 
+            layout = entry.get("layout", "")
+            if layout in _EXCLUDED_LAYOUTS:
+                skipped += 1
+                continue
+
             try:
                 card = Card.model_validate(entry)
             except (ValidationError, ValueError) as exc:
@@ -395,7 +414,7 @@ class ScryfallBulkClient:
                     cards[front_face] = card
 
         if skipped:
-            log.warning("scryfall_bulk.parse_summary", skipped=skipped, loaded=len(unique))
+            log.info("scryfall_bulk.parse_summary", skipped=skipped, loaded=len(unique))
 
         if not unique:
             raise ScryfallBulkError(

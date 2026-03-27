@@ -150,8 +150,10 @@ filterwarnings = [
     "error",                           # treat warnings as errors by default
     "ignore::DeprecationWarning",      # except deprecation warnings from deps
 ]
+addopts = "-m 'not live'"
 markers = [
     "integration: marks tests requiring full orchestrator (deselect with '-m \"not integration\"')",
+    "live: marks tests that start a real server and hit real APIs (deselect with '-m \"not live\"')",
 ]
 
 # ---------------------------------------------------------------------------
