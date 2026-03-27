@@ -80,11 +80,11 @@ class TestSubServerMaskErrorDetails:
 
         assert edhrec_mcp._mask_error_details is True
 
-    def test_mtgjson_mask_error_details(self):
-        """MTGJSON sub-server masks unhandled errors."""
-        from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
+    def test_scryfall_bulk_mask_error_details(self):
+        """Scryfall Bulk sub-server masks unhandled errors."""
+        from mtg_mcp_server.providers.scryfall_bulk import scryfall_bulk_mcp
 
-        assert mtgjson_mcp._mask_error_details is True
+        assert scryfall_bulk_mcp._mask_error_details is True
 
     def test_workflow_mask_error_details(self):
         """Workflow sub-server masks unhandled errors."""
@@ -106,7 +106,7 @@ class TestConfig:
         assert settings.enable_edhrec is True
         assert settings.enable_17lands is True
         assert settings.disable_cache is False
-        assert settings.enable_mtgjson is True
+        assert settings.enable_bulk_data is True
 
     def test_config_reads_env_vars(self, monkeypatch: pytest.MonkeyPatch):
         """MTG_MCP_ env vars override defaults."""

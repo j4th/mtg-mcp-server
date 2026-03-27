@@ -32,10 +32,10 @@ class SmitheryConfig(BaseModel):
         title="Enable EDHREC",
         description="Enable EDHREC commander metagame backend (uses undocumented endpoints)",
     )
-    MTG_MCP_ENABLE_MTGJSON: bool = Field(
+    MTG_MCP_ENABLE_BULK_DATA: bool = Field(
         default=True,
-        title="Enable MTGJSON",
-        description="Enable MTGJSON bulk card data for rate-limit-free lookups (~100 MB download on first use)",
+        title="Enable Bulk Data",
+        description="Enable Scryfall bulk card data for rate-limit-free lookups (~80 MB download on first use)",
     )
     MTG_MCP_LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
         default="INFO",
@@ -49,10 +49,10 @@ class SmitheryConfig(BaseModel):
         ge=10,
         le=5000,
     )
-    MTG_MCP_MTGJSON_REFRESH_HOURS: int = Field(
-        default=24,
-        title="MTGJSON Refresh Interval (hours)",
-        description="Hours between MTGJSON bulk data refreshes",
+    MTG_MCP_BULK_DATA_REFRESH_HOURS: int = Field(
+        default=12,
+        title="Bulk Data Refresh Interval (hours)",
+        description="Hours between Scryfall bulk data refreshes",
         ge=1,
         le=168,
     )

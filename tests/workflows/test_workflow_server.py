@@ -292,7 +292,7 @@ class TestCardComparisonToolError:
             patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
             patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
             patch("mtg_mcp_server.workflows.server._edhrec", None),
-            patch("mtg_mcp_server.workflows.server._mtgjson", None),
+            patch("mtg_mcp_server.workflows.server._bulk", None),
         ):
             result = await mcp_client.call_tool(
                 "card_comparison",
@@ -312,7 +312,7 @@ class TestCardComparisonToolError:
             patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
             patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
             patch("mtg_mcp_server.workflows.server._edhrec", None),
-            patch("mtg_mcp_server.workflows.server._mtgjson", None),
+            patch("mtg_mcp_server.workflows.server._bulk", None),
         ):
             result = await mcp_client.call_tool(
                 "card_comparison",
@@ -400,7 +400,7 @@ class TestDeckAnalysisToolError:
             patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
             patch("mtg_mcp_server.workflows.server._spellbook", mock_spellbook),
             patch("mtg_mcp_server.workflows.server._edhrec", None),
-            patch("mtg_mcp_server.workflows.server._mtgjson", None),
+            patch("mtg_mcp_server.workflows.server._bulk", None),
         ):
             result = await mcp_client.call_tool(
                 "deck_analysis",

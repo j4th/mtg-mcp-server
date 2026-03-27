@@ -16,7 +16,6 @@ from mtg_mcp_server.types import (
     EDHRECCard,
     EDHRECCardList,
     EDHRECCommanderData,
-    MTGJSONCard,
 )
 from mtg_mcp_server.workflows.analysis import deck_analysis
 
@@ -42,20 +41,6 @@ def _make_card(
         type_line="Creature",
         prices=CardPrices(usd=usd_price),
         rarity="common",
-    )
-
-
-def _make_mtgjson_card(
-    name: str,
-    mana_cost: str = "{2}{U}",
-    mana_value: float = 3.0,
-) -> MTGJSONCard:
-    """Create a minimal MTGJSONCard for testing."""
-    return MTGJSONCard(
-        name=name,
-        mana_cost=mana_cost,
-        mana_value=mana_value,
-        type_line="Creature",
     )
 
 
@@ -144,16 +129,16 @@ def _make_scryfall(cards: dict[str, Card] | None = None) -> AsyncMock:
     return mock
 
 
-def _make_mtgjson(cards: dict[str, MTGJSONCard] | None = None) -> AsyncMock:
-    """Mock MTGJSONClient that returns MTGJSONCard objects by name."""
+def _make_bulk(cards: dict[str, Card] | None = None) -> AsyncMock:
+    """Mock ScryfallBulkClient that returns Card objects by name."""
     default_cards = {
-        "sol ring": _make_mtgjson_card("Sol Ring", mana_cost="{1}", mana_value=1.0),
-        "spore frog": _make_mtgjson_card("Spore Frog", mana_cost="{G}", mana_value=1.0),
-        "bad card": _make_mtgjson_card("Bad Card", mana_cost="{3}{B}{B}", mana_value=5.0),
+        "sol ring": _make_card("Sol Ring", mana_cost="{1}", cmc=1.0, usd_price="3.00"),
+        "spore frog": _make_card("Spore Frog", mana_cost="{G}", cmc=1.0, usd_price="0.50"),
+        "bad card": _make_card("Bad Card", mana_cost="{3}{B}{B}", cmc=5.0, usd_price="0.10"),
     }
     lookup = cards if cards is not None else default_cards
 
-    async def get_card(name: str) -> MTGJSONCard | None:
+    async def get_card(name: str) -> Card | None:
         return lookup.get(name.lower())
 
     mock = AsyncMock()
@@ -194,7 +179,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -207,7 +192,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -219,7 +204,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -231,7 +216,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -244,7 +229,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -257,7 +242,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -269,7 +254,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -278,14 +263,14 @@ class TestDeckAnalysisHappyPath:
         assert "Scryfall](https://scryfall.com): OK" in result
         assert "Commander Spellbook](https://commanderspellbook.com): OK" in result
         assert "EDHREC](https://edhrec.com): OK" in result
-        assert "MTGJSON](https://mtgjson.com): OK" in result
+        assert "Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): OK" in result
 
     async def test_bracket_tag_displayed(self) -> None:
         """Bracket tag from Spellbook displayed in output."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -297,7 +282,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(combos=_make_decklist_combos(included=[SAMPLE_COMBO])),
             edhrec=_make_edhrec(),
@@ -309,7 +294,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -325,7 +310,7 @@ class TestDeckAnalysisHappyPath:
         result = await deck_analysis(
             ["Sol Ring", "Spore Frog", "Bad Card"],
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -334,28 +319,28 @@ class TestDeckAnalysisHappyPath:
         assert "B: 2" in result
 
 
-class TestDeckAnalysisMtgjsonDisabled:
-    """MTGJSON is None — falls back to Scryfall for card resolution."""
+class TestDeckAnalysisBulkDisabled:
+    """Bulk data is None — falls back to Scryfall for card resolution."""
 
     async def test_falls_back_to_scryfall(self) -> None:
-        """Falls back to Scryfall and shows MTGJSON as Disabled in footer."""
+        """Falls back to Scryfall and shows bulk data as Disabled in footer."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=None,
+            bulk=None,
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
         assert "Deck Analysis" in result
-        assert "MTGJSON](https://mtgjson.com): Disabled" in result
+        assert "Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): Disabled" in result
 
     async def test_mana_curve_still_computed(self) -> None:
-        """Mana curve computed via Scryfall fallback when MTGJSON is disabled."""
+        """Mana curve computed via Scryfall fallback when bulk data is disabled."""
         result = await deck_analysis(
             ["Sol Ring", "Spore Frog"],
             COMMANDER,
-            mtgjson=None,
+            bulk=None,
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -371,7 +356,7 @@ class TestDeckAnalysisEdhrecDisabled:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=None,
@@ -384,7 +369,7 @@ class TestDeckAnalysisEdhrecDisabled:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=None,
@@ -409,7 +394,7 @@ class TestDeckAnalysisSpellbookFailure:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=spellbook,
             edhrec=_make_edhrec(),
@@ -429,7 +414,7 @@ class TestDeckAnalysisSpellbookFailure:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=spellbook,
             edhrec=_make_edhrec(),
@@ -444,11 +429,11 @@ class TestDeckAnalysisPartialCardResolution:
 
     async def test_failures_noted_in_output(self) -> None:
         """Unresolved cards listed in an Unresolved section."""
-        # "Unknown Card" will fail in both MTGJSON (None) and Scryfall (not found)
+        # "Unknown Card" will fail in both bulk data (None) and Scryfall (not found)
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -461,7 +446,7 @@ class TestDeckAnalysisPartialCardResolution:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -479,7 +464,7 @@ class TestDeckAnalysisEmptyDecklist:
         result = await deck_analysis(
             [],
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -490,30 +475,29 @@ class TestDeckAnalysisEmptyDecklist:
 class TestDeckAnalysisProgressCallback:
     """Progress callback is called at the right steps."""
 
-    async def test_progress_called_four_times(self) -> None:
-        """Progress callback invoked four times (steps 1/4 through 4/4)."""
+    async def test_progress_called_three_times(self) -> None:
+        """Progress callback invoked three times (steps 1/3 through 3/3)."""
         progress = AsyncMock()
         await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
             on_progress=progress,
         )
-        assert progress.await_count == 4
-        progress.assert_any_await(1, 4)
-        progress.assert_any_await(2, 4)
-        progress.assert_any_await(3, 4)
-        progress.assert_any_await(4, 4)
+        assert progress.await_count == 3
+        progress.assert_any_await(1, 3)
+        progress.assert_any_await(2, 3)
+        progress.assert_any_await(3, 3)
 
     async def test_works_without_progress(self) -> None:
         """No crash when on_progress is None."""
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -534,7 +518,7 @@ class TestDeckAnalysisEdhrecFailure:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=edhrec,
@@ -549,7 +533,7 @@ class TestDeckAnalysisEdhrecFailure:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=edhrec,
@@ -568,7 +552,7 @@ class TestDeckAnalysisBudget:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
@@ -580,7 +564,7 @@ class TestDeckAnalysisBudget:
         result = await deck_analysis(
             SAMPLE_DECKLIST,
             COMMANDER,
-            mtgjson=_make_mtgjson(),
+            bulk=_make_bulk(),
             scryfall=_make_scryfall(),
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),

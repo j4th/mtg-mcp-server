@@ -45,15 +45,10 @@ class Settings(BaseSettings):
     # Optional backends can be disabled without code changes.
     enable_17lands: bool = True
     enable_edhrec: bool = True  # Behind flag — scrapes undocumented endpoints
-    enable_mtgjson: bool = True  # Deprecated: will be removed with MTGJSON migration
     enable_bulk_data: bool = True
 
     # --- Caching ---
     disable_cache: bool = False  # Set True in tests to bypass TTLCache
-
-    # --- MTGJSON (deprecated: will be removed with MTGJSON migration) ---
-    mtgjson_data_url: str = "https://mtgjson.com/api/v5/AtomicCards.json.gz"
-    mtgjson_refresh_hours: int = 24
 
     # --- Scryfall Bulk Data ---
     bulk_data_refresh_hours: int = 12
