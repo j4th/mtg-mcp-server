@@ -140,26 +140,26 @@ Get synergy data for a specific card with a specific commander.
 
 ---
 
-## MTGJSON Backend (namespace: `mtgjson`)
+## Scryfall Bulk Data Backend (namespace: `bulk`)
 
-### `mtgjson_card_lookup`
-Look up a Magic card by exact name using MTGJSON bulk data. Rate-limit-free.
+### `bulk_card_lookup`
+Look up a Magic card by exact name using Scryfall bulk data. Rate-limit-free.
 
 | Field | Detail |
 |-------|--------|
 | Input | `name: str` |
-| Output | Full card data: name, mana cost, type, oracle text, colors, color identity, P/T, keywords, supertypes, subtypes, mana value |
-| Backend | `MTGJSONClient.get_card()` |
+| Output | Full card data: name, mana cost, type, oracle text, colors, color identity, P/T, keywords, prices, legalities, EDHREC rank, image URIs |
+| Backend | `ScryfallBulkClient.get_card()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
-### `mtgjson_card_search`
-Search for Magic cards in MTGJSON bulk data by name, type, or oracle text. Rate-limit-free.
+### `bulk_card_search`
+Search for Magic cards in Scryfall bulk data by name, type, or oracle text. Rate-limit-free.
 
 | Field | Detail |
 |-------|--------|
 | Input | `query: str`, `search_field: str = "name"` (one of "name", "type", "text"), `limit: int = 20` |
 | Output | Formatted list of matching cards with name, mana cost, type line |
-| Backend | `MTGJSONClient.search_cards()` / `search_by_type()` / `search_by_text()` |
+| Backend | `ScryfallBulkClient.search_cards()` / `search_by_type()` / `search_by_text()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ---
@@ -245,10 +245,10 @@ Full decklist health check — mana curve, colors, combos, bracket, budget, syne
 |-------|--------|
 | Input | `decklist: list[str]`, `commander_name: str` |
 | Output | Markdown with: mana curve distribution table, color pip requirements, combos & bracket estimate, total/average budget, 5 lowest-synergy cards, unresolved cards, Data Sources footer |
-| Backends | MTGJSON/Scryfall (card data) + Spellbook (combos/bracket) + EDHREC (synergy) + Scryfall (prices) |
-| Card resolution | Uses MTGJSON-first strategy via `card_resolver` with Scryfall fallback. Fills missing prices from Scryfall |
+| Backends | Scryfall bulk data/Scryfall API (card data) + Spellbook (combos/bracket) + EDHREC (synergy) |
+| Card resolution | Uses bulk-data-first strategy via `card_resolver` with Scryfall API fallback |
 | Partial failure | Degrades gracefully — all backends except Scryfall are optional |
-| Progress | Reports progress (1/4 resolving, 2/4 combos, 3/4 synergy, 4/4 prices) |
+| Progress | Reports progress (1/3 resolving, 2/3 combos/bracket, 3/3 synergy) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `set_overview`
@@ -332,8 +332,8 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 |-----|-------------|
 | `mtg://commander/{name}/staples` | Commander staples data as JSON |
 
-### MTGJSON Resources
+### Scryfall Bulk Data Resources
 
 | URI | Description |
 |-----|-------------|
-| `mtg://card-data/{name}` | Card data from MTGJSON bulk data as JSON |
+| `mtg://card-data/{name}` | Card data from Scryfall bulk data as JSON |

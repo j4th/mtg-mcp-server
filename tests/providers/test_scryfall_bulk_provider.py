@@ -266,3 +266,41 @@ class TestCardSearch:
         result = await client_with_data.call_tool("card_search", {"query": "Sol"})
         text = result.content[0].text
         assert "Data: Scryfall bulk data" in text
+
+
+class TestResourceErrors:
+    """Test card_data_resource error and not-found paths."""
+
+    async def test_resource_card_not_found(self, client_with_data: Client):
+        """Resource returns error JSON when card is not found."""
+        import json as _json
+
+        result = await client_with_data.read_resource("mtg://card-data/nonexistent")
+        data = _json.loads(result[0].text)
+        assert "error" in data
+        assert "not found" in data["error"].lower()
+
+    async def test_resource_returns_card_json(self, client_with_data: Client):
+        """Resource returns valid card JSON for a known card."""
+        import json as _json
+
+        result = await client_with_data.read_resource("mtg://card-data/Sol Ring")
+        data = _json.loads(result[0].text)
+        assert data["name"] == "Sol Ring"
+
+
+class TestLegalitiesFormatting:
+    """Test _format_legalities edge cases."""
+
+    async def test_no_legal_formats(self, mock_service: AsyncMock):
+        """card_lookup shows 'Not legal in any format' when all banned/restricted."""
+        card = _make_card(legalities={"commander": "banned", "modern": "not_legal"})
+        mock_service.get_card = AsyncMock(return_value=card)
+
+        with patch(
+            "mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock_service
+        ):
+            async with Client(transport=scryfall_bulk_mcp) as c:
+                result = await c.call_tool("card_lookup", {"name": "Sol Ring"})
+                text = result.content[0].text
+                assert "Not legal in any format" in text

@@ -49,7 +49,7 @@ _bulk: ScryfallBulkClient | None = None
 async def workflow_lifespan(server: FastMCP):
     """Initialize all service clients needed by workflow tools.
 
-    Uses ``AsyncExitStack`` to manage up to 5 clients in a single lifespan.
+    Uses ``AsyncExitStack`` to manage multiple clients in a single lifespan.
     Feature-flagged backends (17Lands, EDHREC, Scryfall bulk data) are only created
     when their corresponding ``Settings`` flag is enabled. All clients are torn down
     when the server shuts down.

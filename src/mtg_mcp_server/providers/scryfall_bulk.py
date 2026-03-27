@@ -1,7 +1,7 @@
 """Scryfall bulk data MCP provider -- rate-limit-free card lookup and search.
 
-Uses Scryfall's Oracle Cards bulk file for in-memory card data with prices,
-legalities, and EDHREC rank -- data that MTGJSON does not provide.
+Uses Scryfall's Oracle Cards bulk file for rate-limit-free in-memory card data
+including prices, legalities, and EDHREC rank.
 """
 
 from __future__ import annotations
@@ -30,11 +30,10 @@ _client: ScryfallBulkClient | None = None
 
 @lifespan
 async def scryfall_bulk_lifespan(server: FastMCP):
-    """Manage the ScryfallBulkClient lifecycle.
+    """Initialize the ScryfallBulkClient and start its background refresh timer.
 
-    Downloads (or refreshes) the Oracle Cards bulk file, then keeps the
-    in-memory card index available for the server's lifetime. Starts a
-    background refresh task to periodically re-download fresh data.
+    Data is loaded lazily on the first tool call, not during startup. The
+    background task periodically re-downloads data at the configured interval.
     """
     global _client
     settings = Settings()

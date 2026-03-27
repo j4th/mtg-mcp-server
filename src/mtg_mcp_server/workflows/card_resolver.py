@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkError
+
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall import ScryfallClient
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
@@ -38,7 +40,12 @@ async def resolve_card(
         CardNotFoundError: If the card is not found in any source.
     """
     if bulk is not None:
-        card = await bulk.get_card(name)
+        try:
+            card = await bulk.get_card(name)
+        except ScryfallBulkError:
+            log.warning("resolve_card.bulk_error", name=name, exc_info=True)
+            card = None
+
         if card is not None:
             log.debug("resolve_card.bulk_hit", name=name)
             return card

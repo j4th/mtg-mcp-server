@@ -7,17 +7,14 @@ data rather than propagating the error.
 
 Unlike :class:`BaseClient`, this is a standalone service managing its own HTTP
 downloads. It does not use rate limiting or retries — the bulk-data endpoint is
-a single file download, not a query API.
+a single lightweight request and the bulk download is a large file fetch, neither
+benefiting from the per-request rate-limit pattern that ``BaseClient`` provides.
 
-Key differences from the MTGJSON service this replaces:
-
-- Returns :class:`~mtg_mcp_server.types.Card` (not ``MTGJSONCard``), with
-  prices, legalities, EDHREC rank, and image URIs already populated.
-- Checks the ``/bulk-data/oracle_cards`` metadata endpoint before download to
-  get the current ``download_uri``.
-- Supports ETag-based conditional downloads (HTTP 304 = skip re-parse).
-- Uses ``asyncio.Lock`` to prevent duplicate concurrent downloads.
-- Runs a background refresh loop via ``asyncio.create_task()``.
+Returns :class:`~mtg_mcp_server.types.Card` objects with prices, legalities,
+EDHREC rank, and image URIs. Checks the ``/bulk-data/oracle_cards`` metadata
+endpoint before download, supports ETag-based conditional downloads, uses
+``asyncio.Lock`` to prevent duplicate concurrent downloads, and runs a
+background refresh loop via ``asyncio.create_task()``.
 """
 
 from __future__ import annotations
@@ -153,12 +150,16 @@ class ScryfallBulkClient:
                 return
 
             is_refresh = self._loaded_at > 0
-            log.info("scryfall_bulk.loading", base_url=self._base_url, stale=is_refresh)
+            log.info("scryfall_bulk.loading", base_url=self._base_url, is_refresh=is_refresh)
 
             try:
                 # Step 1: Fetch metadata to get the current download URL
                 metadata = await self._fetch_metadata()
-                download_url = metadata["download_uri"]
+                download_url = metadata.get("download_uri")
+                if not download_url or not isinstance(download_url, str):
+                    raise ScryfallBulkError(
+                        f"Bulk metadata missing 'download_uri'. Keys: {list(metadata.keys())}"
+                    )
 
                 # Step 2: Download the bulk data (with ETag if URL matches)
                 result = await self._download(download_url)
@@ -175,9 +176,13 @@ class ScryfallBulkClient:
                 )
             except ScryfallBulkError:
                 if is_refresh:
-                    # Stale data is better than no data
-                    log.warning("scryfall_bulk.refresh_failed", base_url=self._base_url)
-                    self._loaded_at = time.monotonic()
+                    # Stale data is better than no data — retry in 5 min, not full interval
+                    log.warning(
+                        "scryfall_bulk.refresh_failed",
+                        base_url=self._base_url,
+                        exc_info=True,
+                    )
+                    self._loaded_at = time.monotonic() - self._refresh_seconds + 300
                     return
                 raise
 
@@ -284,7 +289,12 @@ class ScryfallBulkClient:
                     raise ScryfallBulkDownloadError(
                         f"HTTP {response.status_code} fetching bulk metadata from {url}"
                     ) from None
-                return response.json()
+                try:
+                    return response.json()
+                except (json.JSONDecodeError, ValueError) as exc:
+                    raise ScryfallBulkDownloadError(
+                        f"Metadata response is not valid JSON from {url}: {exc}"
+                    ) from exc
         except httpx.RequestError as exc:
             raise ScryfallBulkDownloadError(f"Network error fetching bulk metadata: {exc}") from exc
 
@@ -362,7 +372,7 @@ class ScryfallBulkClient:
 
             try:
                 card = Card.model_validate(entry)
-            except (ValidationError, ValueError, TypeError) as exc:
+            except (ValidationError, ValueError) as exc:
                 log.warning(
                     "scryfall_bulk.card_parse_error",
                     card_name=entry.get("name", "unknown"),
@@ -387,6 +397,12 @@ class ScryfallBulkClient:
         if skipped:
             log.warning("scryfall_bulk.parse_summary", skipped=skipped, loaded=len(unique))
 
+        if not unique:
+            raise ScryfallBulkError(
+                f"Parsed 0 cards from {len(raw)} entries ({skipped} skipped). "
+                "Scryfall bulk data schema may have changed."
+            )
+
         self._cards = cards
         self._unique_cards = unique
 
@@ -400,5 +416,7 @@ class ScryfallBulkClient:
             await asyncio.sleep(self._refresh_seconds)
             try:
                 await self.ensure_loaded()
-            except Exception:
+            except ScryfallBulkError:
                 log.warning("scryfall_bulk.background_refresh_error", exc_info=True)
+            except Exception:
+                log.error("scryfall_bulk.background_refresh_unexpected_error", exc_info=True)

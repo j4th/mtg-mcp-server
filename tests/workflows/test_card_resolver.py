@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from mtg_mcp_server.services.scryfall import CardNotFoundError
+from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkError
 from mtg_mcp_server.workflows.card_resolver import resolve_card
 
 
@@ -68,3 +69,14 @@ class TestResolveCard:
 
         with pytest.raises(CardNotFoundError):
             await resolve_card("Nonexistent", bulk=None, scryfall=mock_scryfall)
+
+    async def test_bulk_error_falls_back_to_scryfall(self, mock_bulk, mock_scryfall):
+        """ScryfallBulkError from bulk client falls back to Scryfall."""
+        mock_bulk.get_card.side_effect = ScryfallBulkError("Download failed")
+        scryfall_card = AsyncMock(name="Sol Ring")
+        mock_scryfall.get_card_by_name.return_value = scryfall_card
+
+        result = await resolve_card("Sol Ring", bulk=mock_bulk, scryfall=mock_scryfall)
+
+        assert result is scryfall_card
+        mock_scryfall.get_card_by_name.assert_awaited_once_with("Sol Ring")

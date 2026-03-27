@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # Optional backends can be disabled without code changes.
     enable_17lands: bool = True
     enable_edhrec: bool = True  # Behind flag — scrapes undocumented endpoints
-    enable_bulk_data: bool = True
+    enable_bulk_data: bool = True  # Scryfall Oracle Cards bulk download (~30MB)
 
     # --- Caching ---
     disable_cache: bool = False  # Set True in tests to bypass TTLCache

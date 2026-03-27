@@ -562,7 +562,7 @@ class TestExceptionTypes:
         assert isinstance(err, ScryfallBulkError)
 
     async def test_network_error_raises_download_error(self):
-        """Network connection failure raises ScryfallBulkDownloadError."""
+        """Network connection failure on metadata raises ScryfallBulkDownloadError."""
         with respx.mock:
             respx.get(f"{_BASE_URL}/bulk-data/oracle_cards").mock(
                 side_effect=httpx.ConnectError("Connection refused")
@@ -572,3 +572,155 @@ class TestExceptionTypes:
             async with client:
                 with pytest.raises(ScryfallBulkDownloadError, match="Network error"):
                     await client.ensure_loaded()
+
+    async def test_download_network_error_raises(self):
+        """Network failure during bulk data download raises ScryfallBulkDownloadError."""
+        with respx.mock:
+            _mock_metadata_route(respx)
+            respx.get(_DOWNLOAD_URL).mock(side_effect=httpx.ReadTimeout("Read timed out"))
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkDownloadError, match="Network error"):
+                    await client.ensure_loaded()
+
+
+class TestMetadataValidation:
+    """Test metadata response validation and edge cases."""
+
+    async def test_missing_download_uri_raises(self):
+        """Missing download_uri key in metadata raises ScryfallBulkError."""
+        with respx.mock:
+            _mock_metadata_route(respx, metadata={"object": "bulk_data", "type": "oracle_cards"})
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkError, match="missing 'download_uri'"):
+                    await client.ensure_loaded()
+
+    async def test_non_json_metadata_raises(self):
+        """Non-JSON metadata response raises ScryfallBulkDownloadError."""
+        with respx.mock:
+            respx.get(f"{_BASE_URL}/bulk-data/oracle_cards").mock(
+                return_value=httpx.Response(
+                    200, content=b"<html>error</html>", headers={"Content-Type": "text/html"}
+                )
+            )
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkDownloadError, match="not valid JSON"):
+                    await client.ensure_loaded()
+
+
+class TestParseFailures:
+    """Test _parse error handling for malformed data."""
+
+    async def test_non_json_bulk_data_raises(self):
+        """Non-JSON bulk data raises ScryfallBulkError on first load."""
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx, content=b"<html>CDN error</html>")
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkError, match="Failed to parse"):
+                    await client.ensure_loaded()
+
+    async def test_json_object_instead_of_array_raises(self):
+        """JSON object (not array) raises ScryfallBulkError."""
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx, content=b'{"error": "not found"}')
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkError, match="not a JSON array"):
+                    await client.ensure_loaded()
+
+    async def test_all_invalid_cards_raises_zero_parsed(self):
+        """Array of all-invalid entries raises ScryfallBulkError (zero cards)."""
+        bad_data = json.dumps([{"not_a": "card"}, {"also": "bad"}]).encode()
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx, content=bad_data)
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkError, match="Parsed 0 cards"):
+                    await client.ensure_loaded()
+
+    async def test_bad_card_skipped_good_cards_loaded(self):
+        """A malformed card in the middle is skipped; valid cards still load."""
+        sample = json.loads(_load_oracle_cards())
+        sample.insert(1, {"not_a": "valid_card"})  # inject bad entry
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx, content=json.dumps(sample).encode())
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                await client.ensure_loaded()
+                # Original fixture has 8 valid cards
+                assert len(client._unique_cards) == 8
+                assert await client.get_card("Sol Ring") is not None
+
+    async def test_corrupt_data_on_refresh_serves_stale(self):
+        """Corrupt data during refresh serves stale data instead of failing."""
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx, headers={"ETag": '"abc"'})
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=1)
+            async with client:
+                await client.ensure_loaded()
+                original_count = len(client._unique_cards)
+                assert original_count > 0
+
+                # Simulate stale + corrupt download
+                respx.reset()
+                _mock_metadata_route(respx)
+                _mock_download_route(respx, content=b"not json at all")
+
+                loaded_at = client._loaded_at
+                stale_time = loaded_at + 7200
+
+                with patch(
+                    "mtg_mcp_server.services.scryfall_bulk.time.monotonic",
+                    return_value=stale_time,
+                ):
+                    await client.ensure_loaded()  # Should NOT raise
+
+                # Stale data still available
+                assert len(client._unique_cards) == original_count
+                assert await client.get_card("Sol Ring") is not None
+
+
+class TestETagEdgeCases:
+    """Test ETag edge cases."""
+
+    async def test_missing_etag_header_leaves_etag_none(self):
+        """Response without ETag header does not set _etag."""
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx)  # No ETag header
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                await client.ensure_loaded()
+                assert client._etag is None
+
+
+class TestBackgroundRefreshEdgeCases:
+    """Test background refresh edge cases."""
+
+    async def test_start_background_refresh_idempotent(self):
+        """Calling start_background_refresh twice does not create duplicate tasks."""
+        client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+        async with client:
+            client.start_background_refresh()
+            first_task = client._refresh_task
+            assert first_task is not None
+
+            client.start_background_refresh()
+            assert client._refresh_task is first_task  # Same task, not a new one
