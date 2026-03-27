@@ -108,6 +108,19 @@ run = [
 description = "Update Smithery registry metadata (requires SMITHERY_API_KEY)"
 run = "bash scripts/update_smithery_metadata.sh"
 
+[tasks."smithery:publish"]
+description = "Re-publish to Smithery with config schema (requires SMITHERY_API_KEY)"
+run = """
+uv run python -c "
+from mtg_mcp_server.smithery import SmitheryConfig
+import json
+print(json.dumps(SmitheryConfig.model_json_schema()))
+" > /tmp/smithery-config-schema.json
+npx -y @smithery/cli mcp publish "https://mtg-mcp-server.fastmcp.app/mcp" \
+  -n @j4th/mtg-mcp-server \
+  --config-schema /tmp/smithery-config-schema.json
+"""
+
 [tasks."smithery:check-schema"]
 description = "Verify smithery.yaml matches SmitheryConfig model"
 run = "uv run python scripts/check_smithery_schema.py"

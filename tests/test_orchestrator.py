@@ -241,6 +241,13 @@ class TestServerMetadata:
 
         assert server.name == "MTG"
 
+    def test_server_version_from_package(self):
+        """Server version matches package version, not FastMCP version."""
+        from mtg_mcp_server import __version__
+        from mtg_mcp_server.server import mcp as server
+
+        assert server.version == __version__
+
     def test_server_website_url(self):
         """Server has a website URL configured."""
         from mtg_mcp_server.server import mcp as server
