@@ -125,7 +125,7 @@ async def _progress(ctx: Context, step: int, total: int) -> None:
     try:
         await ctx.report_progress(progress=step, total=total)
     except Exception:
-        _log.debug("progress_report_failed", step=step, total=total, exc_info=True)
+        _log.warning("progress_report_failed", step=step, total=total, exc_info=True)
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)

@@ -14,6 +14,7 @@ Prerequisites: [mise](https://mise.jdx.dev) must be installed. Then `mise instal
 ```bash
 mise run setup          # Install deps, create venv
 mise run check          # Quality gate: lint + typecheck + all tests except live
+mise run check:quick    # Fast gate: lint + typecheck + only tests affected by recent changes
 mise run check:full     # Complete gate: lint + typecheck + all tests INCLUDING live
 mise run test           # All tests except live, with coverage
 mise run test:quick     # Only tests affected by recent changes (fastest iteration)
@@ -37,6 +38,7 @@ Four test tiers, ordered by speed. Use the fastest tier that covers your change:
 | Integration | `mise run test:integration` | ~2s | Cross-component verification — full orchestrator with fixture-mocked backends |
 | Unit | `mise run test:unit` | ~2.5min | Focused component testing — services + providers only |
 | Live | `mise run test:live` | ~1-2min | Real-world smoke test — starts real server, hits real APIs |
+| Fast gate | `mise run check:quick` | ~10s* | Quick validation — lint + typecheck + affected tests only |
 | Quality gate | `mise run check` | ~3min | Before commits — lint + typecheck + all tests except live |
 | Complete gate | `mise run check:full` | ~4-5min | Maximum confidence — full gate + live smoke tests. CI runs this on PRs |
 

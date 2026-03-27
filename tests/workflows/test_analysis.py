@@ -424,6 +424,29 @@ class TestDeckAnalysisSpellbookFailure:
         assert "## Lowest Synergy Cards" in result
 
 
+class TestDeckAnalysisPartialSpellbookFailure:
+    """One Spellbook call succeeds, the other fails — partial success path."""
+
+    async def test_bracket_ok_combos_fail(self) -> None:
+        """Bracket succeeds but find_decklist_combos fails — Spellbook marked OK."""
+        spellbook = AsyncMock()
+        spellbook.estimate_bracket = _make_spellbook().estimate_bracket
+        spellbook.find_decklist_combos = AsyncMock(
+            side_effect=ServiceError("combo endpoint down", status_code=503)
+        )
+        result = await deck_analysis(
+            SAMPLE_DECKLIST,
+            COMMANDER,
+            bulk=_make_bulk(),
+            scryfall=_make_scryfall(),
+            spellbook=spellbook,
+            edhrec=_make_edhrec(),
+        )
+        # Spellbook should be marked OK since bracket succeeded
+        assert "Spellbook](https://commanderspellbook.com): OK" in result
+        assert "## Mana Curve" in result
+
+
 class TestDeckAnalysisPartialCardResolution:
     """Some cards fail to resolve."""
 

@@ -302,7 +302,7 @@ class ScryfallBulkClient:
                 if response.status_code != 200:
                     raise ScryfallBulkDownloadError(
                         f"HTTP {response.status_code} fetching bulk metadata from {url}"
-                    ) from None
+                    )
                 try:
                     return response.json()
                 except (json.JSONDecodeError, ValueError) as exc:
@@ -342,7 +342,7 @@ class ScryfallBulkClient:
                 if response.status_code != 200:
                     raise ScryfallBulkDownloadError(
                         f"HTTP {response.status_code} downloading bulk data from {url}"
-                    ) from None
+                    )
 
                 # Save ETag for future conditional requests
                 etag = response.headers.get("ETag")

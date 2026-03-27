@@ -53,8 +53,8 @@ Claude Code / claude.ai / any MCP client
     │  │  ns=edhrec  │    │    Commander staples, synergy scores
     │  └─────────────┘    │
     │  ┌─────────────┐    │
-    │  │  MTGJSON     │────┼──► mtgjson.com (bulk file)
-    │  │  ns=mtgjson  │    │    Offline card data, rate-limit-free search
+    │  │  Scryfall    │────┼──► api.scryfall.com (bulk data)
+    │  │  Bulk ns=bulk│    │    Rate-limit-free card lookup and search
     │  └─────────────┘    │
     └─────────────────────┘
 ```
@@ -130,7 +130,7 @@ mtg-mcp/
 │       │   ├── spellbook.py        # SpellbookClient
 │       │   ├── seventeen_lands.py  # SeventeenLandsClient
 │       │   ├── edhrec.py           # EDHRECClient
-│       │   ├── mtgjson.py          # MTGJSONClient (file-based, not BaseClient)
+│       │   ├── scryfall_bulk.py    # ScryfallBulkClient (file-based, not BaseClient)
 │       │   └── cache.py            # async_cached decorator, TTLCache helpers
 │       │
 │       ├── providers/              # FastMCP sub-servers (one per backend, independently runnable)
@@ -139,7 +139,7 @@ mtg-mcp/
 │       │   ├── spellbook.py        # spellbook_mcp = FastMCP("Spellbook")
 │       │   ├── seventeen_lands.py  # draft_mcp = FastMCP("17Lands")
 │       │   ├── edhrec.py           # edhrec_mcp = FastMCP("EDHREC")
-│       │   └── mtgjson.py          # mtgjson_mcp = FastMCP("MTGJSON")
+│       │   └── scryfall_bulk.py    # scryfall_bulk_mcp = FastMCP("Scryfall Bulk")
 │       │
 │       └── workflows/              # Composed tools (registered on orchestrator, no namespace)
 │           ├── __init__.py
@@ -148,7 +148,7 @@ mtg-mcp/
 │           ├── draft.py            # draft_pack_pick, set_overview
 │           ├── deck.py             # suggest_cuts
 │           ├── analysis.py         # deck_analysis
-│           └── card_resolver.py    # MTGJSON-first card resolution with Scryfall fallback
+│           └── card_resolver.py    # Bulk-data-first card resolution with Scryfall fallback
 │
 ├── tests/
 │   ├── conftest.py                 # Shared fixtures, mock clients
@@ -179,7 +179,7 @@ mtg-mcp/
 │       ├── spellbook/              # Combos, bracket estimates, decklist combos
 │       ├── seventeen_lands/        # Card ratings, color ratings
 │       ├── edhrec/                 # Commander pages, card synergy
-│       └── mtgjson/                # Sample AtomicCards.json.gz
+│       └── scryfall_bulk/          # Oracle Cards sample with adversarial entries
 │
 ├── scripts/
 │   └── capture_fixtures.py
@@ -197,7 +197,7 @@ mtg-mcp/
 
 **`services/` vs `providers/`**: Services are plain Python classes with async methods that call external APIs. Providers are FastMCP server instances that register tools backed by services. Services are reusable outside MCP and independently testable.
 
-**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return formatted strings. Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `draft.py`, `deck.py`, `analysis.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`. `card_resolver.py` provides MTGJSON-first card resolution with Scryfall fallback, used by `analysis.py` for rate-limit-friendly bulk lookups.
+**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return formatted strings. Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `draft.py`, `deck.py`, `analysis.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`. `card_resolver.py` provides bulk-data-first card resolution with Scryfall fallback, used by `analysis.py` for rate-limit-friendly bulk lookups.
 
 **`types.py`**: Shared Pydantic models that services return and tools consume. Ensures type safety across the service → provider → workflow pipeline.
 
@@ -212,7 +212,7 @@ mtg-mcp/
 from fastmcp import FastMCP
 from mtg_mcp_server.providers.scryfall import scryfall_mcp
 from mtg_mcp_server.providers.spellbook import spellbook_mcp
-from mtg_mcp_server.providers.mtgjson import mtgjson_mcp
+from mtg_mcp_server.providers.scryfall_bulk import scryfall_bulk_mcp
 from mtg_mcp_server.workflows.server import workflow_mcp
 
 mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics server.")
@@ -221,8 +221,8 @@ mcp = FastMCP("MTG", instructions="Magic: The Gathering data and analytics serve
 mcp.mount(scryfall_mcp, namespace="scryfall")
 mcp.mount(spellbook_mcp, namespace="spellbook")
 # Feature-flagged backends mounted conditionally (see server.py)
-if settings.enable_mtgjson:
-    mcp.mount(mtgjson_mcp, namespace="mtgjson")
+if settings.enable_bulk_data:
+    mcp.mount(scryfall_bulk_mcp, namespace="bulk")
 
 # Workflow tools mounted WITHOUT namespace for clean names
 mcp.mount(workflow_mcp)
@@ -296,11 +296,11 @@ _scryfall: ScryfallClient | None = None
 _spellbook: SpellbookClient | None = None
 _seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
-_mtgjson: MTGJSONClient | None = None
+_bulk: ScryfallBulkClient | None = None
 
 @lifespan
 async def workflow_lifespan(server: FastMCP):
-    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _mtgjson
+    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk
     settings = Settings()
     async with AsyncExitStack() as stack:
         _scryfall = await stack.enter_async_context(
@@ -317,12 +317,15 @@ async def workflow_lifespan(server: FastMCP):
             _edhrec = await stack.enter_async_context(
                 EDHRECClient(base_url=settings.edhrec_base_url)
             )
-        if settings.enable_mtgjson:
-            _mtgjson = await stack.enter_async_context(
-                MTGJSONClient(data_url=settings.mtgjson_data_url, ...)
+        if settings.enable_bulk_data:
+            client = ScryfallBulkClient(
+                base_url=settings.scryfall_base_url,
+                refresh_hours=settings.bulk_data_refresh_hours,
             )
+            _bulk = await stack.enter_async_context(client)
+            _bulk.start_background_refresh()
         yield {}
-    _scryfall = _spellbook = _seventeen_lands = _edhrec = _mtgjson = None
+    _scryfall = _spellbook = _seventeen_lands = _edhrec = _bulk = None
 
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)
 ```
@@ -515,12 +518,11 @@ class Settings(BaseSettings):
     edhrec_base_url: str = "https://json.edhrec.com"
 
     enable_17lands: bool = True
-    enable_edhrec: bool = True
-    enable_mtgjson: bool = True
+    enable_edhrec: bool = True  # Behind flag — scrapes undocumented endpoints
+    enable_bulk_data: bool = True  # Scryfall Oracle Cards bulk download (~30MB)
     disable_cache: bool = False
 
-    mtgjson_data_url: str = "https://mtgjson.com/api/v5/AtomicCards.json.gz"
-    mtgjson_refresh_hours: int = 24
+    bulk_data_refresh_hours: int = 12
 
     model_config = {"env_prefix": "MTG_MCP_", "env_file": ".env", "extra": "ignore"}
 ```
@@ -557,7 +559,7 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Transport | stdio default, HTTP optional | stdio for Claude Code/Desktop; HTTP for remote use |
 | Type checker | ty (beta) | Astral stack, speed, FastMCP validates against it |
 | HTTP mocking | respx | Decorator-based, clean API for async httpx mocking |
-| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `mtgjson_` | FastMCP mount namespacing |
+| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `bulk_` | FastMCP mount namespacing |
 | Workflow tools | No namespace prefix | Clean names: `commander_overview`, `evaluate_upgrade` |
 | Client lifecycle | Lifespan + module-level `_client` | `Depends()`/`lifespan_context` breaks through `mount()` — module-level is the workaround |
 | Settings wiring | `Settings()` in each lifespan | Base URLs are configurable via `MTG_MCP_*` env vars, not hardcoded |
@@ -573,9 +575,9 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Workflow testing | AsyncMock (not respx) | Workflows are pure functions — mock the service clients directly, no HTTP layer to test |
 | draft_pack_pick backends | 17Lands only | 17Lands already provides name, color, rarity, all win rate metrics — no Scryfall calls needed |
 | Service caching | cachetools TTLCache per method | Caches parsed Pydantic models (skips network + parsing). Per-method TTL granularity. Single asyncio loop = no locking needed |
-| MTGJSON | Bulk file service (not BaseClient) | File-based, not HTTP API — lazy download, in-memory dict for O(1) lookups. Behind feature flag |
-| MTGJSON integration | Workflow layer, not ScryfallClient | Preserves service independence — workflows can check MTGJSON before Scryfall |
-| Card resolver | Shared utility in `workflows/card_resolver.py` | MTGJSON-first resolution with Scryfall fallback. Avoids duplicating lookup logic across workflow modules |
+| Scryfall bulk data | File-based service (not BaseClient) | Lazy download of Oracle Cards, in-memory dict for O(1) lookups. Returns full Card objects with prices, legalities, images. Behind feature flag |
+| Bulk data integration | Workflow layer, not ScryfallClient | Preserves service independence — workflows can check bulk data before Scryfall API |
+| Card resolver | Shared utility in `workflows/card_resolver.py` | Bulk-data-first resolution with Scryfall fallback. Avoids duplicating lookup logic across workflow modules |
 | Progress reporting | `ctx.report_progress()` via callback | Workflow pure functions accept `on_progress` callback; `server.py` bridges to MCP `Context.report_progress()` |
 | Tool tags | Tag constants in `providers/__init__.py` | Categorize tools by domain (commander, draft, pricing, beta). Shared constants avoid duplication |
 | Prompts | Registered on workflow server | Guide multi-step analysis workflows. No namespace — clean invocation names |

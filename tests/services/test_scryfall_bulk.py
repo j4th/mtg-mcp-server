@@ -207,6 +207,34 @@ class TestRefreshFailure:
                 assert card is not None
                 assert card.name == "Sol Ring"
 
+    async def test_refresh_failure_schedules_earlier_retry(self):
+        """After refresh failure, next refresh triggers in ~5 min, not full interval."""
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx, headers={"ETag": '"abc123"'})
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=1)
+            async with client:
+                await client.ensure_loaded()
+
+                # Simulate stale + failed refresh
+                respx.reset()
+                _mock_metadata_route(respx, status_code=503)
+
+                loaded_at = client._loaded_at
+                stale_time = loaded_at + 7200
+
+                with patch(
+                    "mtg_mcp_server.services.scryfall_bulk.time.monotonic",
+                    return_value=stale_time,
+                ):
+                    await client.ensure_loaded()
+
+                # After failure, _loaded_at should be set so data appears stale
+                # again in ~300s (not the full 3600s interval)
+                expected_retry_at = stale_time - client._refresh_seconds + 300
+                assert client._loaded_at == pytest.approx(expected_retry_at, abs=1.0)
+
 
 class TestETag:
     """Test ETag-based conditional download (304 = skip re-parse)."""
@@ -707,6 +735,17 @@ class TestParseFailures:
         with respx.mock:
             _mock_metadata_route(respx)
             _mock_download_route(respx, content=bad_data)
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkError, match="Parsed 0 cards"):
+                    await client.ensure_loaded()
+
+    async def test_empty_json_array_raises_zero_parsed(self):
+        """Empty JSON array [] raises ScryfallBulkError (zero cards)."""
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(respx, content=b"[]")
 
             client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
             async with client:

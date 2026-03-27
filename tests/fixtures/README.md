@@ -51,4 +51,4 @@ Captured JSON responses from real API calls, used by tests via `respx` mocking. 
 | File | Source Endpoint | Description |
 |------|-----------------|-------------|
 | `bulk_metadata.json` | `GET /bulk-data/oracle_cards` | Bulk data download metadata |
-| `oracle_cards_sample.json` | Subset of Oracle Cards bulk download | 8-card sample array in Scryfall format |
+| `oracle_cards_sample.json` | Subset of Oracle Cards bulk download | 12-entry sample (8 playable cards + 4 adversarial non-playable layouts) in Scryfall format |

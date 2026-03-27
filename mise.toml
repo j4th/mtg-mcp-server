@@ -28,6 +28,10 @@ run = "echo 'Dev environment ready. Run: mise run check'"
 description = "Quality gate: lint + typecheck + all tests except live"
 depends = ["lint", "typecheck", "test"]
 
+[tasks."check:quick"]
+description = "Fast quality gate: lint + typecheck + only tests affected by recent changes"
+depends = ["lint", "typecheck", "test:quick"]
+
 [tasks."check:full"]
 description = "Complete quality gate: lint + typecheck + all tests including live smoke tests"
 depends = ["check", "test:live"]
