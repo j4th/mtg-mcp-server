@@ -35,7 +35,7 @@ See @docs/ARCHITECTURE.md for full details.
 - **`src/mtg_mcp_server/services/`** — Pure async API clients. No MCP awareness. Return Pydantic models.
 - **`src/mtg_mcp_server/providers/`** — FastMCP sub-servers. Each independently runnable. Register tools that call services.
 - **`src/mtg_mcp_server/workflows/`** — Composed tools calling multiple services. Mounted without namespace.
-- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `mtgjson_`.
+- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `bulk_`.
 
 ## Conventions
 
@@ -78,7 +78,7 @@ When PR review comments come in:
 - Don't use `Any` type — use `Unknown` or proper types.
 - When compacting, preserve the list of which services/providers are implemented vs stubbed.
 - Service caching: all service methods use `@async_cached` with class-level `TTLCache`. Tests must clear caches (autouse `_clear_caches` fixture in conftest.py).
-- MTGJSON is behind `MTG_MCP_ENABLE_MTGJSON` feature flag. It's a file-based service (not BaseClient). Lazy-loads on first access.
+- Scryfall bulk data is behind `MTG_MCP_ENABLE_BULK_DATA` feature flag. It's a file-based service (not BaseClient). Lazy-loads on first access. Returns full `Card` objects (same as Scryfall API).
 
 ## Implementation Status
 
@@ -86,8 +86,8 @@ When PR review comments come in:
 - **Phase 1** (Scryfall): Complete — 4 tools (search_cards, card_details, card_price, card_rulings)
 - **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools across 3 backends
 - **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
-- **Phase 4** (Caching + MTGJSON): Complete — TTL caching on all 12 service methods, MTGJSON bulk card provider (2 tools: card_lookup, card_search)
-- **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for MTGJSON-first lookups with Scryfall fallback. Tool tagging via `tags` parameter. 374 tests, 92% coverage.
+- **Phase 4** (Caching + Bulk Data): Complete — TTL caching on all 12 service methods, Scryfall bulk data provider (2 tools: card_lookup, card_search). Replaced MTGJSON with Scryfall Oracle Cards bulk data for richer card info (prices, legalities, images, EDHREC rank).
+- **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for bulk-data-first lookups with Scryfall fallback. Tool tagging via `tags` parameter. 437 tests, 92% coverage.
 
 ## Environment
 
