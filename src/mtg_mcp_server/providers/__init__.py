@@ -22,6 +22,7 @@ __all__ = [
     "ATTRIBUTION_EDHREC",
     "ATTRIBUTION_MTGJSON",
     "ATTRIBUTION_SCRYFALL",
+    "ATTRIBUTION_SCRYFALL_BULK",
     "ATTRIBUTION_SPELLBOOK",
     "TAGS_BETA",
     "TAGS_COMBO",
@@ -53,6 +54,7 @@ TAGS_BETA = {"beta"}
 # upstream usage terms and enable both the LLM and end user to identify the
 # data source.
 ATTRIBUTION_SCRYFALL = "\n\n*Data provided by [Scryfall](https://scryfall.com)*"
+ATTRIBUTION_SCRYFALL_BULK = "\n\n*Data: Scryfall bulk data (Oracle Cards)*"
 ATTRIBUTION_SPELLBOOK = (
     "\n\n*Data provided by [Commander Spellbook](https://commanderspellbook.com)*"
 )
