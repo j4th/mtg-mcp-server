@@ -349,10 +349,10 @@ class TestParsing:
     """Test that the bulk data is parsed correctly into Card models."""
 
     async def test_correct_card_count(self, loaded_client: ScryfallBulkClient):
-        """8 playable cards (4 non-playable layouts filtered), 9 dict entries for DFC."""
-        assert len(loaded_client._unique_cards) == 8
-        # 8 normal keys + 1 extra for DFC front-face-only key
-        assert len(loaded_client._cards) == 9
+        """27 playable cards (4 non-playable layouts filtered), 28 dict entries for DFC."""
+        assert len(loaded_client._unique_cards) == 27
+        # 27 normal keys + 1 extra for DFC front-face-only key
+        assert len(loaded_client._cards) == 28
 
     async def test_card_has_prices(self, loaded_client: ScryfallBulkClient):
         """Parsed cards have price data."""
@@ -763,8 +763,8 @@ class TestParseFailures:
             client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
             async with client:
                 await client.ensure_loaded()
-                # Original fixture has 8 valid cards
-                assert len(client._unique_cards) == 8
+                # Fixture has 27 playable cards (non-playable layouts filtered)
+                assert len(client._unique_cards) == 27
                 assert await client.get_card("Sol Ring") is not None
 
     async def test_corrupt_data_on_refresh_serves_stale(self):
