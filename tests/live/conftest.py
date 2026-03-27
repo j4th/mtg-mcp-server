@@ -16,7 +16,7 @@ from fastmcp import Client
 def _find_free_port() -> int:
     """Bind to port 0 and let the OS assign a free port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))
+        s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
 
 
