@@ -28,7 +28,6 @@ SCRYFALL_BASE = "https://api.scryfall.com"
 SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
 EDHREC_BASE = "https://json.edhrec.com"
-BULK_DOWNLOAD_URL = "https://data.scryfall.io/oracle-cards/oracle-cards-20260326090226.json"
 
 
 def _load_json(path: Path) -> dict | list:
@@ -39,6 +38,11 @@ def _load_json(path: Path) -> dict | list:
 def _load_bulk_metadata() -> dict:
     """Load the Scryfall bulk-data metadata fixture."""
     return json.loads((SCRYFALL_BULK_FIXTURES / "bulk_metadata.json").read_text())
+
+
+def _bulk_download_url() -> str:
+    """Derive the bulk download URL from the metadata fixture."""
+    return _load_bulk_metadata()["download_uri"]
 
 
 def _load_oracle_cards_bytes() -> bytes:
@@ -57,7 +61,7 @@ async def bulk_client():
         respx.get(f"{SCRYFALL_BASE}/bulk-data/oracle_cards").mock(
             return_value=httpx.Response(200, json=_load_bulk_metadata())
         )
-        respx.get(BULK_DOWNLOAD_URL).mock(
+        respx.get(_bulk_download_url()).mock(
             return_value=httpx.Response(
                 200, content=_load_oracle_cards_bytes(), headers={"ETag": '"integration-test"'}
             )
@@ -131,7 +135,7 @@ async def mcp_client():
         respx.get(f"{SCRYFALL_BASE}/bulk-data/oracle_cards").mock(
             return_value=httpx.Response(200, json=_load_bulk_metadata())
         )
-        respx.get(BULK_DOWNLOAD_URL).mock(
+        respx.get(_bulk_download_url()).mock(
             return_value=httpx.Response(
                 200, content=_load_oracle_cards_bytes(), headers={"ETag": '"integration-test"'}
             )

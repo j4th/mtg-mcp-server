@@ -413,11 +413,8 @@ def _format_output(
     lines.append(f"| Cards | {counts} |")
     lines.append("")
     lines.append(f"**Total mana value:** {mana_curve.total_mana_value:.0f}")
-    lines.append(
-        f"**Average mana value:** {mana_curve.total_mana_value / deck_size:.1f}"
-        if deck_size > 0
-        else ""
-    )
+    if deck_size > 0:
+        lines.append(f"**Average mana value:** {mana_curve.total_mana_value / deck_size:.1f}")
     lines.append("")
 
     # Color Requirements

@@ -22,6 +22,7 @@ class TestServerHealth:
     async def test_all_tools_registered(self, live_client):
         tools = await live_client.list_tools()
         tool_names = {t.name for t in tools}
+        # 1 ping + 4 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 bulk + 8 workflows = 23
         assert len(tool_names) == 23, (
             f"Expected 23 tools, got {len(tool_names)}: {sorted(tool_names)}"
         )

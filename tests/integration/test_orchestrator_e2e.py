@@ -24,6 +24,7 @@ class TestToolRegistration:
         """The orchestrator exposes exactly 23 tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
+        # 1 ping + 4 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 bulk + 8 workflows = 23
         assert len(tools) == 23, f"Expected 23 tools, got {len(tools)}.\nTools: {tool_names}"
 
     async def test_no_mtgjson_tools(self, mcp_client: Client):

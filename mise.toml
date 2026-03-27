@@ -40,7 +40,7 @@ depends = ["check", "test:live"]
 
 [tasks.test]
 description = "Run all tests except live, with coverage"
-run = "uv run pytest --cov --cov-report=term-missing"
+run = "uv run pytest --cov --cov-report=term-missing --timeout=300"
 
 [tasks."test:quick"]
 description = "Run only tests affected by recent changes (fastest iteration)"
