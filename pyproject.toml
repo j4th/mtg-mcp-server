@@ -70,6 +70,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
     "pytest-testmon>=2.2.0",
+    "pytest-timeout>=2.3",
     "respx>=0.22",
 ]
 
