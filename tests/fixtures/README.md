@@ -8,8 +8,6 @@ Captured JSON responses from real API calls, used by tests via `respx` mocking. 
 2. Save the full JSON response to the appropriate directory
 3. Reference in tests via `respx` route mocking with `httpx.Response(200, json=fixture_data)`
 
-For MTGJSON, the fixture is a gzipped JSON file (`atomic_cards_sample.json.gz`) containing a small subset of the full AtomicCards dataset.
-
 ## Fixture Files
 
 ### `scryfall/`
@@ -48,8 +46,9 @@ For MTGJSON, the fixture is a gzipped JSON file (`atomic_cards_sample.json.gz`) 
 | `card_spore_frog.json` | `GET /pages/cards/spore-frog.json` | Card synergy page data |
 | `commander_not_found.json` | N/A | 404 response for unknown commander |
 
-### `mtgjson/`
+### `scryfall_bulk/`
 
-| File | Source | Description |
-|------|--------|-------------|
-| `atomic_cards_sample.json.gz` | Subset of `AtomicCards.json.gz` | Small sample for testing (gzipped) |
+| File | Source Endpoint | Description |
+|------|-----------------|-------------|
+| `bulk_metadata.json` | `GET /bulk-data/oracle_cards` | Bulk data download metadata |
+| `oracle_cards_sample.json` | Subset of Oracle Cards bulk download | 12-entry sample (8 playable cards + 4 adversarial non-playable layouts) in Scryfall format |

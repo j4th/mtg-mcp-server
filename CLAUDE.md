@@ -13,9 +13,14 @@ Prerequisites: [mise](https://mise.jdx.dev) must be installed. Then `mise instal
 
 ```bash
 mise run setup          # Install deps, create venv
-mise run check          # Lint + format + typecheck + test (the full gate)
-mise run test           # pytest with coverage
-mise run test:quick     # pytest --testmon (only tests affected by changes)
+mise run check          # Quality gate: lint + typecheck + all tests except live
+mise run check:quick    # Fast gate: lint + typecheck + only tests affected by recent changes
+mise run check:full     # Complete gate: lint + typecheck + all tests INCLUDING live
+mise run test           # All tests except live, with coverage
+mise run test:quick     # Only tests affected by recent changes (fastest iteration)
+mise run test:unit      # Unit tests only (services + providers)
+mise run test:integration # Integration tests (fixture-mocked, cross-component)
+mise run test:live      # Live smoke tests (real server + real APIs, ~60s)
 mise run lint           # ruff check + ruff format --check
 mise run typecheck      # ty check
 mise run dev            # fastmcp dev inspector (MCP Inspector on :6274)
@@ -25,8 +30,28 @@ mise run fix            # Auto-fix lint and format issues
 
 ### Testing strategy
 
-- **Iterating**: Use `mise run test:quick` (pytest-testmon) after edits for fast feedback — only runs tests affected by your changes.
-- **Quality gate**: Use `mise run check` before commits and PRs — full lint + typecheck + test suite with coverage.
+Four test tiers, ordered by speed. Use the fastest tier that covers your change:
+
+| Tier | Command | Speed | When to use |
+|------|---------|-------|-------------|
+| Quick | `mise run test:quick` | ~5s* | Active iteration — only runs tests affected by your changes (pytest-testmon) |
+| Integration | `mise run test:integration` | ~2s | Cross-component verification — full orchestrator with fixture-mocked backends |
+| Unit | `mise run test:unit` | ~2.5min | Focused component testing — services + providers only |
+| Live | `mise run test:live` | ~1-2min | Real-world smoke test — starts real server, hits real APIs |
+| Fast gate | `mise run check:quick` | ~10s* | Quick validation — lint + typecheck + affected tests only |
+| Quality gate | `mise run check` | ~3min | Before commits — lint + typecheck + all tests except live |
+| Complete gate | `mise run check:full` | ~4-5min | Maximum confidence — full gate + live smoke tests. CI runs this on PRs |
+
+*\*testmon is fast when no code changed; after changes it re-runs affected tests which may approach full suite time (~3min).*
+
+**Rules of thumb:**
+- **Editing a service or provider?** `test:quick` while iterating, `check` before commit.
+- **Changing data parsing, models, or fixtures?** `test:quick` → `test:integration` → `test:live` (data bugs hide in real-world data).
+- **Changing workflows?** `test:quick` is sufficient — workflows use AsyncMock, no HTTP.
+- **Before any PR?** `mise run check`. For data-layer PRs, also `mise run test:live`.
+- **Maximum confidence?** `mise run check:full` — runs everything including live tests against real APIs.
+
+**CI/CD:** PRs to main run `check` + `live-tests` + `build` + `security` in parallel. Push to main runs `check` + `build` + `security` (live already validated on the PR).
 
 ## Architecture
 
@@ -35,7 +60,7 @@ See @docs/ARCHITECTURE.md for full details.
 - **`src/mtg_mcp_server/services/`** — Pure async API clients. No MCP awareness. Return Pydantic models.
 - **`src/mtg_mcp_server/providers/`** — FastMCP sub-servers. Each independently runnable. Register tools that call services.
 - **`src/mtg_mcp_server/workflows/`** — Composed tools calling multiple services. Mounted without namespace.
-- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `mtgjson_`.
+- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `bulk_`.
 
 ## Conventions
 
@@ -48,6 +73,8 @@ See @docs/ARCHITECTURE.md for full details.
 - Workflows handle partial failures — if one backend is down, return what you can from the rest.
 - Workflow tests use `unittest.mock.AsyncMock` (not respx) since they test pure functions, not HTTP.
 - EDHREC is behind a feature flag (`MTG_MCP_ENABLE_EDHREC`). It scrapes undocumented endpoints and will break.
+- Integration tests (`tests/integration/`) test the full MCP pipeline with fixture-mocked backends. Marked `@pytest.mark.integration`. Included in `mise run check`.
+- Live tests (`tests/live/`) start a real server subprocess and hit real APIs. Marked `@pytest.mark.live`, skipped by default. Run via `mise run test:live`. CI runs these on PRs to main.
 
 ## PR Review Workflow
 
@@ -78,7 +105,7 @@ When PR review comments come in:
 - Don't use `Any` type — use `Unknown` or proper types.
 - When compacting, preserve the list of which services/providers are implemented vs stubbed.
 - Service caching: all service methods use `@async_cached` with class-level `TTLCache`. Tests must clear caches (autouse `_clear_caches` fixture in conftest.py).
-- MTGJSON is behind `MTG_MCP_ENABLE_MTGJSON` feature flag. It's a file-based service (not BaseClient). Lazy-loads on first access.
+- Scryfall bulk data is behind `MTG_MCP_ENABLE_BULK_DATA` feature flag. It's a file-based service (not BaseClient). Lazy-loads on first access. Returns full `Card` objects (same as Scryfall API).
 
 ## Implementation Status
 
@@ -86,8 +113,8 @@ When PR review comments come in:
 - **Phase 1** (Scryfall): Complete — 4 tools (search_cards, card_details, card_price, card_rulings)
 - **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools across 3 backends
 - **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
-- **Phase 4** (Caching + MTGJSON): Complete — TTL caching on all 12 service methods, MTGJSON bulk card provider (2 tools: card_lookup, card_search)
-- **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for MTGJSON-first lookups with Scryfall fallback. Tool tagging via `tags` parameter. 374 tests, 92% coverage.
+- **Phase 4** (Caching + Bulk Data): Complete — TTL caching on all 12 service methods, Scryfall bulk data provider (2 tools: card_lookup, card_search). Replaced MTGJSON with Scryfall Oracle Cards bulk data for richer card info (prices, legalities, images, EDHREC rank).
+- **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for bulk-data-first lookups with Scryfall fallback. Tool tagging via `tags` parameter. 437 tests, 92% coverage.
 
 ## Environment
 

@@ -25,26 +25,38 @@ run = "echo 'Dev environment ready. Run: mise run check'"
 # --- Quality Gate ---
 
 [tasks.check]
-description = "Full quality gate: lint + typecheck + test"
+description = "Quality gate: lint + typecheck + all tests except live"
 depends = ["lint", "typecheck", "test"]
+
+[tasks."check:quick"]
+description = "Fast quality gate: lint + typecheck + only tests affected by recent changes"
+depends = ["lint", "typecheck", "test:quick"]
+
+[tasks."check:full"]
+description = "Complete quality gate: lint + typecheck + all tests including live smoke tests"
+depends = ["check", "test:live"]
 
 # --- Testing ---
 
 [tasks.test]
-description = "Run tests with coverage"
-run = "uv run pytest --cov --cov-report=term-missing"
+description = "Run all tests except live, with coverage"
+run = "uv run pytest --cov --cov-report=term-missing --timeout=300"
+
+[tasks."test:quick"]
+description = "Run only tests affected by recent changes (fastest iteration)"
+run = "uv run pytest --testmon"
 
 [tasks."test:unit"]
-description = "Run unit tests only"
+description = "Run unit tests only (services + providers)"
 run = "uv run pytest tests/services tests/providers -v"
 
 [tasks."test:integration"]
-description = "Run integration tests only"
+description = "Run integration tests (fixture-mocked, cross-component)"
 run = "uv run pytest tests/integration -v"
 
-[tasks."test:quick"]
-description = "Run only tests affected by recent changes"
-run = "uv run pytest --testmon"
+[tasks."test:live"]
+description = "Run live smoke tests (real server + real APIs, ~60s)"
+run = "uv run pytest tests/live -v -m live --timeout=120"
 
 [tasks."test:watch"]
 description = "Re-run tests on file changes"

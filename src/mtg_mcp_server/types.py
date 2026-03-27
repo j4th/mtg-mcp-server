@@ -10,7 +10,6 @@ Backends:
     Commander Spellbook — Combo, DecklistCombos, BracketEstimate
     17Lands — DraftCardRating, ArchetypeRating
     EDHREC — EDHRECCard, EDHRECCardList, EDHRECCommanderData
-    MTGJSON — MTGJSONCard
 """
 
 from __future__ import annotations
@@ -32,7 +31,6 @@ __all__ = [
     "EDHRECCard",
     "EDHRECCardList",
     "EDHRECCommanderData",
-    "MTGJSONCard",
     "Ruling",
 ]
 
@@ -79,6 +77,7 @@ class Card(BaseModel):
     set_code: str = Field(alias="set", default="")  # Aliased: Scryfall JSON uses "set"
     collector_number: str = ""
     rarity: str = ""
+    layout: str = ""  # Scryfall layout (e.g. "normal", "transform", "modal_dfc")
     prices: CardPrices = Field(default_factory=CardPrices)
     legalities: dict[str, str] = Field(default_factory=dict)  # format -> "legal"/"not_legal"/etc.
     image_uris: CardImageUris | None = None
@@ -330,31 +329,3 @@ class EDHRECCommanderData(BaseModel):
     commander_name: str
     cardlists: list[EDHRECCardList] = Field(default_factory=list)
     total_decks: int = 0
-
-
-# ---------------------------------------------------------------------------
-# MTGJSON
-# ---------------------------------------------------------------------------
-
-
-class MTGJSONCard(BaseModel):
-    """Card data from MTGJSON AtomicCards bulk download.
-
-    Unlike :class:`Card` (Scryfall), this model has no pricing, legality,
-    or image data — it provides offline, rate-limit-free card lookups for
-    basic oracle info like name, type, and text.
-    """
-
-    name: str  # Front-face name for DFCs (e.g. "Delver of Secrets")
-    mana_cost: str = ""
-    type_line: str = ""  # Mapped from MTGJSON's "type" field
-    oracle_text: str = ""  # Mapped from MTGJSON's "text" field
-    colors: list[str] = Field(default_factory=list)
-    color_identity: list[str] = Field(default_factory=list)
-    types: list[str] = Field(default_factory=list)  # e.g. ["Creature"]
-    subtypes: list[str] = Field(default_factory=list)  # e.g. ["Human", "Wizard"]
-    supertypes: list[str] = Field(default_factory=list)  # e.g. ["Legendary"]
-    keywords: list[str] = Field(default_factory=list)
-    power: str | None = None
-    toughness: str | None = None
-    mana_value: float = 0.0

@@ -9,14 +9,15 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.workflows.deck import build_synergy_lookup
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from mtg_mcp_server.services.edhrec import EDHRECClient
-    from mtg_mcp_server.services.mtgjson import MTGJSONClient
     from mtg_mcp_server.services.scryfall import ScryfallClient
+    from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
     from mtg_mcp_server.services.spellbook import SpellbookClient
     from mtg_mcp_server.types import (
         BracketEstimate,
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
         DecklistCombos,
         EDHRECCard,
         EDHRECCommanderData,
-        MTGJSONCard,
     )
 
 log = structlog.get_logger(service="workflow.analysis")
@@ -52,12 +52,12 @@ class _DataSources:
     edhrec_ok: bool = False
     edhrec_available: bool = False
     edhrec_error: str | None = None
-    mtgjson_available: bool = False
+    bulk_data_available: bool = False
 
 
 @dataclass
 class _ResolvedCard:
-    """A card resolved from either MTGJSON or Scryfall."""
+    """A card resolved from bulk data or Scryfall."""
 
     name: str
     mana_cost: str | None = None
@@ -85,30 +85,19 @@ class _ColorPips:
 # ---------------------------------------------------------------------------
 
 
-def _get_cmc(card: Card | MTGJSONCard) -> float:
+def _get_cmc(card: Card) -> float:
     """Extract CMC from a resolved card."""
-    from mtg_mcp_server.types import Card as _Card
-    from mtg_mcp_server.types import MTGJSONCard as _MTGJSONCard
-
-    if isinstance(card, _Card):
-        return card.cmc
-    if isinstance(card, _MTGJSONCard):
-        return card.mana_value
-    return 0.0
+    return card.cmc
 
 
-def _get_mana_cost(card: Card | MTGJSONCard) -> str | None:
+def _get_mana_cost(card: Card) -> str | None:
     """Extract mana cost from a resolved card."""
     return card.mana_cost if card.mana_cost else None
 
 
-def _get_price_usd(card: Card | MTGJSONCard) -> str | None:
-    """Extract USD price — only available from Scryfall Card objects."""
-    from mtg_mcp_server.types import Card as _Card
-
-    if isinstance(card, _Card):
-        return card.prices.usd
-    return None
+def _get_price_usd(card: Card) -> str | None:
+    """Extract USD price from a card."""
+    return card.prices.usd
 
 
 def _count_pips(mana_cost: str | None) -> dict[str, int]:
@@ -153,7 +142,7 @@ async def deck_analysis(
     decklist: list[str],
     commander_name: str,
     *,
-    mtgjson: MTGJSONClient | None,
+    bulk: ScryfallBulkClient | None,
     scryfall: ScryfallClient,
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
@@ -164,7 +153,7 @@ async def deck_analysis(
     Args:
         decklist: List of card names in the deck.
         commander_name: The commander's name.
-        mtgjson: Initialized MTGJSONClient, or None if disabled.
+        bulk: Initialized ScryfallBulkClient, or None if disabled.
         scryfall: Initialized ScryfallClient.
         spellbook: Initialized SpellbookClient.
         edhrec: Initialized EDHRECClient, or None if disabled.
@@ -177,38 +166,32 @@ async def deck_analysis(
 
     sources = _DataSources(
         edhrec_available=edhrec is not None,
-        mtgjson_available=mtgjson is not None,
+        bulk_data_available=bulk is not None,
     )
 
     if not decklist:
         return f"# Deck Analysis \u2014 {commander_name}\n\nNo cards in decklist to analyze."
 
-    # Step 1/4: Resolve cards
+    # Step 1/3: Resolve cards
     if on_progress is not None:
-        await on_progress(1, 4)
+        await on_progress(1, 3)
 
-    resolved_cards, failures = await _resolve_cards(decklist, mtgjson=mtgjson, scryfall=scryfall)
+    resolved_cards, failures = await _resolve_cards(decklist, bulk=bulk, scryfall=scryfall)
 
-    # Step 2/4: Combo/bracket analysis
+    # Step 2/3: Combo/bracket analysis
     if on_progress is not None:
-        await on_progress(2, 4)
+        await on_progress(2, 3)
 
     bracket, deck_combos = await _fetch_spellbook_data(
         commander_name, decklist, spellbook=spellbook, sources=sources
     )
 
-    # Step 3/4: Synergy analysis
+    # Step 3/3: Synergy analysis
     if on_progress is not None:
-        await on_progress(3, 4)
+        await on_progress(3, 3)
 
     edhrec_data = await _fetch_edhrec_data(commander_name, edhrec=edhrec, sources=sources)
     synergy_lookup = build_synergy_lookup(edhrec_data)
-
-    # Step 4/4: Fill in missing prices (for MTGJSON-resolved cards)
-    if on_progress is not None:
-        await on_progress(4, 4)
-
-    await _fill_missing_prices(resolved_cards, scryfall=scryfall)
 
     # Compute analytics
     mana_curve = _compute_mana_curve(resolved_cards)
@@ -245,19 +228,19 @@ async def deck_analysis(
 async def _resolve_cards(
     decklist: list[str],
     *,
-    mtgjson: MTGJSONClient | None,
+    bulk: ScryfallBulkClient | None,
     scryfall: ScryfallClient,
 ) -> tuple[list[_ResolvedCard], list[str]]:
-    """Resolve all cards in the decklist using MTGJSON-first fallback."""
+    """Resolve all cards in the decklist using bulk-data-first fallback."""
     from mtg_mcp_server.workflows.card_resolver import resolve_card
 
     # Cap concurrent Scryfall lookups to avoid overwhelming the connection pool.
     sem = asyncio.Semaphore(10)
 
-    async def _bounded_resolve(name: str) -> Card | MTGJSONCard:
+    async def _bounded_resolve(name: str) -> Card:
         """Resolve a single card with concurrency limiting."""
         async with sem:
-            return await resolve_card(name, mtgjson=mtgjson, scryfall=scryfall)
+            return await resolve_card(name, bulk=bulk, scryfall=scryfall)
 
     tasks = [_bounded_resolve(name) for name in decklist]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -346,51 +329,13 @@ async def _fetch_edhrec_data(
 
     try:
         data = await edhrec.commander_top_cards(commander_name)
-    except Exception as exc:
+    except ServiceError as exc:
         log.warning("deck_analysis.edhrec_failed", error=str(exc), error_type=type(exc).__name__)
         sources.edhrec_error = str(exc)
         return None
 
     sources.edhrec_ok = True
     return data
-
-
-async def _fill_missing_prices(
-    resolved_cards: list[_ResolvedCard],
-    *,
-    scryfall: ScryfallClient,
-) -> None:
-    """Fetch Scryfall prices for MTGJSON-resolved cards that lack price data.
-
-    Only targets cards with ``price_usd is None`` — Scryfall-resolved cards
-    already have prices populated and are skipped.
-    """
-    need_prices = [(i, card) for i, card in enumerate(resolved_cards) if card.price_usd is None]
-    if not need_prices:
-        return
-
-    # Cap concurrent Scryfall lookups to avoid overwhelming the connection pool.
-    sem = asyncio.Semaphore(10)
-
-    async def _fetch_price(name: str) -> Card:
-        """Fetch a single card's price with concurrency limiting."""
-        async with sem:
-            return await scryfall.get_card_by_name(name)
-
-    tasks = [_fetch_price(card.name) for _, card in need_prices]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    failed = 0
-    for (idx, card), result in zip(need_prices, results, strict=True):
-        if isinstance(result, BaseException):
-            log.debug("fill_prices.failed", card=card.name, error=str(result))
-            failed += 1
-            continue
-        if result.prices.usd is not None:
-            resolved_cards[idx].price_usd = result.prices.usd
-
-    if failed:
-        log.warning("fill_prices.partial_failure", failed=failed, total=len(need_prices))
 
 
 # ---------------------------------------------------------------------------
@@ -468,11 +413,8 @@ def _format_output(
     lines.append(f"| Cards | {counts} |")
     lines.append("")
     lines.append(f"**Total mana value:** {mana_curve.total_mana_value:.0f}")
-    lines.append(
-        f"**Average mana value:** {mana_curve.total_mana_value / deck_size:.1f}"
-        if deck_size > 0
-        else ""
-    )
+    if deck_size > 0:
+        lines.append(f"**Average mana value:** {mana_curve.total_mana_value / deck_size:.1f}")
     lines.append("")
 
     # Color Requirements
@@ -562,10 +504,10 @@ def _format_output(
     else:
         lines.append("- [EDHREC](https://edhrec.com): Failed")
 
-    if sources.mtgjson_available:
-        lines.append("- [MTGJSON](https://mtgjson.com): OK")
+    if sources.bulk_data_available:
+        lines.append("- [Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): OK")
     else:
-        lines.append("- [MTGJSON](https://mtgjson.com): Disabled")
+        lines.append("- [Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): Disabled")
 
     log.info("deck_analysis.complete", commander=commander_name, deck_size=deck_size)
     return "\n".join(lines)

@@ -20,10 +20,10 @@ startCommand:
         title: "Enable EDHREC"
         description: "Enable EDHREC commander metagame backend (uses undocumented endpoints)"
         default: true
-      MTG_MCP_ENABLE_MTGJSON:
+      MTG_MCP_ENABLE_BULK_DATA:
         type: boolean
-        title: "Enable MTGJSON"
-        description: "Enable MTGJSON bulk card data for rate-limit-free lookups (~100 MB download on first use)"
+        title: "Enable Bulk Data"
+        description: "Enable Scryfall bulk card data for rate-limit-free lookups (~80 MB download on first use)"
         default: true
       MTG_MCP_LOG_LEVEL:
         type: string
@@ -38,10 +38,10 @@ startCommand:
         default: 100
         minimum: 10
         maximum: 5000
-      MTG_MCP_MTGJSON_REFRESH_HOURS:
+      MTG_MCP_BULK_DATA_REFRESH_HOURS:
         type: integer
-        title: "MTGJSON Refresh Interval (hours)"
-        description: "Hours between MTGJSON bulk data refreshes"
-        default: 24
+        title: "Bulk Data Refresh Interval (hours)"
+        description: "Hours between Scryfall bulk data refreshes"
+        default: 12
         minimum: 1
         maximum: 168

@@ -18,7 +18,7 @@ SCRYFALL_FIXTURES = Path(__file__).parent / "fixtures" / "scryfall"
 SPELLBOOK_FIXTURES = Path(__file__).parent / "fixtures" / "spellbook"
 SEVENTEEN_LANDS_FIXTURES = Path(__file__).parent / "fixtures" / "seventeen_lands"
 EDHREC_FIXTURES = Path(__file__).parent / "fixtures" / "edhrec"
-MTGJSON_FIXTURES = Path(__file__).parent / "fixtures" / "mtgjson"
+SCRYFALL_BULK_FIXTURES = Path(__file__).parent / "fixtures" / "scryfall_bulk"
 SCRYFALL_BASE = "https://api.scryfall.com"
 SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
@@ -171,46 +171,58 @@ class TestEdhrecMounted:
         assert "Muldrotha, the Gravetide" in text
 
 
-class TestMtgjsonMounted:
-    """Verify MTGJSON tools appear with mtgjson_ namespace on the orchestrator."""
+class TestScryfallBulkMounted:
+    """Verify Scryfall bulk data tools appear with bulk_ namespace on the orchestrator."""
 
     async def test_namespaced_tools_appear(self, mcp_client: Client):
-        """Both MTGJSON tools are listed with the mtgjson_ namespace prefix."""
+        """Both bulk data tools are listed with the bulk_ namespace prefix."""
         tools = await mcp_client.list_tools()
         tool_names = {t.name for t in tools}
-        assert "mtgjson_card_lookup" in tool_names
-        assert "mtgjson_card_search" in tool_names
+        assert "bulk_card_lookup" in tool_names
+        assert "bulk_card_search" in tool_names
 
     async def test_end_to_end_card_lookup(self, mcp_client: Client):
-        """Calling mtgjson_card_lookup through the orchestrator returns card data."""
-        fixture_bytes = (MTGJSON_FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
-        mock_response = httpx.Response(200, content=fixture_bytes)
+        """Calling bulk_card_lookup through the orchestrator returns card data."""
+        metadata = json.loads((SCRYFALL_BULK_FIXTURES / "bulk_metadata.json").read_text())
+        oracle_cards = json.loads((SCRYFALL_BULK_FIXTURES / "oracle_cards_sample.json").read_text())
+        mock_metadata_resp = httpx.Response(
+            200,
+            json=metadata,
+            headers={"etag": '"test-etag"'},
+        )
+        mock_cards_resp = httpx.Response(200, json=oracle_cards)
 
-        with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
+        with patch("mtg_mcp_server.services.scryfall_bulk.httpx.AsyncClient") as mock_cls:
             mock_http = AsyncMock()
-            mock_http.get = AsyncMock(return_value=mock_response)
+            mock_http.get = AsyncMock(side_effect=[mock_metadata_resp, mock_cards_resp])
             mock_http.__aenter__ = AsyncMock(return_value=mock_http)
             mock_http.__aexit__ = AsyncMock(return_value=False)
             mock_cls.return_value = mock_http
 
-            result = await mcp_client.call_tool("mtgjson_card_lookup", {"name": "Sol Ring"})
+            result = await mcp_client.call_tool("bulk_card_lookup", {"name": "Sol Ring"})
             text = result.content[0].text
             assert "Sol Ring" in text
             assert "Artifact" in text
 
     async def test_end_to_end_card_search(self, mcp_client: Client):
-        """Calling mtgjson_card_search through the orchestrator returns search results."""
-        fixture_bytes = (MTGJSON_FIXTURES / "atomic_cards_sample.json.gz").read_bytes()
-        mock_response = httpx.Response(200, content=fixture_bytes)
+        """Calling bulk_card_search through the orchestrator returns search results."""
+        metadata = json.loads((SCRYFALL_BULK_FIXTURES / "bulk_metadata.json").read_text())
+        oracle_cards = json.loads((SCRYFALL_BULK_FIXTURES / "oracle_cards_sample.json").read_text())
+        mock_metadata_resp = httpx.Response(
+            200,
+            json=metadata,
+            headers={"etag": '"test-etag"'},
+        )
+        mock_cards_resp = httpx.Response(200, json=oracle_cards)
 
-        with patch("mtg_mcp_server.services.mtgjson.httpx.AsyncClient") as mock_cls:
+        with patch("mtg_mcp_server.services.scryfall_bulk.httpx.AsyncClient") as mock_cls:
             mock_http = AsyncMock()
-            mock_http.get = AsyncMock(return_value=mock_response)
+            mock_http.get = AsyncMock(side_effect=[mock_metadata_resp, mock_cards_resp])
             mock_http.__aenter__ = AsyncMock(return_value=mock_http)
             mock_http.__aexit__ = AsyncMock(return_value=False)
             mock_cls.return_value = mock_http
 
-            result = await mcp_client.call_tool("mtgjson_card_search", {"query": "bolt"})
+            result = await mcp_client.call_tool("bulk_card_search", {"query": "bolt"})
             text = result.content[0].text
             assert "Lightning Bolt" in text
 
@@ -232,7 +244,7 @@ class TestServerMetadata:
         assert "spellbook_*" in server.instructions
         assert "draft_*" in server.instructions
         assert "edhrec_*" in server.instructions
-        assert "mtgjson_*" in server.instructions
+        assert "bulk_*" in server.instructions
         assert "Workflow" in server.instructions
 
     def test_server_name(self):
@@ -350,7 +362,7 @@ class TestResourcePropagation:
             "combo/{combo_id}",  # Spellbook combo
             "ratings",  # 17Lands ratings
             "staples",  # EDHREC staples
-            "card-data/{name}",  # MTGJSON card-data
+            "card-data/{name}",  # Scryfall bulk card-data
         ]
         for fragment in expected_fragments:
             found = any(fragment in uri for uri in uri_set)
@@ -420,7 +432,7 @@ class TestToolNamingConventions:
             "spellbook_": ["spellbook_find_combos", "spellbook_combo_details"],
             "draft_": ["draft_card_ratings", "draft_archetype_stats"],
             "edhrec_": ["edhrec_commander_staples", "edhrec_card_synergy"],
-            "mtgjson_": ["mtgjson_card_lookup", "mtgjson_card_search"],
+            "bulk_": ["bulk_card_lookup", "bulk_card_search"],
         }
         for prefix, expected_tools in backend_prefixes.items():
             for tool_name in expected_tools:

@@ -464,9 +464,6 @@ async def card_comparison(
     Raises:
         CardNotFoundError: If a card is not found on Scryfall (propagated).
     """
-    from mtg_mcp_server.types import Card as ScryfallCard
-    from mtg_mcp_server.types import MTGJSONCard
-
     log.info("card_comparison.start", cards=cards, commander=commander_name)
 
     # Step 1/3: Resolve cards (always Scryfall — prices required)
@@ -477,7 +474,7 @@ async def card_comparison(
     resolved = await asyncio.gather(*resolve_tasks, return_exceptions=True)
 
     # Collect resolved cards, skip failures
-    card_data: list[ScryfallCard | MTGJSONCard] = []
+    card_data: list[Card] = []
     not_found_names: list[str] = []
     for i, result in enumerate(resolved):
         if isinstance(result, BaseException):
@@ -555,11 +552,7 @@ async def card_comparison(
         else:
             combo_str = str(len(cmb_result))
 
-        # Extract price (only available on Scryfall Card, not MTGJSONCard)
-        if isinstance(card, ScryfallCard) and card.prices.usd is not None:
-            price_str = f"${card.prices.usd}"
-        else:
-            price_str = "N/A"
+        price_str = f"${card.prices.usd}" if card.prices.usd is not None else "N/A"
 
         lines.append(
             f"| {card.name} | {mana_cost} | {type_line} | "

@@ -1,4 +1,4 @@
-"""Tests for card_resolver — MTGJSON-first resolution with Scryfall fallback."""
+"""Tests for card_resolver — bulk-data-first resolution with Scryfall fallback."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from mtg_mcp_server.services.scryfall import CardNotFoundError
+from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkError
 from mtg_mcp_server.workflows.card_resolver import resolve_card
 
 
@@ -19,8 +20,8 @@ def mock_scryfall():
 
 
 @pytest.fixture
-def mock_mtgjson():
-    """Provide a mock MTGJSONClient with get_card method."""
+def mock_bulk():
+    """Provide a mock ScryfallBulkClient with get_card method."""
     client = AsyncMock()
     client.get_card = AsyncMock()
     return client
@@ -29,47 +30,35 @@ def mock_mtgjson():
 class TestResolveCard:
     """Tests for the resolve_card utility function."""
 
-    async def test_mtgjson_hit_returns_mtgjson_card(self, mock_mtgjson, mock_scryfall):
-        """MTGJSON card returned directly when found, Scryfall not called."""
-        mtgjson_card = AsyncMock(name="Sol Ring")
-        mock_mtgjson.get_card.return_value = mtgjson_card
+    async def test_bulk_hit_returns_card(self, mock_bulk, mock_scryfall):
+        """Bulk data card returned directly when found, Scryfall not called."""
+        bulk_card = AsyncMock(name="Sol Ring")
+        mock_bulk.get_card.return_value = bulk_card
 
-        result = await resolve_card("Sol Ring", mtgjson=mock_mtgjson, scryfall=mock_scryfall)
+        result = await resolve_card("Sol Ring", bulk=mock_bulk, scryfall=mock_scryfall)
 
-        assert result is mtgjson_card
-        mock_mtgjson.get_card.assert_awaited_once_with("Sol Ring")
+        assert result is bulk_card
+        mock_bulk.get_card.assert_awaited_once_with("Sol Ring")
         mock_scryfall.get_card_by_name.assert_not_awaited()
 
-    async def test_mtgjson_miss_falls_back_to_scryfall(self, mock_mtgjson, mock_scryfall):
-        """Falls back to Scryfall when MTGJSON returns None."""
-        mock_mtgjson.get_card.return_value = None
+    async def test_bulk_miss_falls_back_to_scryfall(self, mock_bulk, mock_scryfall):
+        """Falls back to Scryfall when bulk data returns None."""
+        mock_bulk.get_card.return_value = None
         scryfall_card = AsyncMock(name="Sol Ring")
         mock_scryfall.get_card_by_name.return_value = scryfall_card
 
-        result = await resolve_card("Sol Ring", mtgjson=mock_mtgjson, scryfall=mock_scryfall)
+        result = await resolve_card("Sol Ring", bulk=mock_bulk, scryfall=mock_scryfall)
 
         assert result is scryfall_card
-        mock_mtgjson.get_card.assert_awaited_once()
+        mock_bulk.get_card.assert_awaited_once()
         mock_scryfall.get_card_by_name.assert_awaited_once_with("Sol Ring")
 
-    async def test_need_prices_skips_mtgjson(self, mock_mtgjson, mock_scryfall):
-        """MTGJSON skipped entirely when need_prices=True, goes straight to Scryfall."""
+    async def test_bulk_none_uses_scryfall(self, mock_scryfall):
+        """Uses Scryfall directly when bulk client is None (disabled)."""
         scryfall_card = AsyncMock(name="Sol Ring")
         mock_scryfall.get_card_by_name.return_value = scryfall_card
 
-        result = await resolve_card(
-            "Sol Ring", mtgjson=mock_mtgjson, scryfall=mock_scryfall, need_prices=True
-        )
-
-        assert result is scryfall_card
-        mock_mtgjson.get_card.assert_not_awaited()
-
-    async def test_mtgjson_none_uses_scryfall(self, mock_scryfall):
-        """Uses Scryfall directly when MTGJSON client is None (disabled)."""
-        scryfall_card = AsyncMock(name="Sol Ring")
-        mock_scryfall.get_card_by_name.return_value = scryfall_card
-
-        result = await resolve_card("Sol Ring", mtgjson=None, scryfall=mock_scryfall)
+        result = await resolve_card("Sol Ring", bulk=None, scryfall=mock_scryfall)
 
         assert result is scryfall_card
         mock_scryfall.get_card_by_name.assert_awaited_once_with("Sol Ring")
@@ -79,4 +68,15 @@ class TestResolveCard:
         mock_scryfall.get_card_by_name.side_effect = CardNotFoundError("Not found")
 
         with pytest.raises(CardNotFoundError):
-            await resolve_card("Nonexistent", mtgjson=None, scryfall=mock_scryfall)
+            await resolve_card("Nonexistent", bulk=None, scryfall=mock_scryfall)
+
+    async def test_bulk_error_falls_back_to_scryfall(self, mock_bulk, mock_scryfall):
+        """ScryfallBulkError from bulk client falls back to Scryfall."""
+        mock_bulk.get_card.side_effect = ScryfallBulkError("Download failed")
+        scryfall_card = AsyncMock(name="Sol Ring")
+        mock_scryfall.get_card_by_name.return_value = scryfall_card
+
+        result = await resolve_card("Sol Ring", bulk=mock_bulk, scryfall=mock_scryfall)
+
+        assert result is scryfall_card
+        mock_scryfall.get_card_by_name.assert_awaited_once_with("Sol Ring")

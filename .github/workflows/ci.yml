@@ -44,6 +44,22 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+  live-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: jdx/mise-action@v4
+
+      - name: Install dependencies
+        run: mise run setup
+
+      - name: Live smoke tests (real server + real APIs)
+        run: mise run test:live
+
   build:
     runs-on: ubuntu-latest
     steps:

@@ -30,8 +30,8 @@ from mtg_mcp_server.providers import (
 )
 from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient
-from mtg_mcp_server.services.mtgjson import MTGJSONClient
 from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient
+from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
 from mtg_mcp_server.services.spellbook import SpellbookClient
 
@@ -42,19 +42,19 @@ _scryfall: ScryfallClient | None = None
 _spellbook: SpellbookClient | None = None
 _seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
-_mtgjson: MTGJSONClient | None = None
+_bulk: ScryfallBulkClient | None = None
 
 
 @lifespan
 async def workflow_lifespan(server: FastMCP):
     """Initialize all service clients needed by workflow tools.
 
-    Uses ``AsyncExitStack`` to manage up to 5 clients in a single lifespan.
-    Feature-flagged backends (17Lands, EDHREC, MTGJSON) are only created when
-    their corresponding ``Settings`` flag is enabled. All clients are torn down
+    Uses ``AsyncExitStack`` to manage multiple clients in a single lifespan.
+    Feature-flagged backends (17Lands, EDHREC, Scryfall bulk data) are only created
+    when their corresponding ``Settings`` flag is enabled. All clients are torn down
     when the server shuts down.
     """
-    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _mtgjson
+    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk
     settings = Settings()
     async with AsyncExitStack() as stack:
         _scryfall = await stack.enter_async_context(
@@ -71,19 +71,19 @@ async def workflow_lifespan(server: FastMCP):
             _edhrec = await stack.enter_async_context(
                 EDHRECClient(base_url=settings.edhrec_base_url)
             )
-        if settings.enable_mtgjson:
-            _mtgjson = await stack.enter_async_context(
-                MTGJSONClient(
-                    data_url=settings.mtgjson_data_url,
-                    refresh_hours=settings.mtgjson_refresh_hours,
-                )
+        if settings.enable_bulk_data:
+            client = ScryfallBulkClient(
+                base_url=settings.scryfall_base_url,
+                refresh_hours=settings.bulk_data_refresh_hours,
             )
+            _bulk = await stack.enter_async_context(client)
+            _bulk.start_background_refresh()
         yield {}
     _scryfall = None
     _spellbook = None
     _seventeen_lands = None
     _edhrec = None
-    _mtgjson = None
+    _bulk = None
 
 
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan, mask_error_details=True)
@@ -125,7 +125,7 @@ async def _progress(ctx: Context, step: int, total: int) -> None:
     try:
         await ctx.report_progress(progress=step, total=total)
     except Exception:
-        _log.debug("progress_report_failed", step=step, total=total, exc_info=True)
+        _log.warning("progress_report_failed", step=step, total=total, exc_info=True)
 
 
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
@@ -338,9 +338,9 @@ async def deck_analysis(
 ) -> str:
     """Full decklist health check — mana curve, colors, combos, bracket, budget, synergy.
 
-    Uses all available backends: MTGJSON/Scryfall for card data, Spellbook for combos
-    and bracket estimation, EDHREC for synergy scores, Scryfall for prices.
-    Degrades gracefully if optional backends are unavailable.
+    Uses all available backends: Scryfall bulk data for rate-limit-free card resolution,
+    Scryfall API as fallback, Spellbook for combos and bracket estimation, EDHREC for
+    synergy scores. Degrades gracefully if optional backends are unavailable.
     """
     from mtg_mcp_server.workflows.analysis import deck_analysis as impl
 
@@ -351,7 +351,7 @@ async def deck_analysis(
         return await impl(
             decklist,
             commander_name,
-            mtgjson=_mtgjson,
+            bulk=_bulk,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
