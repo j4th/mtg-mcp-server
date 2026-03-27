@@ -1,0 +1,13 @@
+{
+  "object": "bulk_data",
+  "id": "27bf3214-1271-490b-bdfe-c0be6c23b02e",
+  "type": "oracle_cards",
+  "updated_at": "2026-03-25T09:02:00.000+00:00",
+  "uri": "https://api.scryfall.com/bulk-data/oracle_cards",
+  "name": "Oracle Cards",
+  "description": "Oracle card data for every card object on Scryfall.",
+  "size": 162000000,
+  "download_uri": "https://data.scryfall.io/oracle-cards/oracle-cards-20260325120200.json",
+  "content_type": "application/json",
+  "content_encoding": "gzip"
+}
