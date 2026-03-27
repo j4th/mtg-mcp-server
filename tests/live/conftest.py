@@ -65,17 +65,25 @@ def live_server():
 
     yield {"port": port, "url": url}
 
-    # Teardown: graceful termination.
+    # Teardown: graceful termination, then close pipes to avoid ResourceWarning.
     process.terminate()
     try:
         process.wait(timeout=10)
     except subprocess.TimeoutExpired:
         process.send_signal(signal.SIGKILL)
         process.wait(timeout=5)
+    if process.stdout:
+        process.stdout.close()
+    if process.stderr:
+        process.stderr.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def live_client(live_server):
-    """FastMCP Client connected to the live server over HTTP."""
+    """FastMCP Client connected to the live server over HTTP.
+
+    Function-scoped so each test gets a client on its own event loop.
+    The server subprocess (session-scoped) stays alive across all tests.
+    """
     async with Client(live_server["url"]) as client:
         yield client
