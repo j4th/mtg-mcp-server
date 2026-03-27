@@ -18,6 +18,7 @@ from fastmcp import FastMCP
 from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddleware
 from mcp.types import Icon, ToolAnnotations
 
+from mtg_mcp_server import __version__
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.logging import configure_logging
 from mtg_mcp_server.providers.edhrec import edhrec_mcp
@@ -30,6 +31,7 @@ from mtg_mcp_server.workflows.server import workflow_mcp
 
 mcp = FastMCP(
     "MTG",
+    version=__version__,
     mask_error_details=True,
     website_url="https://github.com/j4th/mtg-mcp-server",
     icons=[

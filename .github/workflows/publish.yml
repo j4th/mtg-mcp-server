@@ -62,3 +62,52 @@ jobs:
         run: |
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish
+
+  smithery:
+    runs-on: ubuntu-latest
+    needs: pypi
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: jdx/mise-action@v4
+
+      - name: Install dependencies
+        run: mise run setup
+
+      - name: Generate config schema from SmitheryConfig
+        run: |
+          uv run python -c "
+          from mtg_mcp_server.smithery import SmitheryConfig
+          import json
+          print(json.dumps(SmitheryConfig.model_json_schema()))
+          " > /tmp/smithery-config-schema.json
+          echo "Generated schema:"
+          cat /tmp/smithery-config-schema.json
+
+      - name: Wait for Horizon to rebuild with new version
+        run: |
+          PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          HORIZON_URL="https://mtg-mcp-server.fastmcp.app/mcp"
+          echo "Waiting for Horizon to serve version ${PKG_VERSION}..."
+          for i in $(seq 1 30); do
+            RESP=$(curl -sS -X POST "$HORIZON_URL" \
+              -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}' \
+              2>/dev/null || true)
+            SERVER_VER=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('result',{}).get('serverInfo',{}).get('version',''))" 2>/dev/null || true)
+            if [ "$SERVER_VER" = "$PKG_VERSION" ]; then
+              echo "Horizon serving version ${PKG_VERSION} after ~$((i * 15))s"
+              exit 0
+            fi
+            echo "Attempt $i/30 — got version '${SERVER_VER}', waiting 15s..."
+            sleep 15
+          done
+          echo "::warning::Horizon did not update to ${PKG_VERSION} within 7.5 minutes — publishing anyway"
+
+      - name: Publish to Smithery with config schema
+        env:
+          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
+        run: |
+          npx -y @smithery/cli mcp publish "https://mtg-mcp-server.fastmcp.app/mcp" \
+            -n @j4th/mtg-mcp-server \
+            --config-schema /tmp/smithery-config-schema.json

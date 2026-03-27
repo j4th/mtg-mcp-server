@@ -16,12 +16,12 @@
         "source": "github",
         "id": "1187666627"
     },
-    "version": "1.2.2",
+    "version": "1.2.3",
     "packages": [
         {
             "registryType": "pypi",
             "identifier": "mtg-mcp-server",
-            "version": "1.2.2",
+            "version": "1.2.3",
             "transport": {"type": "stdio"},
             "runtimeHint": "uvx",
             "environmentVariables": [
