@@ -23,13 +23,16 @@ __all__ = [
     "ATTRIBUTION_SCRYFALL",
     "ATTRIBUTION_SCRYFALL_BULK",
     "ATTRIBUTION_SPELLBOOK",
+    "TAGS_ALL_FORMATS",
     "TAGS_BETA",
+    "TAGS_BUILD",
     "TAGS_COMBO",
     "TAGS_COMMANDER",
     "TAGS_DRAFT",
     "TAGS_LOOKUP",
     "TAGS_PRICING",
     "TAGS_SEARCH",
+    "TAGS_VALIDATE",
     "TOOL_ANNOTATIONS",
 ]
 
@@ -47,6 +50,9 @@ TAGS_COMMANDER = {"commander", "analysis", "stable"}
 TAGS_DRAFT = {"draft", "analysis", "stable"}
 TAGS_COMBO = {"combo", "stable"}
 TAGS_PRICING = {"pricing", "stable"}
+TAGS_VALIDATE = {"validate", "all-formats", "stable"}
+TAGS_BUILD = {"build", "analyze", "all-formats", "stable"}
+TAGS_ALL_FORMATS = {"all-formats", "stable"}
 TAGS_BETA = {"beta"}
 
 # Attribution lines appended to tool outputs. These ensure compliance with
