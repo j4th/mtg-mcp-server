@@ -25,6 +25,7 @@ def _price_sort_key(usd: str | None) -> tuple[int, float]:
     try:
         return (0, -float(usd))
     except ValueError:
+        log.debug("price_sort.invalid_usd", usd=usd)
         return (1, 0.0)
 
 
@@ -39,7 +40,7 @@ async def price_comparison(
     a markdown table sorted by USD price descending. Includes a total row.
 
     Args:
-        cards: Card names to compare (already deduplicated by server.py).
+        cards: Card names to compare (deduplication handled internally).
         bulk: Initialized ScryfallBulkClient.
 
     Returns:
@@ -100,7 +101,7 @@ async def price_comparison(
                 total_usd += float(usd)
                 total_usd_available = True
             except ValueError:
-                pass
+                log.debug("price_comparison.invalid_usd", card=name, usd=usd)
 
     # Total row
     lines.append("|------|-----|----------|-----|")

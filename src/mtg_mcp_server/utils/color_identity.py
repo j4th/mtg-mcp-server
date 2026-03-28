@@ -9,7 +9,7 @@ from __future__ import annotations
 
 VALID_COLORS = frozenset({"W", "U", "B", "R", "G"})
 
-FIVE_COLOR = frozenset({"W", "U", "B", "R", "G"})
+FIVE_COLOR = VALID_COLORS
 
 _NAMED_IDENTITIES: dict[str, frozenset[str]] = {
     # Guilds (two-color)

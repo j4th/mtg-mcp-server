@@ -10,14 +10,17 @@ class TestQueryFiltersDefaults:
 
     def test_empty_filters(self) -> None:
         f = QueryFilters()
-        assert f.type_contains == []
-        assert f.text_contains == []
-        assert f.text_any == []
+        assert f.type_contains == ()
+        assert f.text_contains == ()
+        assert f.text_any == ()
         assert f.cmc_eq is None
         assert f.cmc_lte is None
-        assert f.keywords == []
-        assert f.name_contains is None
         assert f.description == ""
+
+    def test_frozen(self) -> None:
+        f = QueryFilters()
+        with pytest.raises(AttributeError):
+            f.cmc_eq = 3.0  # type: ignore[misc]
 
 
 class TestNDropPatterns:
@@ -38,7 +41,7 @@ class TestNDropPatterns:
     def test_3_drops_no_type(self) -> None:
         result = parse_query("3-drops")
         assert result.cmc_eq == 3.0
-        assert result.type_contains == []
+        assert result.type_contains == ()
         assert "CMC 3" in result.description
 
     def test_1_drop(self) -> None:

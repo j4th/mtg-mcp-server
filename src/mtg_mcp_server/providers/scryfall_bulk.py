@@ -250,6 +250,9 @@ async def format_legality(
     in the specified format. Handles common format aliases (e.g. 'edh'
     for 'commander').
     """
+    if not cards:
+        raise ToolError("Provide at least one card name to check.")
+
     client = _get_client()
     fmt = normalize_format(format)
 
@@ -306,9 +309,15 @@ async def format_search(
     optional color identity, price, and rarity constraints. Results are
     sorted by EDHREC rank (most popular first).
     """
+    if not query.strip():
+        raise ToolError("Provide a search query.")
+
     client = _get_client()
     fmt = normalize_format(format)
-    identity = parse_color_identity(color_identity) if color_identity else None
+    try:
+        identity = parse_color_identity(color_identity) if color_identity else None
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
 
     try:
         await client.ensure_loaded()
@@ -321,9 +330,12 @@ async def format_search(
     # Pre-lowercase parsed terms to avoid re-lowering per card
     type_lower_terms = [t.lower() for t in parsed.type_contains] if parsed.type_contains else None
     text_any_lower = [p.lower() for p in parsed.text_any] if parsed.text_any else None
-    text_contains_lower = parsed.text_contains[0].lower() if parsed.text_contains else None
+    text_contains_lower = (
+        [t.lower() for t in parsed.text_contains] if parsed.text_contains else None
+    )
     rarity_lower = rarity.lower() if rarity else None
 
+    MAX_CANDIDATES = 5000  # Cap accumulation for very broad queries
     matches: list[Card] = []
     for card in client._unique_cards:
         # Format legality check
@@ -361,14 +373,16 @@ async def format_search(
             continue
         if text_contains_lower is not None:
             name_lower = card.name.lower()
-            if not (
-                text_contains_lower in name_lower
-                or text_contains_lower in card.type_line.lower()
-                or text_contains_lower in oracle_lower
+            type_lower_text = card.type_line.lower()
+            if not all(
+                t in name_lower or t in type_lower_text or t in oracle_lower
+                for t in text_contains_lower
             ):
                 continue
 
         matches.append(card)
+        if len(matches) >= MAX_CANDIDATES:
+            break
 
     if not matches:
         raise ToolError(
@@ -421,7 +435,10 @@ async def format_staples(
     """
     client = _get_client()
     fmt = normalize_format(format)
-    identity = parse_color_identity(color) if color else None
+    try:
+        identity = parse_color_identity(color) if color else None
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
 
     try:
         await client.ensure_loaded()
@@ -487,6 +504,7 @@ async def similar_cards(
 
     try:
         source = await client.get_card(card_name)
+        await client.ensure_loaded()  # explicit guard for _unique_cards below
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
@@ -563,7 +581,10 @@ async def random_card(
     """
     client = _get_client()
     fmt = normalize_format(format) if format else None
-    identity = parse_color_identity(color_identity) if color_identity else None
+    try:
+        identity = parse_color_identity(color_identity) if color_identity else None
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
 
     try:
         card = await client.random_card(
@@ -593,6 +614,9 @@ async def ban_list(
     Returns alphabetically sorted lists of banned and restricted cards,
     including their type lines.
     """
+    if not format.strip():
+        raise ToolError("Provide a format name.")
+
     client = _get_client()
     fmt = normalize_format(format)
 
@@ -738,6 +762,7 @@ async def card_similar_resource(name: str) -> str:
     client = _get_client()
     try:
         source = await client.get_card(name)
+        await client.ensure_loaded()  # explicit guard for _unique_cards below
     except ScryfallBulkError as exc:
         log.warning("resource.card_similar_error", name=name, error=str(exc))
         return json.dumps({"error": f"Scryfall bulk data error: {exc}"})

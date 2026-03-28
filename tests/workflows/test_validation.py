@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+import pytest
+
 from mtg_mcp_server.types import Card, CardPrices
 from mtg_mcp_server.workflows.validation import deck_validate
 
@@ -392,18 +394,17 @@ class TestSideboardSize:
 
 
 class TestUnknownFormat:
-    """Unknown format returns an error message."""
+    """Unknown format raises ValueError (caught by server.py → ToolError)."""
 
     async def test_invalid_format(self) -> None:
         mock_bulk = _make_bulk({})
 
-        result = await deck_validate(
-            ["Sol Ring"],
-            "notaformat",
-            bulk=mock_bulk,
-        )
-
-        assert "Error" in result or "Unknown format" in result
+        with pytest.raises(ValueError, match="Unknown format"):
+            await deck_validate(
+                ["Sol Ring"],
+                "notaformat",
+                bulk=mock_bulk,
+            )
 
 
 class TestUnresolvedCards:

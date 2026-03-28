@@ -552,6 +552,8 @@ async def deck_validate(
             sideboard=sideboard,
             bulk=_require_bulk(),
         )
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
     except ServiceError as exc:
         raise ToolError(f"deck_validate failed: {exc}") from exc
 
@@ -584,6 +586,8 @@ async def suggest_mana_base(
             total_lands=total_lands,
             bulk=_require_bulk(),
         )
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
     except ServiceError as exc:
         raise ToolError(f"suggest_mana_base failed: {exc}") from exc
 
@@ -610,6 +614,8 @@ async def price_comparison(
             cards,
             bulk=_require_bulk(),
         )
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
     except ServiceError as exc:
         raise ToolError(f"price_comparison failed: {exc}") from exc
 

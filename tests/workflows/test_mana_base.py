@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+import pytest
+
 from mtg_mcp_server.types import Card, CardPrices
 from mtg_mcp_server.workflows.mana_base import suggest_mana_base
 
@@ -316,13 +318,12 @@ class TestEdgeCases:
     async def test_unknown_format(self) -> None:
         mock_bulk = _make_bulk({})
 
-        result = await suggest_mana_base(
-            ["Card"],
-            "notaformat",
-            bulk=mock_bulk,
-        )
-
-        assert "Error" in result or "Unknown" in result
+        with pytest.raises(ValueError, match="Unknown format"):
+            await suggest_mana_base(
+                ["Card"],
+                "notaformat",
+                bulk=mock_bulk,
+            )
 
     async def test_empty_decklist(self) -> None:
         mock_bulk = _make_bulk({})

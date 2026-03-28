@@ -52,7 +52,7 @@ async def suggest_mana_base(
     suggests format-legal dual lands.
 
     Args:
-        decklist: Non-land card entries (e.g. ``["4x Lightning Bolt"]``).
+        decklist: Card entries (e.g. ``["4x Lightning Bolt"]``). Lands are filtered internally.
         format: Format for legality checks (e.g. ``"commander"``).
         total_lands: Override the recommended total land count.
         bulk: Initialized ScryfallBulkClient.
@@ -62,11 +62,8 @@ async def suggest_mana_base(
     """
     log.info("suggest_mana_base.start", format=format, cards=len(decklist))
 
-    # --- Normalize format ---
-    try:
-        fmt = normalize_format(format)
-    except ValueError as exc:
-        return f"# Mana Base Error\n\n{exc}"
+    # --- Normalize format (ValueError propagates to server.py → ToolError) ---
+    fmt = normalize_format(format)
 
     # --- Parse and resolve ---
     parsed = parse_decklist(decklist)
@@ -141,12 +138,16 @@ async def suggest_mana_base(
     # --- Dual land suggestions ---
     dual_lands: list[Card] = []
     if len(deck_colors) >= 2:
-        dual_lands = await bulk.filter_cards(
-            format=fmt,
-            type_contains=["Land"],
-            color_identity=frozenset(deck_colors),
-            limit=20,
-        )
+        try:
+            dual_lands = await bulk.filter_cards(
+                format=fmt,
+                type_contains=["Land"],
+                color_identity=frozenset(deck_colors),
+                limit=20,
+            )
+        except Exception:
+            log.warning("suggest_mana_base.dual_land_search_failed", format=fmt)
+            dual_lands = []
         # Filter to only dual/multi lands (must produce colored mana)
         dual_lands = [
             card for card in dual_lands if card.color_identity and len(card.color_identity) >= 2

@@ -53,11 +53,8 @@ async def deck_validate(
     """
     log.info("deck_validate.start", format=format, cards=len(decklist))
 
-    # --- Normalize format ---
-    try:
-        fmt = normalize_format(format)
-    except ValueError as exc:
-        return f"# Deck Validation Error\n\n{exc}"
+    # --- Normalize format (ValueError propagates to server.py → ToolError) ---
+    fmt = normalize_format(format)
 
     rules: FormatRules = get_format_rules(fmt)
 
@@ -162,7 +159,9 @@ async def deck_validate(
             if qty > 1:
                 errors.append(f"'{name}' is restricted in {fmt}: {qty} copies (max 1)")
 
-        # Pauper rarity
+        # Pauper rarity — note: Scryfall legality data already accounts for
+        # printings at common, so this catches cards incorrectly marked legal
+        # or provides a clearer error message than just "not legal".
         if rules.check_rarity == "common" and card.rarity != "common":
             errors.append(f"'{name}' is {card.rarity} (Pauper requires common rarity)")
 
