@@ -170,6 +170,13 @@ class TestCardLookup:
         assert "{T}: Add {C}{C}." in text
         assert "Data: Scryfall bulk data" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["name"] == "Sol Ring"
+        assert sc["type_line"] == "Artifact"
+        assert sc["mana_cost"] == "{1}"
+
     async def test_card_with_prices_and_legalities(self, client_with_data: Client):
         """card_lookup shows prices, legalities, and EDHREC rank."""
         result = await client_with_data.call_tool("card_lookup", {"name": "Sol Ring"})
@@ -187,6 +194,13 @@ class TestCardLookup:
         assert "Muldrotha, the Gravetide" in text
         assert "6/6" in text
         assert "Legendary Creature" in text
+
+        # Structured output for creature
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert sc["power"] == "6"
+        assert sc["toughness"] == "6"
 
     async def test_case_insensitive(self, client_with_data: Client):
         """card_lookup matches card names case-insensitively."""
@@ -227,6 +241,15 @@ class TestCardSearch:
         text = result.content[0].text
         assert "Sol Ring" in text
         assert "Found" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["query"] == "Sol"
+        assert sc["search_field"] == "name"
+        assert sc["total_results"] >= 1
+        assert isinstance(sc["cards"], list)
+        assert sc["cards"][0]["name"] == "Sol Ring"
 
     async def test_search_by_type(self, client_with_data: Client):
         """card_search finds cards by type line when search_field is 'type'."""
@@ -490,6 +513,14 @@ class TestFormatLegality:
         assert "Lightning Bolt" in text
         assert "Legal" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
+        assert len(sc["cards"]) == 2
+        assert sc["cards"][0]["status"] == "legal"
+
     async def test_banned_card(self):
         """format_legality shows Banned status for banned cards."""
         mock = _make_pool_client()
@@ -547,6 +578,13 @@ class TestFormatSearch:
                 )
         text = result.content[0].text
         assert "Lightning Bolt" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["format"] == "commander"
+        assert sc["total_results"] >= 1
+        assert isinstance(sc["cards"], list)
 
     async def test_search_by_type(self):
         """format_search matches type line text."""
@@ -622,6 +660,15 @@ class TestFormatStaples:
         assert "Sol Ring" in text
         assert "#1" in text  # Sol Ring should be rank 1
 
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["format"] == "commander"
+        assert sc["total_results"] >= 1
+        assert isinstance(sc["cards"], list)
+        assert sc["cards"][0]["name"] == "Sol Ring"
+        assert sc["cards"][0]["edhrec_rank"] == 1
+
     async def test_staples_with_type_filter(self):
         """format_staples filters by card type."""
         mock = _make_pool_client()
@@ -683,6 +730,15 @@ class TestSimilarCards:
         assert "Similar to Lightning Bolt" in text
         assert "score:" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["source_card"] == "Lightning Bolt"
+        assert sc["total_results"] >= 1
+        assert isinstance(sc["similar"], list)
+        assert "name" in sc["similar"][0]
+        assert "score" in sc["similar"][0]
+
     async def test_similar_not_found(self):
         """similar_cards returns error for unknown source card."""
         mock = _make_pool_client()
@@ -732,6 +788,13 @@ class TestRandomCard:
         pool_names = [c.name for c in _make_test_pool()]
         assert any(name in text for name in pool_names)
         assert "Data: Scryfall bulk data" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert "name" in sc
+        assert "type_line" in sc
+        assert sc["name"] in pool_names
 
     async def test_random_with_format(self):
         """random_card filters by format legality."""
@@ -792,6 +855,13 @@ class TestBanList:
         assert "Banned" in text
         assert "Sol Ring" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["format"] == "modern"
+        assert isinstance(sc["banned"], list)
+        assert any(c["name"] == "Sol Ring" for c in sc["banned"])
+
     async def test_has_restricted_cards(self):
         """ban_list shows restricted cards for vintage."""
         mock = _make_pool_client()
@@ -846,6 +916,13 @@ class TestCardInFormats:
         assert "Commander" in text
         assert "Modern" in text
         assert "Vintage" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["card_name"] == "Sol Ring"
+        assert isinstance(sc["legalities"], dict)
+        assert sc["legalities"]["commander"] == "legal"
 
     async def test_card_not_found(self):
         """card_in_formats returns error for unknown card."""

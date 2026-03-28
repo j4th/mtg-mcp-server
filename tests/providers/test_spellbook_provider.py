@@ -47,6 +47,15 @@ class TestFindCombos:
         assert "1414-2730-5131-5256" in text
         assert "Data provided by [Commander Spellbook]" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["card_name"] == "Muldrotha, the Gravetide"
+        assert sc["total_combos"] == 5
+        assert isinstance(sc["combos"], list)
+        assert len(sc["combos"]) == 5
+        assert sc["combos"][0]["id"] == "1414-2730-5131-5256"
+
     @respx.mock
     async def test_no_combos_returns_message(self, client: Client):
         """find_combos returns a 'no combos found' message when none match."""
@@ -59,6 +68,12 @@ class TestFindCombos:
         result = await client.call_tool("find_combos", {"card_name": "Xyzzy Nonexistent"})
         text = result.content[0].text
         assert "No combos found" in text
+
+        # Structured output — empty result
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_combos"] == 0
+        assert sc["combos"] == []
 
 
 class TestComboDetails:
@@ -78,6 +93,14 @@ class TestComboDetails:
         assert "Muldrotha, the Gravetide" in text
         assert "BGU" in text
         assert "Infinite death triggers" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["id"] == "1414-2730-5131-5256"
+        assert sc["identity"] == "BGU"
+        assert isinstance(sc["cards"], list)
+        assert any(c["name"] == "Muldrotha, the Gravetide" for c in sc["cards"])
 
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
@@ -114,6 +137,13 @@ class TestFindDecklistCombos:
         assert "BGU" in text
         assert "combo" in text.lower()
 
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["identity"] == "BGU"
+        assert "included" in sc
+        assert "almost_included" in sc
+
 
 class TestEstimateBracket:
     """Spellbook estimate_bracket tool behavior."""
@@ -135,6 +165,13 @@ class TestEstimateBracket:
         )
         text = result.content[0].text
         assert "E" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert "bracket_tag" in sc
+        assert "banned_cards" in sc
+        assert "two_card_combos" in sc
 
 
 class TestToolRegistration:

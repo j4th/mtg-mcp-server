@@ -12,6 +12,7 @@ import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from mtg_mcp_server.config import Settings
@@ -57,7 +58,7 @@ async def commander_staples(
             description="Filter by card type: 'creatures', 'enchantments', 'artifacts', 'instants', 'sorceries', 'lands', 'planeswalkers'"
         ),
     ] = None,
-) -> str:
+) -> ToolResult:
     """Get the most-played cards for a commander with synergy scores and inclusion rates.
 
     Shows which cards are most commonly played with this commander and how
@@ -82,7 +83,10 @@ async def commander_staples(
 
     if not data.cardlists:
         lines.append("No card data available.")
-        return "\n".join(lines) + ATTRIBUTION_EDHREC
+        return ToolResult(
+            content="\n".join(lines) + ATTRIBUTION_EDHREC,
+            structured_content=data.model_dump(mode="json"),
+        )
 
     for cardlist in data.cardlists:
         lines.append(f"\n### {cardlist.header}")
@@ -93,7 +97,10 @@ async def commander_staples(
                 f"  {card.name} — synergy: {synergy_str}, in {pct}% of decks ({card.num_decks})"
             )
 
-    return "\n".join(lines) + ATTRIBUTION_EDHREC
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_EDHREC,
+        structured_content=data.model_dump(mode="json"),
+    )
 
 
 @edhrec_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BETA)
@@ -103,7 +110,7 @@ async def card_synergy(
         str,
         Field(description="Commander to check synergy against (e.g. 'Muldrotha, the Gravetide')"),
     ],
-) -> str:
+) -> ToolResult:
     """Get synergy data for a specific card with a specific commander.
 
     Shows how synergistic the card is with the commander compared to its
@@ -125,9 +132,17 @@ async def card_synergy(
         raise ToolError(f"EDHREC API error: {exc}") from exc
 
     if card is None:
-        return (
+        markdown = (
             f"'{card_name}' was not found in EDHREC data for '{commander_name}'. "
             "The card may not be commonly played with this commander." + ATTRIBUTION_EDHREC
+        )
+        return ToolResult(
+            content=markdown,
+            structured_content={
+                "card_name": card_name,
+                "commander_name": commander_name,
+                "found": False,
+            },
         )
 
     synergy_str = f"+{card.synergy:.0%}" if card.synergy >= 0 else f"{card.synergy:.0%}"
@@ -139,7 +154,18 @@ async def card_synergy(
     ]
     if card.synergy >= 0.3:
         lines.append("This is a high-synergy card for this commander.")
-    return "\n".join(lines) + ATTRIBUTION_EDHREC
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_EDHREC,
+        structured_content={
+            "card_name": card.name,
+            "commander_name": commander_name,
+            "found": True,
+            "synergy": card.synergy,
+            "num_decks": card.num_decks,
+            "potential_decks": card.potential_decks,
+            "inclusion_pct": float(pct),
+        },
+    )
 
 
 def _inclusion_pct(num_decks: int, total_decks: int) -> str:

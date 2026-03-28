@@ -48,6 +48,16 @@ class TestCardRatings:
         assert "ALSA:" in text
         assert "Data provided by [17Lands]" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["set_code"] == "LCI"
+        assert sc["event_type"] == "PremierDraft"
+        assert sc["total_cards"] == 5
+        assert isinstance(sc["cards"], list)
+        assert len(sc["cards"]) == 5
+        assert sc["cards"][0]["name"] == "Abuelo's Awakening"
+
     @respx.mock
     async def test_empty_results(self, client: Client):
         """card_ratings returns a 'no data' message for unknown set codes."""
@@ -59,6 +69,12 @@ class TestCardRatings:
         result = await client.call_tool("card_ratings", {"set_code": "FAKE"})
         text = result.content[0].text
         assert "No card rating data" in text
+
+        # Structured output — empty result
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_cards"] == 0
+        assert sc["cards"] == []
 
     @respx.mock
     async def test_server_error_returns_tool_error(self, client: Client):
@@ -101,6 +117,17 @@ class TestArchetypeStats:
         assert "Archetype stats" in text
         assert "Azorius (WU)" in text
         assert "WR:" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["set_code"] == "LCI"
+        assert sc["event_type"] == "PremierDraft"
+        assert sc["start_date"] == "2023-11-07"
+        assert sc["end_date"] == "2024-02-07"
+        assert isinstance(sc["archetypes"], list)
+        assert sc["total_archetypes"] == len(fixture)
+        assert any(a["color_name"] == "Azorius (WU)" for a in sc["archetypes"])
 
     @respx.mock
     async def test_server_error_returns_tool_error(self, client: Client):

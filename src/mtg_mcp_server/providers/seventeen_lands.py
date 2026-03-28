@@ -9,6 +9,7 @@ import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from mtg_mcp_server.config import Settings
@@ -51,7 +52,7 @@ async def card_ratings(
     event_type: Annotated[
         str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
     ] = "PremierDraft",
-) -> str:
+) -> ToolResult:
     """Get win rate and draft performance data for cards in a set.
 
     Key metrics: GIH WR (ever_drawn_win_rate), ALSA (avg_seen), OH WR
@@ -71,7 +72,16 @@ async def card_ratings(
         raise ToolError(f"17Lands API error: {exc}") from exc
 
     if not ratings:
-        return f"No card rating data available for {set_code} ({event_type})." + ATTRIBUTION_17LANDS
+        return ToolResult(
+            content=f"No card rating data available for {set_code} ({event_type})."
+            + ATTRIBUTION_17LANDS,
+            structured_content={
+                "set_code": set_code,
+                "event_type": event_type,
+                "total_cards": 0,
+                "cards": [],
+            },
+        )
 
     lines = [f"Card ratings for {set_code} ({event_type}) — {len(ratings)} cards:"]
     lines.append("")
@@ -90,7 +100,15 @@ async def card_ratings(
             f"  {card.name} ({card.color}, {card.rarity}) — "
             f"GIH WR: {gih_wr}, ALSA: {alsa}, IWD: {iwd}, Games: {games}"
         )
-    return "\n".join(lines) + ATTRIBUTION_17LANDS
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_17LANDS,
+        structured_content={
+            "set_code": set_code,
+            "event_type": event_type,
+            "total_cards": len(ratings),
+            "cards": [card.model_dump(mode="json") for card in ratings],
+        },
+    )
 
 
 @draft_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_DRAFT)
@@ -107,7 +125,7 @@ async def archetype_stats(
     event_type: Annotated[
         str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
     ] = "PremierDraft",
-) -> str:
+) -> ToolResult:
     """Get win rates by color pair/archetype for a draft set.
 
     Note: start_date and end_date are required by the 17Lands API.
@@ -127,7 +145,18 @@ async def archetype_stats(
         raise ToolError(f"17Lands API error: {exc}") from exc
 
     if not ratings:
-        return f"No archetype data available for {set_code} ({event_type})." + ATTRIBUTION_17LANDS
+        return ToolResult(
+            content=f"No archetype data available for {set_code} ({event_type})."
+            + ATTRIBUTION_17LANDS,
+            structured_content={
+                "set_code": set_code,
+                "event_type": event_type,
+                "start_date": start_date,
+                "end_date": end_date,
+                "total_archetypes": 0,
+                "archetypes": [],
+            },
+        )
 
     lines = [f"Archetype stats for {set_code} ({event_type}, {start_date} to {end_date}):"]
     lines.append("")
@@ -136,7 +165,26 @@ async def archetype_stats(
         games = f"{arch.games:,}"
         prefix = "  [Summary] " if arch.is_summary else "  "
         lines.append(f"{prefix}{arch.color_name} — WR: {wr}, Games: {games}")
-    return "\n".join(lines) + ATTRIBUTION_17LANDS
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_17LANDS,
+        structured_content={
+            "set_code": set_code,
+            "event_type": event_type,
+            "start_date": start_date,
+            "end_date": end_date,
+            "total_archetypes": len(ratings),
+            "archetypes": [
+                {
+                    "is_summary": arch.is_summary,
+                    "color_name": arch.color_name,
+                    "wins": arch.wins,
+                    "games": arch.games,
+                    "win_rate": arch.win_rate,
+                }
+                for arch in ratings
+            ],
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

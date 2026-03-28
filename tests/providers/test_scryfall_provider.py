@@ -48,6 +48,16 @@ class TestSearchCards:
         assert fixture["data"][0]["name"] in text
         assert "Data provided by [Scryfall]" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_cards"] == fixture["total_cards"]
+        assert sc["has_more"] is True
+        assert sc["page"] == 1
+        assert isinstance(sc["cards"], list)
+        assert len(sc["cards"]) == len(fixture["data"])
+        assert sc["cards"][0]["name"] == fixture["data"][0]["name"]
+
 
 class TestCardDetails:
     """Scryfall card_details tool behavior."""
@@ -65,6 +75,14 @@ class TestCardDetails:
         assert "Muldrotha, the Gravetide" in text
         assert "{3}{B}{G}{U}" in text
         assert "6/6" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert sc["mana_cost"] == "{3}{B}{G}{U}"
+        assert sc["power"] == "6"
+        assert sc["toughness"] == "6"
 
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
@@ -94,6 +112,14 @@ class TestCardPrice:
         assert "Sol Ring" in text
         assert "$" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+        assert "prices" in sc
+        assert isinstance(sc["prices"], dict)
+        assert "usd" in sc["prices"]
+
 
 class TestCardRulings:
     """Scryfall card_rulings tool behavior."""
@@ -117,6 +143,14 @@ class TestCardRulings:
         assert "Muldrotha" in text
         assert "8 ruling" in text.lower()
 
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert isinstance(sc["rulings"], list)
+        assert len(sc["rulings"]) == 8
+        assert "comment" in sc["rulings"][0]
+
 
 class TestSetInfo:
     """Scryfall set_info tool behavior."""
@@ -135,6 +169,13 @@ class TestSetInfo:
         assert "2018-04-27" in text
         assert "280" in text
         assert "Data provided by [Scryfall]" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Dominaria"
+        assert sc["code"] == "dom"
+        assert sc["card_count"] == 280
 
     @respx.mock
     async def test_set_not_found(self, client: Client):
@@ -164,6 +205,13 @@ class TestWhatsNew:
         assert "Found" in text
         assert "card" in text.lower()
         assert "Data provided by [Scryfall]" in text
+
+        # Structured output
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["days"] == 30
+        assert isinstance(sc["cards"], list)
+        assert sc["total_cards"] == fixture["total_cards"]
 
     @respx.mock
     async def test_with_set_and_format_filters(self, client: Client):
