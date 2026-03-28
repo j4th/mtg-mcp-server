@@ -10,7 +10,7 @@ import pytest
 import respx
 
 from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
-from mtg_mcp_server.types import Card, CardSearchResult, Ruling
+from mtg_mcp_server.types import Card, CardSearchResult, Ruling, SetInfo
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "scryfall"
 BASE_URL = "https://api.scryfall.com"
@@ -161,6 +161,37 @@ class TestGetRulings:
         assert all(isinstance(r, Ruling) for r in rulings)
         assert rulings[0].source == "wotc"
         assert "2020-11-10" in rulings[0].published_at
+
+
+class TestGetSet:
+    """Set metadata lookup by code."""
+
+    @respx.mock
+    async def test_get_set(self):
+        """Set lookup returns a fully populated SetInfo model."""
+        fixture = _load_fixture("set_dominaria.json")
+        respx.get(f"{BASE_URL}/sets/dom").mock(return_value=httpx.Response(200, json=fixture))
+        async with ScryfallClient(base_url=BASE_URL) as client:
+            set_info = await client.get_set("dom")
+
+        assert isinstance(set_info, SetInfo)
+        assert set_info.code == "dom"
+        assert set_info.name == "Dominaria"
+        assert set_info.card_count > 0
+        assert set_info.released_at is not None
+
+    @respx.mock
+    async def test_get_set_not_found(self):
+        """Nonexistent set code raises CardNotFoundError."""
+        respx.get(f"{BASE_URL}/sets/zzz").mock(
+            return_value=httpx.Response(
+                404,
+                json={"object": "error", "code": "not_found", "details": "No set found"},
+            )
+        )
+        async with ScryfallClient(base_url=BASE_URL) as client:
+            with pytest.raises(CardNotFoundError):
+                await client.get_set("zzz")
 
 
 class TestScryfallServerErrors:

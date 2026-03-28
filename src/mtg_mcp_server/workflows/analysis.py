@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import structlog
 
 from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.utils.mana import count_pips
 from mtg_mcp_server.workflows.deck import build_synergy_lookup
 
 if TYPE_CHECKING:
@@ -28,10 +28,6 @@ if TYPE_CHECKING:
     )
 
 log = structlog.get_logger(service="workflow.analysis")
-
-# Matches single-color mana symbols like {W}, {U}, {B}, {R}, {G} inside a
-# mana cost string (e.g. "{2}{U}{B}"). Ignores generic, hybrid, and phyrexian.
-_MANA_PIP_RE = re.compile(r"\{([WUBRG])\}")
 
 # Column headers for the mana curve table. Bucket 7 collects all CMC >= 7.
 _CMC_HEADER = ["0", "1", "2", "3", "4", "5", "6", "7+"]
@@ -77,7 +73,9 @@ class _ManaCurve:
 class _ColorPips:
     """Color pip counts extracted from mana costs."""
 
-    pips: dict[str, int] = field(default_factory=lambda: {"W": 0, "U": 0, "B": 0, "R": 0, "G": 0})
+    pips: dict[str, float] = field(
+        default_factory=lambda: {"W": 0.0, "U": 0.0, "B": 0.0, "R": 0.0, "G": 0.0}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -100,18 +98,6 @@ def _get_price_usd(card: Card) -> str | None:
     return card.prices.usd
 
 
-def _count_pips(mana_cost: str | None) -> dict[str, int]:
-    """Count color pips in a mana cost string like '{2}{U}{B}'."""
-    pips: dict[str, int] = {"W": 0, "U": 0, "B": 0, "R": 0, "G": 0}
-    if mana_cost is None:
-        return pips
-    for match in _MANA_PIP_RE.finditer(mana_cost):
-        color = match.group(1)
-        if color in pips:
-            pips[color] += 1
-    return pips
-
-
 def _compute_mana_curve(cards: list[_ResolvedCard]) -> _ManaCurve:
     """Compute mana curve from resolved cards."""
     curve = _ManaCurve()
@@ -127,9 +113,9 @@ def _compute_color_pips(cards: list[_ResolvedCard]) -> _ColorPips:
     """Compute color pip totals from resolved cards."""
     color_pips = _ColorPips()
     for card in cards:
-        pips = _count_pips(card.mana_cost)
+        pips = count_pips(card.mana_cost)
         for color, count in pips.items():
-            color_pips.pips[color] += count
+            color_pips.pips[color] = color_pips.pips.get(color, 0.0) + count
     return color_pips
 
 
@@ -420,7 +406,11 @@ def _format_output(
     # Color Requirements
     lines.append("## Color Requirements")
     lines.append("")
-    pip_parts = [f"{c}: {count}" for c, count in color_pips.pips.items() if count > 0]
+    pip_parts = [
+        f"{c}: {int(count) if count == int(count) else count}"
+        for c, count in color_pips.pips.items()
+        if count > 0
+    ]
     if pip_parts:
         lines.append(", ".join(pip_parts))
     else:

@@ -1,13 +1,15 @@
 # Spec 1: Infrastructure Modernization
 
-> **Status:** Design approved
+> **Status:** Partially complete — Scryfall bulk data done, remaining items folded into Spec 3
 > **Date:** 2026-03-26
 > **Scope:** Foundation upgrades that unblock all future tool expansion
 
 This spec is part of a 3-spec expansion:
-- **Spec 1 (this):** Infrastructure Modernization — Scryfall bulk data, rules engine, structured output, CodeMode readiness
-- **Spec 2:** [Cross-Format Tools & Utilities](SPEC_CROSS_FORMAT_TOOLS.md) — validation, card discovery, format info, mana base
-- **Spec 3:** [Format-Specific Workflows](SPEC_FORMAT_WORKFLOWS.md) — deck building, Commander depth, Limited expansion
+- **Spec 1 (this):** Infrastructure Modernization — Scryfall bulk data *(complete)*, rules engine, structured output, CodeMode readiness *(moved to Spec 3)*
+- **Spec 2:** [Cross-Format Tools & Utilities](SPEC_CROSS_FORMAT_TOOLS.md) — validation, card discovery, format info, mana base *(complete)*
+- **Spec 3:** [Format-Specific Workflows](SPEC_FORMAT_WORKFLOWS.md) — comprehensive v2.0: rules engine, structured output, CodeMode, format workflows
+
+> **Note (2026-03-27):** Phase 1A item 1 (Scryfall bulk data) was implemented during Spec 2. The remaining Spec 1 items — Comprehensive Rules engine (§2), structured output (§4), response_format (§5), CodeMode (§7), rules tools (§8), and structured output retrofit (§10) — have been folded into Spec 3 for the v2.0 release. This spec remains as the original design reference.
 
 This spec covers two phases:
 - **Phase 1A — Infrastructure Build:** New services, platform fixes, patterns

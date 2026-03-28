@@ -118,11 +118,97 @@ class TestCardRulings:
         assert "8 ruling" in text.lower()
 
 
+class TestSetInfo:
+    """Scryfall set_info tool behavior."""
+
+    @respx.mock
+    async def test_returns_set_details(self, client: Client):
+        """set_info returns set metadata with name, code, type, and release date."""
+        fixture = _load_fixture("set_dominaria.json")
+        respx.get(f"{BASE_URL}/sets/dom").mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool("set_info", {"set_code": "dom"})
+        text = result.content[0].text
+        assert "Dominaria" in text
+        assert "DOM" in text
+        assert "expansion" in text
+        assert "2018-04-27" in text
+        assert "280" in text
+        assert "Data provided by [Scryfall]" in text
+
+    @respx.mock
+    async def test_set_not_found(self, client: Client):
+        """set_info returns an error for nonexistent set codes."""
+        respx.get(f"{BASE_URL}/sets/zzz").mock(
+            return_value=httpx.Response(
+                404, json={"object": "error", "code": "not_found", "details": ""}
+            )
+        )
+
+        result = await client.call_tool("set_info", {"set_code": "zzz"}, raise_on_error=False)
+        assert result.is_error
+        assert "not found" in result.content[0].text.lower()
+
+
+class TestWhatsNew:
+    """Scryfall whats_new tool behavior."""
+
+    @respx.mock
+    async def test_returns_recent_cards(self, client: Client):
+        """whats_new returns a formatted list of recently released cards."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool("whats_new", {"days": 30})
+        text = result.content[0].text
+        assert "Found" in text
+        assert "card" in text.lower()
+        assert "Data provided by [Scryfall]" in text
+
+    @respx.mock
+    async def test_with_set_and_format_filters(self, client: Client):
+        """whats_new accepts optional set_code and format filters."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "whats_new", {"days": 7, "set_code": "dom", "format": "standard"}
+        )
+        text = result.content[0].text
+        assert "Found" in text
+
+    async def test_invalid_days_zero(self, client: Client):
+        """whats_new rejects days < 1."""
+        result = await client.call_tool("whats_new", {"days": 0}, raise_on_error=False)
+        assert result.is_error
+        assert "days must be at least 1" in result.content[0].text.lower()
+
+    @respx.mock
+    async def test_no_results(self, client: Client):
+        """whats_new returns an error when no cards match the date range."""
+        respx.get(f"{BASE_URL}/cards/search").mock(
+            return_value=httpx.Response(
+                404, json={"object": "error", "code": "not_found", "details": ""}
+            )
+        )
+
+        result = await client.call_tool("whats_new", {"days": 1}, raise_on_error=False)
+        assert result.is_error
+        assert "no new cards found" in result.content[0].text.lower()
+
+
 class TestToolRegistration:
     """Scryfall provider tool registration."""
 
     async def test_all_tools_registered(self, client: Client):
-        """All four Scryfall tools are registered on the provider."""
+        """All six Scryfall tools are registered on the provider."""
         tools = await client.list_tools()
         tool_names = {t.name for t in tools}
-        assert tool_names == {"search_cards", "card_details", "card_price", "card_rulings"}
+        assert tool_names == {
+            "search_cards",
+            "card_details",
+            "card_price",
+            "card_rulings",
+            "set_info",
+            "whats_new",
+        }

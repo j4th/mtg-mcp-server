@@ -10,7 +10,7 @@ from cachetools import TTLCache
 
 from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, BaseClient, ServiceError
 from mtg_mcp_server.services.cache import _method_key, async_cached
-from mtg_mcp_server.types import Card, CardSearchResult, Ruling
+from mtg_mcp_server.types import Card, CardSearchResult, Ruling, SetInfo
 
 
 class ScryfallError(ServiceError):
@@ -39,6 +39,7 @@ class ScryfallClient(BaseClient):
     _card_id_cache: TTLCache = TTLCache(maxsize=500, ttl=86400)  # 24h
     _search_cache: TTLCache = TTLCache(maxsize=100, ttl=3600)  # 1h
     _rulings_cache: TTLCache = TTLCache(maxsize=200, ttl=86400)  # 24h
+    _sets_cache: TTLCache = TTLCache(maxsize=50, ttl=86400)  # 24h
 
     def __init__(
         self,
@@ -144,3 +145,25 @@ class ScryfallClient(BaseClient):
             raise ScryfallError(exc.message, status_code=exc.status_code) from exc
         data = response.json()
         return [Ruling.model_validate(r) for r in data["data"]]
+
+    @async_cached(_sets_cache, key=_method_key)
+    async def get_set(self, set_code: str) -> SetInfo:
+        """Get set metadata by code.
+
+        Args:
+            set_code: Set code (e.g. "dom", "mh2").
+
+        Returns:
+            Parsed SetInfo model.
+
+        Raises:
+            CardNotFoundError: If the set code doesn't exist.
+            ScryfallError: On other API errors.
+        """
+        try:
+            response = await self._get(f"/sets/{set_code}")
+        except ServiceError as exc:
+            if exc.status_code == 404:
+                raise CardNotFoundError(f"Set not found: '{set_code}'", status_code=404) from exc
+            raise ScryfallError(exc.message, status_code=exc.status_code) from exc
+        return SetInfo.model_validate(response.json())
