@@ -76,7 +76,17 @@ See @docs/ARCHITECTURE.md for full details.
 - Integration tests (`tests/integration/`) test the full MCP pipeline with fixture-mocked backends. Marked `@pytest.mark.integration`. Included in `mise run check`.
 - Live tests (`tests/live/`) start a real server subprocess and hit real APIs. Marked `@pytest.mark.live`, skipped by default. Run via `mise run test:live`. CI runs these on PRs to main.
 
-## PR Review Workflow
+## Git Workflow
+
+- Always work on a feature branch (`feat/description`). Never commit directly to main.
+- Commit atomically after each logical unit of work — don't batch changes into one big commit.
+- Before launching worktree agents: commit all changes, verify `git status` is clean. Agents branch from the last COMMITTED state — uncommitted work is invisible to them and will be lost.
+- Cherry-pick agent commits back to the feature branch. Discard agent rewrites of shared files (use scaffold versions).
+- Cancel stale CI runs on the branch before pushing new commits.
+
+## PR Workflow
+
+- Always create PRs as drafts (`gh pr create --draft`). Claude review triggers on `ready_for_review`, not `opened`.
 
 When PR review comments come in:
 
@@ -106,6 +116,8 @@ When PR review comments come in:
 - When compacting, preserve the list of which services/providers are implemented vs stubbed.
 - Service caching: all service methods use `@async_cached` with class-level `TTLCache`. Tests must clear caches (autouse `_clear_caches` fixture in conftest.py).
 - Scryfall bulk data is behind `MTG_MCP_ENABLE_BULK_DATA` feature flag. It's a file-based service (not BaseClient). Lazy-loads on first access. Returns full `Card` objects (same as Scryfall API).
+- Always `uv run python3`, never bare `python3` — the venv may not be activated in shell.
+- `Client.call_tool()` returns `CallToolResult` (not subscriptable). Access text via `.content[0].text`. For error tests, use `raise_on_error=False` then check `.is_error`.
 
 ## Implementation Status
 
