@@ -32,6 +32,7 @@ __all__ = [
     "EDHRECCardList",
     "EDHRECCommanderData",
     "Ruling",
+    "SetInfo",
 ]
 
 # ---------------------------------------------------------------------------
@@ -128,6 +129,19 @@ class Ruling(BaseModel):
     source: str  # e.g. "wotc" (Wizards of the Coast)
     published_at: str  # ISO date string
     comment: str
+
+
+class SetInfo(BaseModel):
+    """Metadata for a Magic set from Scryfall."""
+
+    code: str
+    name: str
+    set_type: str = ""
+    released_at: str | None = None
+    card_count: int = 0
+    digital: bool = False
+    icon_svg_uri: str = ""
+    scryfall_uri: str = ""
 
 
 # ---------------------------------------------------------------------------

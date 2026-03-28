@@ -24,6 +24,7 @@ def _clear_caches():
     ScryfallClient._card_id_cache.clear()
     ScryfallClient._search_cache.clear()
     ScryfallClient._rulings_cache.clear()
+    ScryfallClient._sets_cache.clear()
     SpellbookClient._combos_cache.clear()
     SpellbookClient._combo_cache.clear()
     SpellbookClient._decklist_combos_cache.clear()
