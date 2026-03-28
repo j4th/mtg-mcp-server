@@ -64,7 +64,6 @@ class TestGetFormatRules:
         assert rules.max_copies == 4
         assert rules.singleton is False
         assert rules.check_color_identity is False
-        assert rules.check_rarity is None
         assert rules.restricted_as_one is False
 
     def test_commander_singleton_with_color_identity(self) -> None:
@@ -75,9 +74,8 @@ class TestGetFormatRules:
         assert rules.singleton is True
         assert rules.check_color_identity is True
 
-    def test_pauper_checks_rarity(self) -> None:
+    def test_pauper(self) -> None:
         rules = get_format_rules("pauper")
-        assert rules.check_rarity == "common"
         assert rules.min_main == 60
         assert rules.max_copies == 4
 

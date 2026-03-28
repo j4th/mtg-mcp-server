@@ -159,12 +159,6 @@ async def deck_validate(
             if qty > 1:
                 errors.append(f"'{name}' is restricted in {fmt}: {qty} copies (max 1)")
 
-        # Pauper rarity — note: Scryfall legality data already accounts for
-        # printings at common, so this catches cards incorrectly marked legal
-        # or provides a clearer error message than just "not legal".
-        if rules.check_rarity == "common" and card.rarity != "common":
-            errors.append(f"'{name}' is {card.rarity} (Pauper requires common rarity)")
-
         # Color identity
         if (
             commander_identity is not None

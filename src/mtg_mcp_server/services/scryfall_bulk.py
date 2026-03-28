@@ -382,6 +382,19 @@ class ScryfallBulkClient:
         await self.ensure_loaded()
         return [card for card in self._unique_cards if card.legalities.get(format) == status]
 
+    async def all_cards(self) -> list[Card]:
+        """All unique cards in the bulk data set.
+
+        Ensures data is loaded before returning. This is the public
+        interface for iterating over the full card pool — providers
+        should use this instead of accessing ``_unique_cards`` directly.
+
+        Returns:
+            All unique Card objects.
+        """
+        await self.ensure_loaded()
+        return self._unique_cards
+
     async def get_cards(self, names: list[str]) -> dict[str, Card | None]:
         """Batch exact-name lookup. Returns dict of name -> Card|None.
 

@@ -320,7 +320,7 @@ async def format_search(
         raise ToolError(str(exc)) from exc
 
     try:
-        await client.ensure_loaded()
+        all_cards = await client.all_cards()
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
@@ -337,7 +337,7 @@ async def format_search(
 
     MAX_CANDIDATES = 5000  # Cap accumulation for very broad queries
     matches: list[Card] = []
-    for card in client._unique_cards:
+    for card in all_cards:
         # Format legality check
         if card.legalities.get(fmt) != "legal":
             continue
@@ -441,12 +441,12 @@ async def format_staples(
         raise ToolError(str(exc)) from exc
 
     try:
-        await client.ensure_loaded()
+        all_cards = await client.all_cards()
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
     matches: list[Card] = []
-    for card in client._unique_cards:
+    for card in all_cards:
         if card.legalities.get(fmt) != "legal":
             continue
         if card.edhrec_rank is None:
@@ -504,7 +504,7 @@ async def similar_cards(
 
     try:
         source = await client.get_card(card_name)
-        await client.ensure_loaded()  # explicit guard for _unique_cards below
+        all_cards = await client.all_cards()
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
@@ -516,7 +516,7 @@ async def similar_cards(
     scored: list[tuple[float, Card]] = []
     source_name_lower = source.name.lower()
 
-    for card in client._unique_cards:
+    for card in all_cards:
         if card.name.lower() == source_name_lower:
             continue
         if fmt and card.legalities.get(fmt) != "legal":
@@ -713,13 +713,12 @@ async def format_legal_cards_resource(format: str) -> str:
     client = _get_client()
     fmt = normalize_format(format)
     try:
-        await client.ensure_loaded()
+        legal = await client.cards_by_legality(fmt, "legal")
     except ScryfallBulkError as exc:
         log.warning("resource.format_legal_cards_error", format=fmt, error=str(exc))
         return json.dumps({"error": f"Scryfall bulk data error: {exc}"})
 
-    count = sum(1 for c in client._unique_cards if c.legalities.get(fmt) == "legal")
-    return json.dumps({"format": fmt, "legal_card_count": count})
+    return json.dumps({"format": fmt, "legal_card_count": len(legal)})
 
 
 @scryfall_bulk_mcp.resource("mtg://format/{format}/banned")
@@ -728,16 +727,12 @@ async def format_banned_resource(format: str) -> str:
     client = _get_client()
     fmt = normalize_format(format)
     try:
-        await client.ensure_loaded()
+        banned_cards = await client.cards_by_legality(fmt, "banned")
     except ScryfallBulkError as exc:
         log.warning("resource.format_banned_error", format=fmt, error=str(exc))
         return json.dumps({"error": f"Scryfall bulk data error: {exc}"})
 
-    banned = [
-        {"name": c.name, "type_line": c.type_line}
-        for c in client._unique_cards
-        if c.legalities.get(fmt) == "banned"
-    ]
+    banned = [{"name": c.name, "type_line": c.type_line} for c in banned_cards]
     banned.sort(key=lambda c: c["name"])
     return json.dumps(banned)
 
@@ -762,7 +757,7 @@ async def card_similar_resource(name: str) -> str:
     client = _get_client()
     try:
         source = await client.get_card(name)
-        await client.ensure_loaded()  # explicit guard for _unique_cards below
+        all_cards = await client.all_cards()
     except ScryfallBulkError as exc:
         log.warning("resource.card_similar_error", name=name, error=str(exc))
         return json.dumps({"error": f"Scryfall bulk data error: {exc}"})
@@ -772,7 +767,7 @@ async def card_similar_resource(name: str) -> str:
     scored: list[tuple[float, Card]] = []
     source_name_lower = source.name.lower()
 
-    for card in client._unique_cards:
+    for card in all_cards:
         if card.name.lower() == source_name_lower:
             continue
         score = _score_similarity(source, card)

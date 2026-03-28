@@ -423,7 +423,9 @@ def _make_pool_client(pool: list[Card] | None = None) -> AsyncMock:
             cards_dict[front] = card
 
     mock._cards = cards_dict
-    mock._unique_cards = cards
+
+    async def mock_all_cards() -> list[Card]:
+        return cards
 
     async def mock_get_card(name: str) -> Card | None:
         return cards_dict.get(name.lower())
@@ -461,6 +463,7 @@ def _make_pool_client(pool: list[Card] | None = None) -> AsyncMock:
     mock.cards_by_legality = AsyncMock(side_effect=mock_cards_by_legality)
     mock.random_card = AsyncMock(side_effect=mock_random_card)
     mock.search_cards = AsyncMock(side_effect=mock_search)
+    mock.all_cards = AsyncMock(side_effect=mock_all_cards)
     mock.ensure_loaded = AsyncMock()
     return mock
 

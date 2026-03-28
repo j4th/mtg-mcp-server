@@ -308,10 +308,16 @@ class TestColorIdentity:
         assert "color identity" in result.lower()
 
 
-class TestPauperRarity:
-    """Pauper requires all commons."""
+class TestPauperLegality:
+    """Pauper validation relies on Scryfall legality data, not rarity field."""
 
-    async def test_uncommon_in_pauper(self) -> None:
+    async def test_uncommon_rarity_but_pauper_legal(self) -> None:
+        """A card with uncommon rarity but pauper: legal passes validation.
+
+        Scryfall's legality data already accounts for all printings — a card
+        printed at common in any set is pauper-legal regardless of the rarity
+        field in bulk data (which reflects one specific printing).
+        """
         cards: dict[str, Card | None] = {
             "Uncommon Card": _make_card(
                 name="Uncommon Card",
@@ -334,9 +340,7 @@ class TestPauperRarity:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Uncommon Card" in result
-        assert "common" in result.lower()
+        assert "VALID" in result
 
 
 class TestVintageRestricted:

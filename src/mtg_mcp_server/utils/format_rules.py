@@ -12,7 +12,6 @@ class FormatRules:
     max_copies: int | None  # None = unlimited (limited formats)
     singleton: bool = False
     check_color_identity: bool = False
-    check_rarity: str | None = None  # "common" for Pauper
     restricted_as_one: bool = False  # Vintage
 
 
@@ -29,7 +28,7 @@ _FORMAT_RULES: dict[str, FormatRules] = {
     "modern": FormatRules(min_main=60, max_sideboard=15, max_copies=4),
     "legacy": FormatRules(min_main=60, max_sideboard=15, max_copies=4),
     "vintage": FormatRules(min_main=60, max_sideboard=15, max_copies=4, restricted_as_one=True),
-    "pauper": FormatRules(min_main=60, max_sideboard=15, max_copies=4, check_rarity="common"),
+    "pauper": FormatRules(min_main=60, max_sideboard=15, max_copies=4),
     "commander": FormatRules(
         min_main=100,
         max_sideboard=0,
