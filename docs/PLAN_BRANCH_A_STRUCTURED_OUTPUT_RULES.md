@@ -1,35 +1,31 @@
 # Branch A: Structured Output + Rules Engine
 
-> **Branch:** `feat/structured-output-rules`
-> **Base:** `main`
-> **Prerequisite:** Specs 1-2 complete (34 tools, 8 prompts, 11+ resources)
+> **Branch:** `feat/structured-output-rules` (exists, has docs commit on `main`)
 > **Goal:** Machine-readable output on all tools + Comprehensive Rules engine + CodeMode readiness
 > **Result:** ~40 tools, all returning `ToolResult` with markdown + JSON
 
 ## Context
 
-The server has 34 tools across 5 backends + workflows. All return markdown strings. This branch adds:
+The server has 34 tools (23 provider, 11 workflow) across 5 backends + 7 workflow modules. All return markdown strings. This branch adds:
 
-1. **Structured output** — all tools return `ToolResult` with both human-readable `content` and machine-readable `structured_content` (JSON). Backward-compatible: existing clients see markdown, future clients consume JSON.
-2. **`response_format` parameter** — workflow tools and key provider tools accept `"detailed"` (default) or `"concise"` to control verbosity. JSON is always full; only markdown varies. Must be wired end-to-end: parameter accepted, passed to impl functions, used by formatters, tested for behavioral difference.
-3. **Comprehensive Rules Engine** — `RulesService` downloads and indexes the MTG Comprehensive Rules (~943KB text, ~3,490 rules + glossary). Five new rules tools turn the server into a rules judge.
-4. **CodeMode readiness** — feature flag for `fastmcp[code-mode]`, tag taxonomy verification, tool description clarity at 40+ tools.
+1. **Structured output** — all tools return `ToolResult` with `content` (markdown) and `structured_content` (JSON). Backward-compatible.
+2. **`response_format` parameter** — `"detailed"` (default) or `"concise"`. JSON always full; only markdown varies. Must be wired end-to-end and tested for behavioral difference.
+3. **Comprehensive Rules Engine** — `RulesService` downloads and indexes MTG Comprehensive Rules. Five new rules tools.
+4. **CodeMode readiness** — feature flag for `fastmcp[code-mode]`, tag taxonomy verification.
 
-This is part of a 2-branch plan for Spec 3. Branch B (format workflow tools) depends on this branch.
+Branch B (format workflow tools) depends on this branch.
 
 ---
 
 ## Phase 1: Structured Output Retrofit
 
-Phase 1 has 4 sub-steps. Each ends with a commit. Do not proceed to the next sub-step without committing.
+Each sub-step ends with a commit. Do not proceed without committing.
 
-### Phase 1a: ToolResult on providers (serial)
+### Phase 1a: ToolResult on providers (2 parallel worktree agents)
 
-**What:** Convert all 23 provider tools to return `ToolResult(content=markdown, structured_content=json)`. No behavior change — same markdown, just wrapped in ToolResult with a JSON dict alongside it.
+**What:** Convert all 23 provider tools to return `ToolResult(content=markdown, structured_content=json)`. No behavior change — same markdown, plus a JSON dict.
 
-**Scope:** 5 provider files + their test files. Tests verify both `.content[0].text` (markdown) and `.structured_content` (JSON keys/types).
-
-**Pattern:**
+**Pattern** (new — include in agent prompts):
 ```python
 from fastmcp.tools.tool import ToolResult
 
@@ -41,92 +37,110 @@ async def card_details(...) -> ToolResult:
     )
 ```
 
-**Commit gate:** `mise run check:quick`. Commit: "feat: return ToolResult from all provider tools"
+Tests verify both `.content[0].text` (markdown unchanged) and `.structured_content` (JSON keys/types).
+
+| Agent | Exclusive Files | Scope |
+|-------|----------------|-------|
+| **Providers A** | `providers/scryfall.py`, `providers/spellbook.py`, `providers/seventeen_lands.py`, `tests/providers/test_scryfall_provider.py`, `tests/providers/test_spellbook_provider.py`, `tests/providers/test_seventeen_lands_provider.py` | 12 tools: Scryfall (6), Spellbook (4), 17Lands (2) |
+| **Providers B** | `providers/edhrec.py`, `providers/scryfall_bulk.py`, `tests/providers/test_edhrec_provider.py`, `tests/providers/test_scryfall_bulk_provider.py` | 11 tools: EDHREC (2), Bulk (9) |
+
+**Commit gate:** Cherry-pick. `mise run check:quick`. Commit: "feat: return ToolResult from all provider tools"
 
 ### Phase 1b: WorkflowResult on workflow functions (serial)
 
-**What:** Add `WorkflowResult` NamedTuple to `workflows/__init__.py`. Convert all 11 workflow pure functions to return `WorkflowResult(markdown, data)`. Update `server.py` wrappers to unwrap into `ToolResult`. Update workflow unit tests for `.markdown` / `.data` assertions.
+**What:** Add `WorkflowResult` NamedTuple to `workflows/__init__.py`. Convert all 11 workflow functions (across 7 modules) to return `WorkflowResult(markdown, data)`. Update `server.py` wrappers to unwrap into `ToolResult`. Update workflow tests for `.markdown` / `.data` assertions.
 
-**Why separate from 1a:** Workflows use a different pattern (pure functions return WorkflowResult, server.py wraps to ToolResult). Keeps the commit focused.
+**Why serial:** `server.py` wraps all 11 workflows — can't be split across agents.
 
 **Commit gate:** `mise run check:quick`. Commit: "feat: return WorkflowResult from all workflow functions"
 
-### Phase 1c: Shared formatters + response_format (parallel agents, worktree-isolated)
+### Phase 1c: Shared formatters + response_format (2 parallel worktree agents)
 
-**What:** Create `utils/formatters.py` with shared card formatting helpers. Add `response_format` parameter end-to-end: provider tools accept it and use formatters, workflow impl functions accept it and vary markdown output. "concise" = compact tables, key metrics only, no explanations. "detailed" = current verbose output unchanged. JSON is always full.
+**What:** Create `utils/formatters.py` with shared card formatting helpers. Add `response_format` parameter end-to-end. "concise" = compact tables, key metrics only. "detailed" = current output unchanged. JSON always full.
 
-**CRITICAL prerequisite:** Phases 1a and 1b MUST be committed before launching agents. Agents branch from committed state — uncommitted work is invisible to them and will be lost.
+**CRITICAL:** Phases 1a and 1b MUST be committed before launching agents.
 
-**Parallel: 2 agents (worktree-isolated)**
+| Agent | Exclusive Files | Scope |
+|-------|----------------|-------|
+| **Provider format** | `utils/formatters.py`, `providers/scryfall.py`, `providers/scryfall_bulk.py`, `tests/providers/test_scryfall_provider.py`, `tests/providers/test_scryfall_bulk_provider.py` | Create formatters. Add `response_format` to card/search tools. Tests verify concise < detailed length. |
+| **Workflow format** | All `workflows/*.py` (except `card_resolver.py`), `workflows/server.py`, all `tests/workflows/test_*.py` | Add `response_format` to all 11 impl functions + server.py wrappers. Tests verify concise < detailed and same `.data`. |
 
-| Agent | Exclusive Files | What |
-|-------|----------------|------|
-| **Provider format** | `utils/formatters.py`, `providers/scryfall.py`, `providers/scryfall_bulk.py`, `tests/providers/test_scryfall_provider.py`, `tests/providers/test_scryfall_bulk_provider.py` | Create shared formatters. Add `response_format` to `card_details`, `search_cards`, `card_lookup`, `card_search`. Concise mode uses one-line summaries. Tests verify concise < detailed length. |
-| **Workflow format** | All `workflows/*.py`, all `tests/workflows/test_*.py` | Add `response_format` param to all 11 impl functions. Pass from server.py wrappers. Concise mode omits footers/explanations, uses compact formatting. Tests verify concise < detailed length and same `.data`. |
-
-**Cherry-pick, then commit gate:** `mise run check`. Commit: "feat: wire response_format end-to-end with shared formatters"
+**Commit gate:** Cherry-pick. `mise run check`. Commit: "feat: wire response_format end-to-end with shared formatters"
 
 ### Phase 1d: Review checkpoint
 
-**What:** Run `mise run check:full`. Verify all tools return ToolResult in integration tests. Verify response_format="concise" produces shorter output. This is the Phase 1 review point before Phase 2.
+Run `mise run check:full`. Verify all tools return ToolResult in integration tests. Verify `response_format="concise"` produces shorter output. This is the gate before Phase 2.
 
 ---
 
 ## Phase 2: Rules Engine
 
-### Serial Scaffold
+### Phase 2a: Scaffold shared files (serial)
 
-**What:** Prepare shared files for parallel agent work.
+**What:** Prepare shared files so parallel agents only touch exclusive files.
 
-- `Rule(number, text, subrules)` and `GlossaryEntry(term, definition)` models in `types.py`
-- Rules settings in `config.py`: `rules_url` (default: known-good Wizards URL), `rules_refresh_hours = 168` (weekly), `enable_rules = True`, `enable_code_mode = False`
-- `TAGS_RULES` tag constant in `providers/__init__.py`
-- `RulesService` client wired into workflow `AsyncExitStack` lifespan (behind `enable_rules` flag), with `_rules` module-level variable and `_require_rules()` helper
-- `get_sets() -> list[SetInfo]` method on `ScryfallClient` (GET `/sets` endpoint) — needed by Branch B's `rotation_check`, added now while modifying shared files
-- CodeMode: `fastmcp[code-mode]` optional dependency in `pyproject.toml`, conditional `CodeMode()` transform in `server.py` behind feature flag
-- Tool stubs for all 5 rules tools in `workflows/server.py`
-- Empty `services/rules.py`, `workflows/rules.py`, test stubs, `tests/fixtures/rules/` directory
+- `Rule`, `GlossaryEntry` models in `types.py`
+- Rules settings in `config.py`: `rules_url`, `rules_refresh_hours = 168`, `enable_rules`, `enable_code_mode`
+- `TAGS_RULES` constant in `providers/__init__.py`
+- `RulesService` wired into workflow `AsyncExitStack` lifespan (behind `enable_rules`), module-level `_rules` + `_require_rules()` helper
+- `get_sets() -> list[SetInfo]` on `ScryfallClient` — needed by Branch B's `rotation_check`
+- 5 rules tool stubs in `workflows/server.py`
+- Empty `services/rules.py`, `workflows/rules.py`, test stubs, `tests/fixtures/rules/`
 
-**Why:** All shared file modifications happen once in a serial step. Parallel agents only touch their exclusive files.
+**Commit gate:** `mise run check:quick`. Commit: "feat: scaffold rules engine types, config, and lifespan wiring"
 
-**CRITICAL:** Commit scaffold before launching agents.
+### Phase 2b: Rules service + rules tools (2 parallel worktree agents)
 
-### Parallel: 2 Agents (worktree-isolated)
+**CRITICAL:** Phase 2a must be committed before launching agents.
 
-Dispatch via `Agent` tool with `isolation: "worktree"`. Each agent gets a self-contained prompt with relevant spec sections and project conventions from CLAUDE.md.
+| Agent | Exclusive Files | Scope |
+|-------|----------------|-------|
+| **Rules Service** | `services/rules.py`, `tests/services/test_rules.py`, `tests/fixtures/rules/` | Download/parse MTG Comprehensive Rules text. Lazy-load, same lifecycle as `ScryfallBulkClient`. Index by rule number (O(1)), glossary by term, section ranges. Keyword search with relevance ranking. Fixture: representative subset, not full 943KB. |
+| **Rules Tools** | `workflows/rules.py`, `tests/workflows/test_rules.py` | 5 pure async functions: `rules_lookup`, `keyword_explain`, `rules_interaction`, `rules_scenario`, `combat_calculator`. Accept `RulesService` + optional `ScryfallBulkClient`. Return `WorkflowResult` (Phase 1b pattern). Export rules prompt + 4 rules resources for `server.py` to register. See Spec 3 "Rules Tools" section. |
 
-| Agent | Exclusive Files | What |
-|-------|----------------|------|
-| **Rules Service** | `services/rules.py`, `tests/services/test_rules.py`, `tests/fixtures/rules/` | Download and parse MTG Comprehensive Rules text. Lazy-load, same lifecycle as `ScryfallBulkClient`. Index by rule number (O(1) lookup), glossary by term, section ranges for browsing. Keyword search with relevance ranking. Cross-reference tracking. Fixture: representative subset of rules text, not full 943KB. |
-| **Rules Tools** | `workflows/rules.py`, `tests/workflows/test_rules.py` | 5 pure async functions: `rules_lookup`, `keyword_explain`, `rules_interaction`, `rules_scenario`, `combat_calculator`. Accept `RulesService` + optional `ScryfallBulkClient` as params. Return `WorkflowResult`. Tests use `AsyncMock`. See Spec 3 "Rules Tools" section for input/output specs. Also export rules prompt (`rules_question`) and 4 rules resources (`mtg://rules/{number}`, `mtg://rules/glossary/{term}`, `mtg://rules/keywords`, `mtg://rules/sections`) for `server.py` to register. |
+**Commit gate:** Cherry-pick. `mise run check`. Commit: "feat: rules service and rules tools"
 
-**Review checkpoint:** Cherry-pick agent work. `mise run check:full`. Manually test `rules_lookup` and `keyword_explain` via `mise run dev` (MCP Inspector).
+### Phase 2c: Review checkpoint
+
+Run `mise run check:full`. Manually test `rules_lookup` and `keyword_explain` via `mise run dev` (MCP Inspector). Verify rules tools return ToolResult with structured_content. Verify rules resources resolve.
 
 ---
 
 ## Phase 3: CodeMode + Integration
 
-**What:** Verify CodeMode works with feature flag. Verify all ~40 tools have clear descriptions and proper tags. Update server instructions string. Run complete gate.
+### Phase 3a: CodeMode wiring (serial)
 
-**Review checkpoint:** `mise run check:full` passes. Create draft PR.
+**What:** Add `fastmcp[code-mode]` optional dependency in `pyproject.toml`. Wire conditional `CodeMode()` transform in `server.py` behind `enable_code_mode` feature flag.
+
+**Commit gate:** `mise run check:quick`. Commit: "feat: wire CodeMode transform behind feature flag"
+
+### Phase 3b: Tool audit + server instructions (serial)
+
+**What:** Audit all ~40 tools for clear descriptions and proper tags. Update server instructions string to reflect rules tools and structured output. Verify tag taxonomy is consistent. Use a subagent to inventory current state before making changes.
+
+**Commit gate:** `mise run check`. Commit: "chore: audit tool descriptions, tags, and server instructions"
+
+### Phase 3c: Final gate + PR
+
+Run `mise run check:full`. Create draft PR (`gh pr create --draft`).
 
 ---
 
 ## Execution Rules
 
-These rules are non-negotiable and override any instinct to "move fast":
+Non-negotiable:
 
-1. **Commit before agents.** Worktree agents branch from committed state. Uncommitted changes are invisible to them and WILL be lost. Always `git status` clean before `Agent` with `isolation: "worktree"`.
-2. **Commit after each sub-step.** Never accumulate more than one sub-step of uncommitted work. If it passes `check:quick`, commit it.
-3. **Agents always use worktrees.** Every `Agent` call that writes code uses `isolation: "worktree"`. No exceptions. Cherry-pick commits back.
-4. **Wait for agents before continuing.** Do not start new work or run final gate checks while agents are still running. Their output must be integrated first.
-5. **Verify agent output before integrating.** After cherry-pick, run tests on the combined result before declaring success.
+1. **Commit before agents.** Worktree agents branch from committed state. Uncommitted changes are invisible to them and WILL be lost. `git status` must be clean before any `Agent` with `isolation: "worktree"`.
+2. **Commit after each sub-step.** Never accumulate more than one sub-step of uncommitted work.
+3. **Agents always use worktrees.** Every `Agent` call that writes code uses `isolation: "worktree"`. Cherry-pick commits back.
+4. **Wait for agents before continuing.** Do not start new work while agents are running. Integrate their output first.
+5. **Verify after cherry-pick.** Run tests on the combined result before declaring success.
 
 ---
 
 ## Key References
 
-- **Spec 3:** `docs/SPEC_FORMAT_WORKFLOWS.md` — "Comprehensive Rules Engine", "Structured Output Pattern", "Response Format Parameter", "CodeMode Readiness" sections
-- **Spec 1 (original design):** `docs/SPEC_INFRASTRUCTURE_MODERNIZATION.md` — Rules engine was originally Spec 1; the design reference remains there
+- **Spec 3:** `docs/SPEC_FORMAT_WORKFLOWS.md` — Rules Engine, Structured Output, Response Format, CodeMode sections
+- **Spec 1:** `docs/SPEC_INFRASTRUCTURE_MODERNIZATION.md` — Original rules engine design reference
 - **Architecture:** `docs/ARCHITECTURE.md` — FastMCP patterns, lifespan/client wiring, testing conventions
-- **Conventions:** `CLAUDE.md` — TDD, ToolError handling, module-level client pattern, testing tiers
+- **Conventions:** `CLAUDE.md` — TDD, ToolError, module-level client pattern, git workflow, testing tiers
