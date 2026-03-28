@@ -1,8 +1,9 @@
-"""Scryfall MCP provider — card search, lookup, pricing, and rulings."""
+"""Scryfall MCP provider — card search, lookup, pricing, rulings, and set info."""
 
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from typing import Annotated
 
 import structlog
@@ -176,6 +177,93 @@ async def card_rulings(
     return "\n".join(lines) + ATTRIBUTION_SCRYFALL
 
 
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
+async def set_info(
+    set_code: Annotated[
+        str,
+        Field(description="Set code (e.g. 'dom', 'mh2', 'lci')"),
+    ],
+) -> str:
+    """Get metadata for a Magic set by its code."""
+    client = _get_client()
+    try:
+        info = await client.get_set(set_code)
+    except CardNotFoundError as exc:
+        raise ToolError(f"Set not found: '{set_code}'. Check the set code.") from exc
+    except ScryfallError as exc:
+        raise ToolError(f"Scryfall API error: {exc}") from exc
+
+    lines = [
+        f"**{info.name}** ({info.code.upper()})",
+        f"Type: {info.set_type}",
+    ]
+    if info.released_at:
+        lines.append(f"Released: {info.released_at}")
+    lines.append(f"Card count: {info.card_count}")
+    if info.digital:
+        lines.append("Digital-only set")
+    if info.scryfall_uri:
+        lines.append(f"Scryfall: {info.scryfall_uri}")
+    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+
+
+@scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
+async def whats_new(
+    days: Annotated[
+        int,
+        Field(description="Look back this many days for recent cards (minimum 1)"),
+    ] = 30,
+    set_code: Annotated[
+        str | None,
+        Field(description="Filter to a specific set code (e.g. 'mh3', 'lci')"),
+    ] = None,
+    format: Annotated[
+        str | None,
+        Field(
+            description="Filter to cards legal in a format (e.g. 'standard', 'commander', 'modern')"
+        ),
+    ] = None,
+) -> str:
+    """Find recently printed or released Magic cards.
+
+    Searches Scryfall for cards released within the given number of days.
+    Optionally filter by set or format legality.
+    """
+    if days < 1:
+        raise ToolError("days must be at least 1.")
+
+    date_str = (date.today() - timedelta(days=days)).isoformat()
+    query_parts = [f"date>={date_str}"]
+    if set_code:
+        query_parts.append(f"s:{set_code}")
+    if format:
+        query_parts.append(f"f:{format}")
+    query = " ".join(query_parts)
+
+    client = _get_client()
+    try:
+        result = await client.search_cards(query)
+    except CardNotFoundError as exc:
+        raise ToolError(
+            f"No new cards found in the last {days} day(s)"
+            + (f" for set '{set_code}'" if set_code else "")
+            + (f" in format '{format}'" if format else "")
+            + "."
+        ) from exc
+    except ScryfallError as exc:
+        raise ToolError(f"Scryfall API error: {exc}") from exc
+
+    lines = [f"Found {result.total_cards} card(s) released in the last {days} day(s):"]
+    for card in result.data:
+        set_label = card.set_code.upper() if card.set_code else ""
+        lines.append(f"  {card.name} {card.mana_cost or ''} — {card.type_line} [{set_label}]")
+    if result.has_more:
+        lines.append(
+            "\nMore results available — refine your search with set_code or format filters."
+        )
+    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+
+
 def _format_legalities(legalities: dict[str, str]) -> str:
     """Format a legalities dict as a comma-separated list of legal format names."""
     legal = [fmt for fmt, status in legalities.items() if status == "legal"]
@@ -187,6 +275,21 @@ def _format_legalities(legalities: dict[str, str]) -> str:
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
+
+
+@scryfall_mcp.resource("mtg://set/{code}")
+async def set_resource(code: str) -> str:
+    """Set metadata as JSON."""
+    client = _get_client()
+    try:
+        info = await client.get_set(code)
+        return info.model_dump_json()
+    except CardNotFoundError:
+        log.debug("resource.set_not_found", code=code)
+        return json.dumps({"error": f"Set not found: {code}"})
+    except ScryfallError as exc:
+        log.warning("resource.set_error", code=code, error=str(exc))
+        return json.dumps({"error": f"Scryfall error: {exc}"})
 
 
 @scryfall_mcp.resource("mtg://card/{name}")

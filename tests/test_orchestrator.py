@@ -328,7 +328,7 @@ class TestToolSchemaCompleteness:
         """Server exposes the expected number of tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
-        assert len(tools) == 26, f"Expected 26 tools, got {len(tools)}.\nTools: {tool_names}"
+        assert len(tools) == 35, f"Expected 35 tools, got {len(tools)}.\nTools: {tool_names}"
 
     async def test_no_context_parameter_exposed(self, mcp_client: Client):
         """No tool should expose 'ctx' (Context) as a user-visible parameter."""

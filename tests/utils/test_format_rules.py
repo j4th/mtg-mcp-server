@@ -3,7 +3,6 @@
 import pytest
 
 from mtg_mcp_server.utils.format_rules import (
-    FormatRules,
     get_format_rules,
     is_basic_land,
     normalize_format,
