@@ -252,38 +252,38 @@ class TestCardComparison:
         )
 
         # Table header
-        assert "Card Comparison" in result
-        assert COMMANDER_NAME in result
+        assert "Card Comparison" in result.markdown
+        assert COMMANDER_NAME in result.markdown
 
         # Both cards present in table
-        assert "Sol Ring" in result
-        assert "Spore Frog" in result
+        assert "Sol Ring" in result.markdown
+        assert "Spore Frog" in result.markdown
 
         # Mana costs
-        assert "{1}" in result
-        assert "{G}" in result
+        assert "{1}" in result.markdown
+        assert "{G}" in result.markdown
 
         # Synergy values
-        assert "-5%" in result or "-0.05" in result  # Sol Ring negative synergy
-        assert "+61%" in result or "0.61" in result  # Spore Frog high synergy
+        assert "-5%" in result.markdown or "-0.05" in result.markdown  # Sol Ring negative synergy
+        assert "+61%" in result.markdown or "0.61" in result.markdown  # Spore Frog high synergy
 
         # Inclusion percentages
-        assert "95%" in result
-        assert "61%" in result
+        assert "95%" in result.markdown
+        assert "61%" in result.markdown
 
         # Combo counts
-        assert "1" in result  # Sol Ring has 1 combo
-        assert "2" in result  # Spore Frog has 2 combos
+        assert "1" in result.markdown  # Sol Ring has 1 combo
+        assert "2" in result.markdown  # Spore Frog has 2 combos
 
         # Prices
-        assert "$1.50" in result
-        assert "$0.25" in result
+        assert "$1.50" in result.markdown
+        assert "$0.25" in result.markdown
 
         # Data Sources footer
-        assert "**Data Sources:**" in result
-        assert "Scryfall](https://scryfall.com)" in result
-        assert "Commander Spellbook](https://commanderspellbook.com)" in result
-        assert "EDHREC](https://edhrec.com)" in result
+        assert "**Data Sources:**" in result.markdown
+        assert "Scryfall](https://scryfall.com)" in result.markdown
+        assert "Commander Spellbook](https://commanderspellbook.com)" in result.markdown
+        assert "EDHREC](https://edhrec.com)" in result.markdown
 
     async def test_edhrec_disabled(
         self,
@@ -308,9 +308,9 @@ class TestCardComparison:
             edhrec=None,
         )
 
-        assert "Sol Ring" in result
-        assert "Spore Frog" in result
-        assert "N/A" in result  # Synergy/inclusion unavailable
+        assert "Sol Ring" in result.markdown
+        assert "Spore Frog" in result.markdown
+        assert "N/A" in result.markdown  # Synergy/inclusion unavailable
 
     async def test_edhrec_fails_partial(
         self,
@@ -337,11 +337,11 @@ class TestCardComparison:
             edhrec=edhrec,
         )
 
-        assert "Sol Ring" in result
-        assert "Spore Frog" in result
+        assert "Sol Ring" in result.markdown
+        assert "Spore Frog" in result.markdown
         # Synergy columns are N/A but combo counts still present
-        assert "N/A" in result
-        assert "$1.50" in result
+        assert "N/A" in result.markdown
+        assert "$1.50" in result.markdown
 
     async def test_spellbook_fails_partial(
         self,
@@ -368,12 +368,12 @@ class TestCardComparison:
             edhrec=edhrec,
         )
 
-        assert "Sol Ring" in result
-        assert "Spore Frog" in result
+        assert "Sol Ring" in result.markdown
+        assert "Spore Frog" in result.markdown
         # Synergy present, combos N/A
-        assert "+61%" in result or "0.61" in result
+        assert "+61%" in result.markdown or "0.61" in result.markdown
         # Both combo columns show N/A
-        lines = result.split("\n")
+        lines = result.markdown.split("\n")
         data_lines = [ln for ln in lines if ln.startswith("| ") and "Sol Ring" in ln]
         assert len(data_lines) == 1
         assert "N/A" in data_lines[0]  # combo column
@@ -407,10 +407,10 @@ class TestCardComparison:
         )
 
         # Valid card is present in result
-        assert "Sol Ring" in result
+        assert "Sol Ring" in result.markdown
         # Missing card noted
-        assert "Nonexistent Card" in result
-        assert "not found" in result.lower()
+        assert "Nonexistent Card" in result.markdown
+        assert "not found" in result.markdown.lower()
 
     async def test_all_cards_not_found_raises(
         self,
@@ -480,7 +480,7 @@ class TestCardComparison:
             edhrec=None,
         )
 
-        assert "Sol Ring" in result
+        assert "Sol Ring" in result.markdown
 
 
 # ===========================================================================
@@ -539,22 +539,22 @@ class TestBudgetUpgrade:
         )
 
         # Header
-        assert "Budget Upgrades" in result
-        assert COMMANDER_NAME in result
-        assert "$5.00" in result
+        assert "Budget Upgrades" in result.markdown
+        assert COMMANDER_NAME in result.markdown
+        assert "$5.00" in result.markdown
 
         # Cards should appear ranked by synergy/$
-        assert "Spore Frog" in result
-        assert "Sakura-Tribe Elder" in result
-        assert "Sol Ring" in result
+        assert "Spore Frog" in result.markdown
+        assert "Sakura-Tribe Elder" in result.markdown
+        assert "Sol Ring" in result.markdown
 
         # Table structure
-        assert "Synergy/$" in result
+        assert "Synergy/$" in result.markdown
 
         # Data Sources footer
-        assert "**Data Sources:**" in result
-        assert "Scryfall](https://scryfall.com)" in result
-        assert "EDHREC](https://edhrec.com)" in result
+        assert "**Data Sources:**" in result.markdown
+        assert "Scryfall](https://scryfall.com)" in result.markdown
+        assert "EDHREC](https://edhrec.com)" in result.markdown
 
     async def test_edhrec_disabled(
         self,
@@ -568,8 +568,8 @@ class TestBudgetUpgrade:
             edhrec=None,
         )
 
-        assert "EDHREC is not enabled" in result
-        assert "MTG_MCP_ENABLE_EDHREC" in result
+        assert "EDHREC is not enabled" in result.markdown
+        assert "MTG_MCP_ENABLE_EDHREC" in result.markdown
 
     async def test_no_cards_under_budget(
         self,
@@ -601,8 +601,8 @@ class TestBudgetUpgrade:
             edhrec=edhrec,
         )
 
-        assert "No cards found under $0.10" in result
-        assert "budget" in result.lower()
+        assert "No cards found under $0.10" in result.markdown
+        assert "budget" in result.markdown.lower()
 
     async def test_empty_edhrec_cardlists(
         self,
@@ -624,7 +624,7 @@ class TestBudgetUpgrade:
             edhrec=edhrec,
         )
 
-        assert "No staples found" in result
+        assert "No staples found" in result.markdown
 
     async def test_scryfall_price_failures_skipped(
         self,
@@ -675,8 +675,8 @@ class TestBudgetUpgrade:
             edhrec=edhrec,
         )
 
-        assert "Good Card" in result
-        assert "Missing Card" not in result
+        assert "Good Card" in result.markdown
+        assert "Missing Card" not in result.markdown
 
     async def test_cards_without_usd_price_skipped(
         self,
@@ -720,7 +720,7 @@ class TestBudgetUpgrade:
             edhrec=edhrec,
         )
 
-        assert "No cards found" in result
+        assert "No cards found" in result.markdown
 
     async def test_progress_callback(
         self,
@@ -792,7 +792,7 @@ class TestBudgetUpgrade:
         # Count data rows in the table (rows starting with "| " and containing a number)
         data_lines = [
             line
-            for line in result.split("\n")
+            for line in result.markdown.split("\n")
             if line.startswith("| ") and not line.startswith("| #") and not line.startswith("|---")
         ]
         assert len(data_lines) == 3
@@ -839,9 +839,9 @@ class TestBudgetUpgrade:
             edhrec=edhrec,
         )
 
-        assert "Penny Card" in result
+        assert "Penny Card" in result.markdown
         # synergy_per_dollar = 0.50 / 0.25 = 2.00 (using floor, not 0.50/0.05=10.0)
-        assert "2.00" in result
+        assert "2.00" in result.markdown
 
     async def test_sorting_by_synergy_per_dollar(
         self,
@@ -917,7 +917,7 @@ class TestBudgetUpgrade:
         )
 
         # Cheap High Synergy should be ranked #1, Expensive Low Synergy #2
-        lines = result.split("\n")
+        lines = result.markdown.split("\n")
         data_lines = [
             line
             for line in lines

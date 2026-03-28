@@ -19,6 +19,7 @@ from mtg_mcp_server.utils.format_rules import (
     is_basic_land,
     normalize_format,
 )
+from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
@@ -34,7 +35,7 @@ async def deck_validate(
     commander: str | None = None,
     sideboard: list[str] | None = None,
     bulk: ScryfallBulkClient,
-) -> str:
+) -> WorkflowResult:
     """Validate a decklist against a format's construction rules.
 
     Checks deck size, legality, copy limits, color identity (Commander),
@@ -61,7 +62,10 @@ async def deck_validate(
     # --- Parse decklist ---
     parsed = parse_decklist(decklist)
     if not parsed:
-        return f"# Deck Validation - {fmt.title()}\n\nNo cards provided."
+        return WorkflowResult(
+            markdown=f"# Deck Validation - {fmt.title()}\n\nNo cards provided.",
+            data={"format": fmt, "valid": False, "errors": [], "warnings": []},
+        )
 
     parsed_sideboard = parse_decklist(sideboard) if sideboard else []
 
@@ -211,4 +215,13 @@ async def deck_validate(
     )
 
     log.info("deck_validate.complete", format=fmt, valid=is_valid, errors=len(errors))
-    return "\n".join(lines)
+    data = {
+        "format": fmt,
+        "valid": is_valid,
+        "errors": errors,
+        "warnings": warnings,
+        "cards_checked": sum(qty for qty, _ in parsed),
+        "resolved_count": resolved_count,
+        "unresolved_count": len(unresolved_names),
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)

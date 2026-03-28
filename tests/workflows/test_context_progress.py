@@ -14,6 +14,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from mtg_mcp_server.workflows import WorkflowResult
+
 if TYPE_CHECKING:
     from fastmcp import Client
 
@@ -27,7 +29,7 @@ def _mock_commander_stubs():
         mod = types.ModuleType("mtg_mcp_server.workflows.commander")
         sys.modules["mtg_mcp_server.workflows.commander"] = mod
 
-    stub = AsyncMock(return_value="stub")
+    stub = AsyncMock(return_value=WorkflowResult(markdown="stub", data={}))
     originals: dict[str, object] = {}
 
     for name in ("card_comparison", "budget_upgrade"):
@@ -56,7 +58,7 @@ def _mock_analysis_stubs():
         mod = types.ModuleType("mtg_mcp_server.workflows.analysis")
         sys.modules["mtg_mcp_server.workflows.analysis"] = mod
 
-    stub = AsyncMock(return_value="stub")
+    stub = AsyncMock(return_value=WorkflowResult(markdown="stub", data={}))
     original = getattr(mod, "deck_analysis", None)
     mod.deck_analysis = stub
 
@@ -81,7 +83,7 @@ def _mock_draft_stubs():
         mod = types.ModuleType("mtg_mcp_server.workflows.draft")
         sys.modules["mtg_mcp_server.workflows.draft"] = mod
 
-    stub = AsyncMock(return_value="stub")
+    stub = AsyncMock(return_value=WorkflowResult(markdown="stub", data={}))
     original = getattr(mod, "set_overview", None)
     mod.set_overview = stub
 

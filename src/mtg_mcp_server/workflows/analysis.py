@@ -10,6 +10,7 @@ import structlog
 
 from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.utils.mana import count_pips
+from mtg_mcp_server.workflows import WorkflowResult
 from mtg_mcp_server.workflows.deck import build_synergy_lookup
 
 if TYPE_CHECKING:
@@ -133,7 +134,7 @@ async def deck_analysis(
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
-) -> str:
+) -> WorkflowResult:
     """Full decklist health check using all available backends.
 
     Args:
@@ -156,7 +157,10 @@ async def deck_analysis(
     )
 
     if not decklist:
-        return f"# Deck Analysis \u2014 {commander_name}\n\nNo cards in decklist to analyze."
+        return WorkflowResult(
+            markdown=f"# Deck Analysis \u2014 {commander_name}\n\nNo cards in decklist to analyze.",
+            data={"commander_name": commander_name, "deck_size": 0},
+        )
 
     # Step 1/3: Resolve cards
     if on_progress is not None:
@@ -190,7 +194,7 @@ async def deck_analysis(
     total_price, avg_price, priced_count = _compute_budget(resolved_cards)
 
     # Format output
-    return _format_output(
+    markdown = _format_output(
         commander_name=commander_name,
         deck_size=len(decklist),
         mana_curve=mana_curve,
@@ -204,6 +208,28 @@ async def deck_analysis(
         failures=failures,
         sources=sources,
     )
+    data: dict = {
+        "commander_name": commander_name,
+        "deck_size": len(decklist),
+        "mana_curve": mana_curve.buckets,
+        "total_mana_value": mana_curve.total_mana_value,
+        "color_pips": {c: v for c, v in color_pips.pips.items() if v > 0},
+        "bracket": bracket.model_dump(mode="json") if bracket is not None else None,
+        "combos_included": len(deck_combos.included) if deck_combos is not None else None,
+        "combos_almost": len(deck_combos.almost_included) if deck_combos is not None else None,
+        "total_price": total_price,
+        "avg_price": avg_price,
+        "priced_count": priced_count,
+        "low_synergy": [{"name": n, "synergy": s} for n, s in low_synergy],
+        "unresolved": failures,
+        "sources": {
+            "scryfall": sources.scryfall_ok,
+            "spellbook": sources.spellbook_ok,
+            "edhrec": sources.edhrec_ok,
+            "bulk_data": sources.bulk_data_available,
+        },
+    }
+    return WorkflowResult(markdown=markdown, data=data)
 
 
 # ---------------------------------------------------------------------------

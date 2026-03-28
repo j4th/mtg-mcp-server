@@ -395,6 +395,8 @@ class TestDeckAnalysisToolError:
         mock_scryfall = AsyncMock()
         mock_scryfall.get_card_by_name = AsyncMock(side_effect=ServiceError("timeout"))
         mock_spellbook = AsyncMock()
+        mock_spellbook.estimate_bracket = AsyncMock(side_effect=ServiceError("unavailable"))
+        mock_spellbook.find_decklist_combos = AsyncMock(side_effect=ServiceError("unavailable"))
 
         with (
             patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),

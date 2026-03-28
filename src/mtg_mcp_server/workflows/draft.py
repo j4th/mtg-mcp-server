@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from mtg_mcp_server.providers import ATTRIBUTION_17LANDS
+from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -90,7 +91,7 @@ async def draft_pack_pick(
     *,
     seventeen_lands: SeventeenLandsClient,
     current_picks: list[str] | None = None,
-) -> str:
+) -> WorkflowResult:
     """Rank cards in a draft pack using 17Lands win rate data.
 
     Args:
@@ -105,7 +106,11 @@ async def draft_pack_pick(
     log.info("draft_pack_pick.start", set_code=set_code, pack_size=len(pack))
 
     if not pack:
-        return f"# Draft Pack Analysis \u2014 {set_code}\n\nNo cards in pack.{ATTRIBUTION_17LANDS}"
+        msg = f"# Draft Pack Analysis \u2014 {set_code}\n\nNo cards in pack.{ATTRIBUTION_17LANDS}"
+        return WorkflowResult(
+            markdown=msg,
+            data={"set_code": set_code, "rankings": [], "no_data": []},
+        )
 
     # Fetch all card ratings for this set
     ratings = await seventeen_lands.card_ratings(set_code)
@@ -176,7 +181,23 @@ async def draft_pack_pick(
     lines.append(ATTRIBUTION_17LANDS)
 
     log.info("draft_pack_pick.complete", set_code=set_code, found=len(found), no_data=len(no_data))
-    return "\n".join(lines)
+    data = {
+        "set_code": set_code,
+        "rankings": [
+            {
+                "name": r.name,
+                "color": r.color,
+                "rarity": r.rarity,
+                "gih_wr": r.ever_drawn_win_rate,
+                "alsa": r.avg_seen,
+                "iwd": r.drawn_improvement_win_rate,
+                "game_count": r.game_count,
+            }
+            for r in found
+        ],
+        "no_data": no_data,
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +214,7 @@ async def set_overview(
     event_type: str = "PremierDraft",
     seventeen_lands: SeventeenLandsClient,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
-) -> str:
+) -> WorkflowResult:
     """Draft format overview with top commons, top uncommons, and trap rares.
 
     Args:
@@ -220,11 +241,22 @@ async def set_overview(
         await on_progress(2, 2)
 
     if not rated:
-        return (
+        msg = (
             f"# Set Overview \u2014 {set_code}\n\n"
             f"No card data available for this set. "
             f"Check the set code is correct and that 17Lands has data for {event_type}."
             f"{ATTRIBUTION_17LANDS}"
+        )
+        return WorkflowResult(
+            markdown=msg,
+            data={
+                "set_code": set_code,
+                "event_type": event_type,
+                "median_gih_wr": None,
+                "top_commons": [],
+                "top_uncommons": [],
+                "trap_rares": [],
+            },
         )
 
     # Single-pass: group by rarity and collect GIH WR values
@@ -296,4 +328,24 @@ async def set_overview(
         uncommons=len(top_uncommons),
         trap_rares=len(trap_rares),
     )
-    return "\n".join(lines)
+
+    def _rating_dict(r: DraftCardRating) -> dict:
+        return {
+            "name": r.name,
+            "color": r.color,
+            "rarity": r.rarity,
+            "gih_wr": r.ever_drawn_win_rate,
+            "alsa": r.avg_seen,
+            "iwd": r.drawn_improvement_win_rate,
+            "game_count": r.game_count,
+        }
+
+    data = {
+        "set_code": set_code,
+        "event_type": event_type,
+        "median_gih_wr": median_gih,
+        "top_commons": [_rating_dict(r) for r in top_commons],
+        "top_uncommons": [_rating_dict(r) for r in top_uncommons],
+        "trap_rares": [_rating_dict(r) for r in trap_rares],
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)

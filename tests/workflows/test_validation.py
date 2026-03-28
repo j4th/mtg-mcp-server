@@ -67,8 +67,8 @@ class TestValidModernDeck:
             bulk=mock_bulk,
         )
 
-        assert "VALID" in result
-        assert "modern" in result.lower()
+        assert "VALID" in result.markdown
+        assert "modern" in result.markdown.lower()
 
     async def test_valid_with_4x_prefix(self) -> None:
         cards = {
@@ -83,7 +83,7 @@ class TestValidModernDeck:
             bulk=mock_bulk,
         )
 
-        assert "VALID" in result
+        assert "VALID" in result.markdown
 
 
 class TestValidCommanderDeck:
@@ -113,7 +113,7 @@ class TestValidCommanderDeck:
             bulk=mock_bulk,
         )
 
-        assert "VALID" in result
+        assert "VALID" in result.markdown
 
 
 # ---------------------------------------------------------------------------
@@ -140,9 +140,9 @@ class TestBannedCard:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Birthing Pod" in result
-        assert "banned" in result.lower()
+        assert "INVALID" in result.markdown
+        assert "Birthing Pod" in result.markdown
+        assert "banned" in result.markdown.lower()
 
 
 class TestDeckSizeTooSmall:
@@ -160,9 +160,9 @@ class TestDeckSizeTooSmall:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "1 cards" in result
-        assert "minimum 60" in result.lower() or "minimum" in result.lower()
+        assert "INVALID" in result.markdown
+        assert "1 cards" in result.markdown
+        assert "minimum 60" in result.markdown.lower() or "minimum" in result.markdown.lower()
 
 
 class TestCommanderWrongSize:
@@ -191,9 +191,9 @@ class TestCommanderWrongSize:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "51 cards" in result
-        assert "100" in result
+        assert "INVALID" in result.markdown
+        assert "51 cards" in result.markdown
+        assert "100" in result.markdown
 
 
 class TestCopyLimits:
@@ -211,10 +211,10 @@ class TestCopyLimits:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Lightning Bolt" in result
-        assert "5" in result
-        assert "max 4" in result.lower() or "max" in result
+        assert "INVALID" in result.markdown
+        assert "Lightning Bolt" in result.markdown
+        assert "5" in result.markdown
+        assert "max 4" in result.markdown.lower() or "max" in result.markdown
 
     async def test_basic_lands_exempt(self) -> None:
         """Basic lands are exempt from copy limits."""
@@ -232,7 +232,7 @@ class TestCopyLimits:
             bulk=mock_bulk,
         )
 
-        assert "VALID" in result
+        assert "VALID" in result.markdown
 
     async def test_singleton_duplicate_in_commander(self) -> None:
         """Commander format forbids more than 1 copy of non-basic cards."""
@@ -265,8 +265,8 @@ class TestCopyLimits:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Sol Ring" in result
+        assert "INVALID" in result.markdown
+        assert "Sol Ring" in result.markdown
 
 
 class TestColorIdentity:
@@ -303,9 +303,9 @@ class TestColorIdentity:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Lightning Bolt" in result
-        assert "color identity" in result.lower()
+        assert "INVALID" in result.markdown
+        assert "Lightning Bolt" in result.markdown
+        assert "color identity" in result.markdown.lower()
 
 
 class TestPauperLegality:
@@ -340,7 +340,7 @@ class TestPauperLegality:
             bulk=mock_bulk,
         )
 
-        assert "VALID" in result
+        assert "VALID" in result.markdown
 
 
 class TestVintageRestricted:
@@ -364,9 +364,9 @@ class TestVintageRestricted:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Ancestral Recall" in result
-        assert "restricted" in result.lower()
+        assert "INVALID" in result.markdown
+        assert "Ancestral Recall" in result.markdown
+        assert "restricted" in result.markdown.lower()
 
 
 class TestSideboardSize:
@@ -388,8 +388,8 @@ class TestSideboardSize:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Sideboard" in result or "sideboard" in result
+        assert "INVALID" in result.markdown
+        assert "Sideboard" in result.markdown or "sideboard" in result.markdown
 
 
 # ---------------------------------------------------------------------------
@@ -430,10 +430,10 @@ class TestUnresolvedCards:
             bulk=mock_bulk,
         )
 
-        assert "VALID" in result
-        assert "warning" in result.lower()
-        assert "Unknown Card" in result
-        assert "unresolved" in result.lower()
+        assert "VALID" in result.markdown
+        assert "warning" in result.markdown.lower()
+        assert "Unknown Card" in result.markdown
+        assert "unresolved" in result.markdown.lower()
 
 
 class TestEmptyDecklist:
@@ -448,7 +448,7 @@ class TestEmptyDecklist:
             bulk=mock_bulk,
         )
 
-        assert "No cards" in result or "no cards" in result
+        assert "No cards" in result.markdown or "no cards" in result.markdown
 
 
 class TestFormatAliases:
@@ -478,7 +478,7 @@ class TestFormatAliases:
         )
 
         # Should normalize to commander
-        assert "Commander" in result
+        assert "Commander" in result.markdown
 
 
 class TestQuantityParsing:
@@ -499,7 +499,7 @@ class TestQuantityParsing:
         )
 
         # Should parse all 8 cards (4+3+1)
-        assert "8 cards checked" in result
+        assert "8 cards checked" in result.markdown
 
 
 class TestNotLegalCard:
@@ -520,5 +520,5 @@ class TestNotLegalCard:
             bulk=mock_bulk,
         )
 
-        assert "INVALID" in result
-        assert "Oko" in result
+        assert "INVALID" in result.markdown
+        assert "Oko" in result.markdown
