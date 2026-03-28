@@ -22,9 +22,9 @@ class TestServerHealth:
     async def test_all_tools_registered(self, live_client):
         tools = await live_client.list_tools()
         tool_names = {t.name for t in tools}
-        # 1 ping + 4 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 bulk + 8 workflows = 23
-        assert len(tool_names) == 23, (
-            f"Expected 23 tools, got {len(tool_names)}: {sorted(tool_names)}"
+        # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 9 bulk + 11 workflows = 35
+        assert len(tool_names) == 35, (
+            f"Expected 35 tools, got {len(tool_names)}: {sorted(tool_names)}"
         )
 
     async def test_no_mtgjson_tools(self, live_client):
@@ -74,3 +74,33 @@ class TestScryfallLive:
             "scryfall_search_cards", {"query": "t:creature c:green cmc=1"}
         )
         assert "Found" in result.content[0].text
+
+    async def test_set_info(self, live_client):
+        result = await live_client.call_tool("scryfall_set_info", {"set_code": "dom"})
+        text = result.content[0].text
+        assert "Dominaria" in text
+
+
+class TestCrossFormatLive:
+    """New cross-format tools against real data."""
+
+    async def test_ban_list_modern(self, live_client):
+        result = await live_client.call_tool("bulk_ban_list", {"format": "modern"})
+        text = result.content[0].text
+        # Modern has banned cards
+        assert "Banned" in text or "banned" in text
+
+    async def test_format_staples_commander(self, live_client):
+        result = await live_client.call_tool(
+            "bulk_format_staples", {"format": "commander", "limit": 5}
+        )
+        text = result.content[0].text
+        assert "Sol Ring" in text or "Commander" in text.lower()
+
+    async def test_card_in_formats(self, live_client):
+        result = await live_client.call_tool(
+            "bulk_card_in_formats", {"card_name": "Lightning Bolt"}
+        )
+        text = result.content[0].text
+        assert "Lightning Bolt" in text
+        assert "modern" in text.lower()
