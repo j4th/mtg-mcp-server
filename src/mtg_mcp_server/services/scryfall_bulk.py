@@ -343,7 +343,7 @@ class ScryfallBulkClient:
                 if not any(t in oracle for t in text_any_lower):
                     continue
             if kw_lower is not None:
-                card_kw = [k.lower() for k in card.keywords]
+                card_kw = {k.lower() for k in card.keywords}
                 if not all(k in card_kw for k in kw_lower):
                     continue
             if cmc_eq is not None and card.cmc != cmc_eq:

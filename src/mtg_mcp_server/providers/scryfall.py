@@ -19,6 +19,7 @@ from mtg_mcp_server.providers import (
     TAGS_PRICING,
     TAGS_SEARCH,
     TOOL_ANNOTATIONS,
+    format_legalities,
 )
 from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
 
@@ -124,7 +125,7 @@ async def card_details(
         lines.append(f"Price: ${card.prices.usd} (foil: ${card.prices.usd_foil or 'N/A'})")
     if card.edhrec_rank is not None:
         lines.append(f"EDHREC Rank: {card.edhrec_rank}")
-    lines.append(f"Legalities: {_format_legalities(card.legalities)}")
+    lines.append(f"Legalities: {format_legalities(card.legalities)}")
     lines.append(f"Scryfall: {card.scryfall_uri}")
     return "\n".join(lines) + ATTRIBUTION_SCRYFALL
 
@@ -262,14 +263,6 @@ async def whats_new(
             "\nMore results available — refine your search with set_code or format filters."
         )
     return "\n".join(lines) + ATTRIBUTION_SCRYFALL
-
-
-def _format_legalities(legalities: dict[str, str]) -> str:
-    """Format a legalities dict as a comma-separated list of legal format names."""
-    legal = [fmt for fmt, status in legalities.items() if status == "legal"]
-    if not legal:
-        return "Not legal in any format"
-    return ", ".join(legal)
 
 
 # ---------------------------------------------------------------------------

@@ -432,7 +432,34 @@ def _make_pool_client(pool: list[Card] | None = None) -> AsyncMock:
         q = query.lower()
         return [c for c in cards if q in c.name.lower()][:limit]
 
+    async def mock_get_cards(names: list[str]) -> dict[str, Card | None]:
+        return {name: cards_dict.get(name.lower()) for name in names}
+
+    async def mock_cards_by_legality(format: str, status: str) -> list[Card]:
+        return [c for c in cards if c.legalities.get(format) == status]
+
+    async def mock_random_card(
+        *,
+        format: str | None = None,
+        color_identity: frozenset[str] | None = None,
+        type_contains: str | None = None,
+        rarity: str | None = None,
+    ) -> Card | None:
+        pool = list(cards)
+        if format is not None:
+            pool = [c for c in pool if c.legalities.get(format) == "legal"]
+        if color_identity is not None:
+            pool = [c for c in pool if frozenset(c.color_identity).issubset(color_identity)]
+        if type_contains is not None:
+            pool = [c for c in pool if type_contains.lower() in c.type_line.lower()]
+        if rarity is not None:
+            pool = [c for c in pool if c.rarity == rarity]
+        return pool[0] if pool else None
+
     mock.get_card = AsyncMock(side_effect=mock_get_card)
+    mock.get_cards = AsyncMock(side_effect=mock_get_cards)
+    mock.cards_by_legality = AsyncMock(side_effect=mock_cards_by_legality)
+    mock.random_card = AsyncMock(side_effect=mock_random_card)
     mock.search_cards = AsyncMock(side_effect=mock_search)
     mock.ensure_loaded = AsyncMock()
     return mock

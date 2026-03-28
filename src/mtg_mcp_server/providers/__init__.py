@@ -65,3 +65,11 @@ ATTRIBUTION_SPELLBOOK = (
 )
 ATTRIBUTION_17LANDS = "\n\n*Data provided by [17Lands](https://www.17lands.com)*"
 ATTRIBUTION_EDHREC = "\n\n*Data provided by [EDHREC](https://edhrec.com)*"
+
+
+def format_legalities(legalities: dict[str, str]) -> str:
+    """Format a legalities dict as a comma-separated list of legal format names."""
+    legal = [fmt for fmt, status in legalities.items() if status == "legal"]
+    if not legal:
+        return "Not legal in any format"
+    return ", ".join(legal)

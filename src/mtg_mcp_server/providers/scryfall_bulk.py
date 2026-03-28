@@ -7,7 +7,6 @@ including prices, legalities, and EDHREC rank.
 from __future__ import annotations
 
 import json
-import random as _random
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import structlog
@@ -24,6 +23,7 @@ from mtg_mcp_server.providers import (
     TAGS_SEARCH,
     TAGS_VALIDATE,
     TOOL_ANNOTATIONS,
+    format_legalities,
 )
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient, ScryfallBulkError
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
@@ -88,12 +88,62 @@ def _get_client() -> ScryfallBulkClient:
     return _client
 
 
-def _format_legalities(legalities: dict[str, str]) -> str:
-    """Format a legalities dict as a comma-separated list of legal format names."""
-    legal = [fmt for fmt, status in legalities.items() if status == "legal"]
-    if not legal:
-        return "Not legal in any format"
-    return ", ".join(legal)
+def _format_card_detail(card: Card) -> list[str]:
+    """Build the standard card detail lines used by card_lookup and random_card."""
+    lines = [
+        f"**{card.name}** {card.mana_cost or ''}",
+        f"Type: {card.type_line}",
+    ]
+    if card.oracle_text:
+        lines.append(f"Text: {card.oracle_text}")
+    if card.power is not None and card.toughness is not None:
+        lines.append(f"P/T: {card.power}/{card.toughness}")
+    lines.append(f"Colors: {', '.join(card.colors) or 'Colorless'}")
+    lines.append(f"Color Identity: {', '.join(card.color_identity) or 'Colorless'}")
+    if card.keywords:
+        lines.append(f"Keywords: {', '.join(card.keywords)}")
+    if card.set_code:
+        lines.append(f"Set: {card.set_code.upper()} ({card.rarity})")
+    if card.prices.usd:
+        lines.append(f"Price: ${card.prices.usd} (foil: ${card.prices.usd_foil or 'N/A'})")
+    if card.edhrec_rank is not None:
+        lines.append(f"EDHREC Rank: {card.edhrec_rank}")
+    lines.append(f"Legalities: {format_legalities(card.legalities)}")
+    return lines
+
+
+def _score_similarity(source: Card, candidate: Card) -> float:
+    """Score how similar a candidate card is to a source card."""
+    source_keywords = {k.lower() for k in source.keywords}
+    source_type_words = {
+        w.lower() for w in source.type_line.replace("\u2014", " ").split() if len(w) > 2
+    }
+    source_text_words: set[str] = set()
+    if source.oracle_text:
+        source_text_words = {
+            w.lower()
+            for w in source.oracle_text.replace(",", " ").replace(".", " ").split()
+            if len(w) > 4
+        }
+
+    score = 0.0
+    if candidate.keywords:
+        card_keywords = {k.lower() for k in candidate.keywords}
+        score += len(source_keywords & card_keywords) * 2.0
+    card_type_words = {
+        w.lower() for w in candidate.type_line.replace("\u2014", " ").split() if len(w) > 2
+    }
+    score += len(source_type_words & card_type_words) * 1.5
+    if abs(candidate.cmc - source.cmc) <= 1:
+        score += 1.0
+    if candidate.oracle_text and source_text_words:
+        card_text_words = {
+            w.lower()
+            for w in candidate.oracle_text.replace(",", " ").replace(".", " ").split()
+            if len(w) > 4
+        }
+        score += len(source_text_words & card_text_words) * 1.0
+    return score
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
@@ -118,26 +168,7 @@ async def card_lookup(
     if card is None:
         raise ToolError(f"Card not found: '{name}'. Check spelling.")
 
-    lines = [
-        f"**{card.name}** {card.mana_cost or ''}",
-        f"Type: {card.type_line}",
-    ]
-    if card.oracle_text:
-        lines.append(f"Text: {card.oracle_text}")
-    if card.power is not None and card.toughness is not None:
-        lines.append(f"P/T: {card.power}/{card.toughness}")
-    lines.append(f"Colors: {', '.join(card.colors) or 'Colorless'}")
-    lines.append(f"Color Identity: {', '.join(card.color_identity) or 'Colorless'}")
-    if card.keywords:
-        lines.append(f"Keywords: {', '.join(card.keywords)}")
-    if card.set_code:
-        lines.append(f"Set: {card.set_code.upper()} ({card.rarity})")
-    if card.prices.usd:
-        lines.append(f"Price: ${card.prices.usd} (foil: ${card.prices.usd_foil or 'N/A'})")
-    if card.edhrec_rank is not None:
-        lines.append(f"EDHREC Rank: {card.edhrec_rank}")
-    lines.append(f"Legalities: {_format_legalities(card.legalities)}")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return "\n".join(_format_card_detail(card)) + ATTRIBUTION_SCRYFALL_BULK
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
@@ -223,19 +254,18 @@ async def format_legality(
     fmt = normalize_format(format)
 
     try:
-        await client.ensure_loaded()
+        resolved = await client.get_cards(cards)
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
     lines = [f"## Legality Check: {fmt.title()}", "", "| Card | Status |", "|------|--------|"]
 
     for name in cards:
-        card = await client.get_card(name)
+        card = resolved.get(name)
         if card is None:
             lines.append(f"| {name} | Not Found |")
         else:
             status = card.legalities.get(fmt, "unknown")
-            # Capitalize and prettify the status
             display_status = status.replace("_", " ").title()
             lines.append(f"| {card.name} | {display_status} |")
 
@@ -288,6 +318,12 @@ async def format_search(
     # Parse natural language into structured filters
     parsed = parse_query(query)
 
+    # Pre-lowercase parsed terms to avoid re-lowering per card
+    type_lower_terms = [t.lower() for t in parsed.type_contains] if parsed.type_contains else None
+    text_any_lower = [p.lower() for p in parsed.text_any] if parsed.text_any else None
+    text_contains_lower = parsed.text_contains[0].lower() if parsed.text_contains else None
+    rarity_lower = rarity.lower() if rarity else None
+
     matches: list[Card] = []
     for card in client._unique_cards:
         # Format legality check
@@ -307,7 +343,7 @@ async def format_search(
             except ValueError:
                 continue
         # Rarity check
-        if rarity is not None and card.rarity.lower() != rarity.lower():
+        if rarity_lower is not None and card.rarity.lower() != rarity_lower:
             continue
         # CMC checks from parsed query
         if parsed.cmc_eq is not None and card.cmc != parsed.cmc_eq:
@@ -315,22 +351,20 @@ async def format_search(
         if parsed.cmc_lte is not None and card.cmc > parsed.cmc_lte:
             continue
         # Type check from parsed query
-        if parsed.type_contains:
+        if type_lower_terms is not None:
             type_lower = card.type_line.lower()
-            if not all(t.lower() in type_lower for t in parsed.type_contains):
+            if not all(t in type_lower for t in type_lower_terms):
                 continue
         # Text matching -- use parsed filters
         oracle_lower = (card.oracle_text or "").lower()
-        name_lower = card.name.lower()
-        if parsed.text_any and not any(p.lower() in oracle_lower for p in parsed.text_any):
+        if text_any_lower is not None and not any(p in oracle_lower for p in text_any_lower):
             continue
-        if parsed.text_contains:
-            # Fallback: match against name, type, or oracle text
-            query_lower = parsed.text_contains[0].lower()
+        if text_contains_lower is not None:
+            name_lower = card.name.lower()
             if not (
-                query_lower in name_lower
-                or query_lower in card.type_line.lower()
-                or query_lower in oracle_lower
+                text_contains_lower in name_lower
+                or text_contains_lower in card.type_line.lower()
+                or text_contains_lower in oracle_lower
             ):
                 continue
 
@@ -461,22 +495,6 @@ async def similar_cards(
 
     fmt = normalize_format(format) if format else None
 
-    # Extract features from the source card
-    source_keywords = set(k.lower() for k in source.keywords)
-    # Split type line into meaningful words (skip short words like "-", "—")
-    source_type_words = set(
-        w.lower() for w in source.type_line.replace("\u2014", " ").split() if len(w) > 2
-    )
-    source_cmc = source.cmc
-    # Extract significant oracle text words (>4 chars) for text overlap scoring
-    source_text_words: set[str] = set()
-    if source.oracle_text:
-        source_text_words = set(
-            w.lower()
-            for w in source.oracle_text.replace(",", " ").replace(".", " ").split()
-            if len(w) > 4
-        )
-
     scored: list[tuple[float, Card]] = []
     source_name_lower = source.name.lower()
 
@@ -495,28 +513,7 @@ async def similar_cards(
             except ValueError:
                 continue
 
-        score = 0.0
-        # Keyword overlap: +2 per shared keyword
-        if card.keywords:
-            card_keywords = set(k.lower() for k in card.keywords)
-            score += len(source_keywords & card_keywords) * 2.0
-        # Type word overlap: +1.5 per shared type word
-        card_type_words = set(
-            w.lower() for w in card.type_line.replace("\u2014", " ").split() if len(w) > 2
-        )
-        score += len(source_type_words & card_type_words) * 1.5
-        # CMC proximity: +1 if within 1 CMC
-        if abs(card.cmc - source_cmc) <= 1:
-            score += 1.0
-        # Oracle text overlap: +1 per shared significant word
-        if card.oracle_text and source_text_words:
-            card_text_words = set(
-                w.lower()
-                for w in card.oracle_text.replace(",", " ").replace(".", " ").split()
-                if len(w) > 4
-            )
-            score += len(source_text_words & card_text_words) * 1.0
-
+        score = _score_similarity(source, card)
         if score > 0:
             scored.append((score, card))
 
@@ -569,49 +566,19 @@ async def random_card(
     identity = parse_color_identity(color_identity) if color_identity else None
 
     try:
-        await client.ensure_loaded()
+        card = await client.random_card(
+            format=fmt,
+            color_identity=identity,
+            type_contains=card_type,
+            rarity=rarity.lower() if rarity else None,
+        )
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
-    # Build candidate pool
-    candidates: list[Card] = []
-    for card in client._unique_cards:
-        if fmt and card.legalities.get(fmt) != "legal":
-            continue
-        if identity is not None and not is_within_identity(card.color_identity, identity):
-            continue
-        if card_type is not None and card_type.lower() not in card.type_line.lower():
-            continue
-        if rarity is not None and card.rarity.lower() != rarity.lower():
-            continue
-        candidates.append(card)
-
-    if not candidates:
+    if card is None:
         raise ToolError("No cards match the specified filters.")
 
-    card = _random.choice(candidates)
-
-    # Same format as card_lookup
-    lines = [
-        f"**{card.name}** {card.mana_cost or ''}",
-        f"Type: {card.type_line}",
-    ]
-    if card.oracle_text:
-        lines.append(f"Text: {card.oracle_text}")
-    if card.power is not None and card.toughness is not None:
-        lines.append(f"P/T: {card.power}/{card.toughness}")
-    lines.append(f"Colors: {', '.join(card.colors) or 'Colorless'}")
-    lines.append(f"Color Identity: {', '.join(card.color_identity) or 'Colorless'}")
-    if card.keywords:
-        lines.append(f"Keywords: {', '.join(card.keywords)}")
-    if card.set_code:
-        lines.append(f"Set: {card.set_code.upper()} ({card.rarity})")
-    if card.prices.usd:
-        lines.append(f"Price: ${card.prices.usd} (foil: ${card.prices.usd_foil or 'N/A'})")
-    if card.edhrec_rank is not None:
-        lines.append(f"EDHREC Rank: {card.edhrec_rank}")
-    lines.append(f"Legalities: {_format_legalities(card.legalities)}")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return "\n".join(_format_card_detail(card)) + ATTRIBUTION_SCRYFALL_BULK
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_ALL_FORMATS)
@@ -630,19 +597,10 @@ async def ban_list(
     fmt = normalize_format(format)
 
     try:
-        await client.ensure_loaded()
+        banned = await client.cards_by_legality(fmt, "banned")
+        restricted = await client.cards_by_legality(fmt, "restricted")
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
-
-    banned: list[Card] = []
-    restricted: list[Card] = []
-
-    for card in client._unique_cards:
-        status = card.legalities.get(fmt)
-        if status == "banned":
-            banned.append(card)
-        elif status == "restricted":
-            restricted.append(card)
 
     banned.sort(key=lambda c: c.name)
     restricted.sort(key=lambda c: c.name)
@@ -786,43 +744,13 @@ async def card_similar_resource(name: str) -> str:
     if source is None:
         return json.dumps({"error": f"Card not found: {name}"})
 
-    # Extract features
-    source_keywords = set(k.lower() for k in source.keywords)
-    source_type_words = set(
-        w.lower() for w in source.type_line.replace("\u2014", " ").split() if len(w) > 2
-    )
-    source_cmc = source.cmc
-    source_text_words: set[str] = set()
-    if source.oracle_text:
-        source_text_words = set(
-            w.lower()
-            for w in source.oracle_text.replace(",", " ").replace(".", " ").split()
-            if len(w) > 4
-        )
-
     scored: list[tuple[float, Card]] = []
     source_name_lower = source.name.lower()
 
     for card in client._unique_cards:
         if card.name.lower() == source_name_lower:
             continue
-        score = 0.0
-        if card.keywords:
-            card_keywords = set(k.lower() for k in card.keywords)
-            score += len(source_keywords & card_keywords) * 2.0
-        card_type_words = set(
-            w.lower() for w in card.type_line.replace("\u2014", " ").split() if len(w) > 2
-        )
-        score += len(source_type_words & card_type_words) * 1.5
-        if abs(card.cmc - source_cmc) <= 1:
-            score += 1.0
-        if card.oracle_text and source_text_words:
-            card_text_words = set(
-                w.lower()
-                for w in card.oracle_text.replace(",", " ").replace(".", " ").split()
-                if len(w) > 4
-            )
-            score += len(source_text_words & card_text_words) * 1.0
+        score = _score_similarity(source, card)
         if score > 0:
             scored.append((score, card))
 

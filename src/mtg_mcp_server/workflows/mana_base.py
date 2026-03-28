@@ -7,11 +7,11 @@ keyword argument and returns a formatted markdown string. The workflow server
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 import structlog
 
+from mtg_mcp_server.utils.decklist import parse_decklist
 from mtg_mcp_server.utils.format_rules import normalize_format
 from mtg_mcp_server.utils.mana import count_pips, suggest_land_count
 
@@ -20,8 +20,6 @@ if TYPE_CHECKING:
     from mtg_mcp_server.types import Card
 
 log = structlog.get_logger(service="workflow.mana_base")
-
-_QTY_RE = re.compile(r"^(\d+)x?\s+(.+)$")
 
 _COLOR_NAMES: dict[str, str] = {
     "W": "White",
@@ -38,25 +36,6 @@ _BASIC_LAND_FOR_COLOR: dict[str, str] = {
     "R": "Mountain",
     "G": "Forest",
 }
-
-
-def _parse_decklist(entries: list[str]) -> list[tuple[int, str]]:
-    """Parse decklist entries into (quantity, card_name) tuples."""
-    parsed: list[tuple[int, str]] = []
-    for entry in entries:
-        entry = entry.strip()
-        if not entry:
-            continue
-        m = _QTY_RE.match(entry)
-        if m:
-            qty = int(m.group(1))
-            name = m.group(2).strip()
-        else:
-            qty = 1
-            name = entry
-        if name:
-            parsed.append((qty, name))
-    return parsed
 
 
 async def suggest_mana_base(
@@ -90,7 +69,7 @@ async def suggest_mana_base(
         return f"# Mana Base Error\n\n{exc}"
 
     # --- Parse and resolve ---
-    parsed = _parse_decklist(decklist)
+    parsed = parse_decklist(decklist)
     if not parsed:
         return "# Mana Base Suggestion\n\nNo cards provided."
 
