@@ -826,3 +826,209 @@ class TestBackgroundRefreshEdgeCases:
 
             client.start_background_refresh()
             assert client._refresh_task is first_task  # Same task, not a new one
+
+
+# ===========================================================================
+# New method test classes
+# ===========================================================================
+
+
+class TestFilterCards:
+    """Test multi-criteria card filtering."""
+
+    async def test_filter_by_format(self, loaded_client: ScryfallBulkClient):
+        """Filter by format returns only cards legal in that format."""
+        results = await loaded_client.filter_cards(format="modern")
+        assert len(results) > 0
+        for card in results:
+            assert card.legalities.get("modern") == "legal"
+
+    async def test_filter_by_color_identity(self, loaded_client: ScryfallBulkClient):
+        """Filter by color identity returns cards with subset identity."""
+        sultai = frozenset({"B", "G", "U"})
+        results = await loaded_client.filter_cards(color_identity=sultai)
+        assert len(results) > 0
+        for card in results:
+            assert frozenset(card.color_identity).issubset(sultai)
+
+    async def test_filter_by_type(self, loaded_client: ScryfallBulkClient):
+        """Filter by type_contains returns cards with matching type line."""
+        results = await loaded_client.filter_cards(type_contains=["Creature"])
+        assert len(results) > 0
+        for card in results:
+            assert "Creature" in card.type_line
+
+    async def test_filter_by_text_any(self, loaded_client: ScryfallBulkClient):
+        """Filter by text_any returns cards matching ANY oracle text term."""
+        results = await loaded_client.filter_cards(text_any=["destroy", "exile"])
+        assert len(results) > 0
+        for card in results:
+            text = (card.oracle_text or "").lower()
+            assert "destroy" in text or "exile" in text
+
+    async def test_filter_by_cmc(self, loaded_client: ScryfallBulkClient):
+        """Filter by cmc_eq returns cards with exact CMC."""
+        results = await loaded_client.filter_cards(cmc_eq=2.0)
+        assert len(results) > 0
+        for card in results:
+            assert card.cmc == 2.0
+
+    async def test_filter_by_max_price(self, loaded_client: ScryfallBulkClient):
+        """Filter by max_price returns only cards at or below that price."""
+        results = await loaded_client.filter_cards(max_price=1.0)
+        assert len(results) > 0
+        for card in results:
+            assert card.prices.usd is not None
+            assert float(card.prices.usd) <= 1.0
+
+    async def test_filter_by_rarity(self, loaded_client: ScryfallBulkClient):
+        """Filter by rarity returns only cards of that rarity."""
+        results = await loaded_client.filter_cards(rarity="mythic")
+        assert len(results) > 0
+        for card in results:
+            assert card.rarity == "mythic"
+
+    async def test_filter_combined(self, loaded_client: ScryfallBulkClient):
+        """Combined filters narrow results correctly."""
+        results = await loaded_client.filter_cards(
+            format="commander", type_contains=["Creature"], cmc_lte=3.0
+        )
+        assert len(results) > 0
+        for card in results:
+            assert card.legalities.get("commander") == "legal"
+            assert "Creature" in card.type_line
+            assert card.cmc <= 3.0
+
+    async def test_filter_limit(self, loaded_client: ScryfallBulkClient):
+        """Limit parameter caps the number of returned results."""
+        results = await loaded_client.filter_cards(limit=3)
+        assert len(results) <= 3
+
+    async def test_filter_empty_result(self, loaded_client: ScryfallBulkClient):
+        """Nonexistent rarity returns empty list."""
+        results = await loaded_client.filter_cards(rarity="nonexistent")
+        assert results == []
+
+    async def test_filter_name_contains(self, loaded_client: ScryfallBulkClient):
+        """Filter by name_contains finds cards with matching name substring."""
+        results = await loaded_client.filter_cards(name_contains="bolt")
+        assert any(c.name == "Lightning Bolt" for c in results)
+
+    async def test_filter_text_contains_all(self, loaded_client: ScryfallBulkClient):
+        """Filter by text_contains requires ALL strings to match."""
+        results = await loaded_client.filter_cards(text_contains=["destroy", "creature"])
+        assert len(results) > 0
+        for card in results:
+            text = (card.oracle_text or "").lower()
+            assert "destroy" in text
+            assert "creature" in text
+
+    async def test_filter_keywords(self, loaded_client: ScryfallBulkClient):
+        """Filter by keywords returns cards with matching keywords."""
+        results = await loaded_client.filter_cards(keywords=["Persist"])
+        assert any(c.name == "Kitchen Finks" for c in results)
+
+    async def test_filter_cmc_lte(self, loaded_client: ScryfallBulkClient):
+        """Filter by cmc_lte returns cards at or below that CMC."""
+        results = await loaded_client.filter_cards(cmc_lte=1.0)
+        assert len(results) > 0
+        for card in results:
+            assert card.cmc <= 1.0
+
+
+class TestCardsByLegality:
+    """Test legality-based card listing."""
+
+    async def test_banned_in_commander(self, loaded_client: ScryfallBulkClient):
+        """Returns cards banned in commander."""
+        results = await loaded_client.cards_by_legality("commander", "banned")
+        names = {c.name for c in results}
+        assert "Black Lotus" in names
+        assert "Channel" in names
+
+    async def test_banned_in_modern(self, loaded_client: ScryfallBulkClient):
+        """Returns cards banned in modern."""
+        results = await loaded_client.cards_by_legality("modern", "banned")
+        names = {c.name for c in results}
+        assert "Birthing Pod" in names
+
+    async def test_legal_returns_cards(self, loaded_client: ScryfallBulkClient):
+        """Returns cards legal in commander."""
+        results = await loaded_client.cards_by_legality("commander", "legal")
+        assert len(results) > 0
+        for card in results:
+            assert card.legalities.get("commander") == "legal"
+
+    async def test_empty_for_nonexistent_format(self, loaded_client: ScryfallBulkClient):
+        """Nonexistent format returns empty list."""
+        results = await loaded_client.cards_by_legality("nonexistent_format", "legal")
+        assert results == []
+
+
+class TestGetCards:
+    """Test batch exact-name lookup."""
+
+    async def test_batch_lookup(self, loaded_client: ScryfallBulkClient):
+        """Batch lookup returns cards for known names."""
+        result = await loaded_client.get_cards(["Sol Ring", "Lightning Bolt"])
+        assert result["Sol Ring"] is not None
+        assert result["Sol Ring"].name == "Sol Ring"
+        assert result["Lightning Bolt"] is not None
+
+    async def test_missing_card(self, loaded_client: ScryfallBulkClient):
+        """Missing cards return None in the dict."""
+        result = await loaded_client.get_cards(["Sol Ring", "Nonexistent Card"])
+        assert result["Sol Ring"] is not None
+        assert result["Nonexistent Card"] is None
+
+    async def test_case_insensitive(self, loaded_client: ScryfallBulkClient):
+        """Batch lookup is case-insensitive, preserving input key casing."""
+        result = await loaded_client.get_cards(["sol ring"])
+        assert result["sol ring"] is not None
+        assert result["sol ring"].name == "Sol Ring"
+
+    async def test_empty_list(self, loaded_client: ScryfallBulkClient):
+        """Empty input returns empty dict."""
+        result = await loaded_client.get_cards([])
+        assert result == {}
+
+
+class TestRandomCard:
+    """Test random card selection."""
+
+    async def test_random_returns_card(self, loaded_client: ScryfallBulkClient):
+        """Random card returns a Card instance."""
+        from mtg_mcp_server.types import Card
+
+        card = await loaded_client.random_card()
+        assert card is not None
+        assert isinstance(card, Card)
+
+    async def test_random_with_format(self, loaded_client: ScryfallBulkClient):
+        """Random card with format filter returns a legal card."""
+        card = await loaded_client.random_card(format="modern")
+        if card is not None:
+            assert card.legalities.get("modern") == "legal"
+
+    async def test_random_with_type(self, loaded_client: ScryfallBulkClient):
+        """Random card with type filter returns a matching card."""
+        card = await loaded_client.random_card(type_contains="Creature")
+        if card is not None:
+            assert "Creature" in card.type_line
+
+    async def test_random_with_rarity(self, loaded_client: ScryfallBulkClient):
+        """Random card with rarity filter returns a matching card."""
+        card = await loaded_client.random_card(rarity="mythic")
+        if card is not None:
+            assert card.rarity == "mythic"
+
+    async def test_random_empty_pool(self, loaded_client: ScryfallBulkClient):
+        """Random card from empty pool returns None."""
+        card = await loaded_client.random_card(rarity="nonexistent")
+        assert card is None
+
+    async def test_random_with_color_identity(self, loaded_client: ScryfallBulkClient):
+        """Random card with color_identity filter returns a subset match."""
+        card = await loaded_client.random_card(color_identity=frozenset({"R"}))
+        if card is not None:
+            assert frozenset(card.color_identity).issubset({"R"})
