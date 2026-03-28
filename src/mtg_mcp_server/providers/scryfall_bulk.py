@@ -27,6 +27,7 @@ from mtg_mcp_server.providers import (
 )
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient, ScryfallBulkError
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
+from mtg_mcp_server.utils.query_parser import parse_query
 
 # Lightweight format alias map — maps common abbreviations to Scryfall legality
 # keys. Unlike utils.format_rules.normalize_format, this does NOT reject unknown
@@ -284,9 +285,9 @@ async def format_search(
     except ScryfallBulkError as exc:
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
-    query_lower = query.lower()
+    # Parse natural language into structured filters
+    parsed = parse_query(query)
 
-    # Search across name, type line, and oracle text
     matches: list[Card] = []
     for card in client._unique_cards:
         # Format legality check
@@ -308,12 +309,32 @@ async def format_search(
         # Rarity check
         if rarity is not None and card.rarity.lower() != rarity.lower():
             continue
-        # Text matching -- search name, type line, and oracle text
-        name_match = query_lower in card.name.lower()
-        type_match = query_lower in card.type_line.lower()
-        text_match = card.oracle_text is not None and query_lower in card.oracle_text.lower()
-        if name_match or type_match or text_match:
-            matches.append(card)
+        # CMC checks from parsed query
+        if parsed.cmc_eq is not None and card.cmc != parsed.cmc_eq:
+            continue
+        if parsed.cmc_lte is not None and card.cmc > parsed.cmc_lte:
+            continue
+        # Type check from parsed query
+        if parsed.type_contains:
+            type_lower = card.type_line.lower()
+            if not all(t.lower() in type_lower for t in parsed.type_contains):
+                continue
+        # Text matching -- use parsed filters
+        oracle_lower = (card.oracle_text or "").lower()
+        name_lower = card.name.lower()
+        if parsed.text_any and not any(p.lower() in oracle_lower for p in parsed.text_any):
+            continue
+        if parsed.text_contains:
+            # Fallback: match against name, type, or oracle text
+            query_lower = parsed.text_contains[0].lower()
+            if not (
+                query_lower in name_lower
+                or query_lower in card.type_line.lower()
+                or query_lower in oracle_lower
+            ):
+                continue
+
+        matches.append(card)
 
     if not matches:
         raise ToolError(
@@ -326,7 +347,8 @@ async def format_search(
     matches.sort(key=lambda c: (c.edhrec_rank is None, c.edhrec_rank or 0))
     matches = matches[:limit]
 
-    lines = [f"## {fmt.title()} Cards: '{query}'"]
+    desc = parsed.description or query
+    lines = [f"## {fmt.title()} Cards: {desc}"]
     if color_identity:
         lines[0] += f" ({color_identity})"
     lines.append(f"Found {len(matches)} result(s):")
