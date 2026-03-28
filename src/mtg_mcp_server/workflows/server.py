@@ -23,9 +23,11 @@ from pydantic import Field
 
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import (
+    TAGS_BUILD,
     TAGS_COMMANDER,
     TAGS_DRAFT,
     TAGS_PRICING,
+    TAGS_VALIDATE,
     TOOL_ANNOTATIONS,
 )
 from mtg_mcp_server.services.base import ServiceError
@@ -115,6 +117,13 @@ def _require_edhrec() -> EDHRECClient:
     if _edhrec is None:
         raise ToolError("EDHREC is not enabled. Set MTG_MCP_ENABLE_EDHREC=true.")
     return _edhrec
+
+
+def _require_bulk() -> ScryfallBulkClient:
+    """Return bulk data client or raise ToolError if the feature flag is off."""
+    if _bulk is None:
+        raise ToolError("Bulk data is not enabled. Set MTG_MCP_ENABLE_BULK_DATA=true.")
+    return _bulk
 
 
 _log = structlog.get_logger(service="workflows")
@@ -497,3 +506,219 @@ Step 3: Evaluation criteria:
   - Category gaps: prioritize upgrades that fill roles the deck is missing
 
 Recommend the top 3-5 upgrades with reasoning and estimated total cost."""
+
+
+# ---------------------------------------------------------------------------
+# Cross-Format Workflow Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_VALIDATE)
+async def deck_validate(
+    decklist: Annotated[
+        list[str],
+        Field(
+            description="Card names, optionally prefixed with quantity (e.g. '4x Lightning Bolt' or 'Lightning Bolt')"
+        ),
+    ],
+    format: Annotated[
+        str,
+        Field(
+            description="Format to validate against (e.g. 'commander', 'modern', 'standard', 'legacy')"
+        ),
+    ],
+    commander: Annotated[
+        str | None, Field(description="Commander card name (required for Commander format)")
+    ] = None,
+    sideboard: Annotated[
+        list[str] | None, Field(description="Sideboard card names, same format as decklist")
+    ] = None,
+) -> str:
+    """Validate a decklist against a format's construction rules.
+
+    Checks legality, deck size, copy limits, color identity (Commander), singleton
+    rules, and Pauper rarity. Returns VALID or INVALID with actionable error messages.
+    """
+    from mtg_mcp_server.workflows.validation import deck_validate as impl
+
+    if not decklist:
+        raise ToolError("Provide at least one card in the decklist.")
+
+    try:
+        return await impl(
+            decklist,
+            format,
+            commander=commander,
+            sideboard=sideboard,
+            bulk=_require_bulk(),
+        )
+    except ServiceError as exc:
+        raise ToolError(f"deck_validate failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BUILD)
+async def suggest_mana_base(
+    decklist: Annotated[list[str], Field(description="Non-land card names in the deck")],
+    format: Annotated[
+        str, Field(description="Format for land legality checking (e.g. 'commander', 'modern')")
+    ],
+    total_lands: Annotated[
+        int | None,
+        Field(description="Override total land count (default: auto-calculated from avg CMC)"),
+    ] = None,
+) -> str:
+    """Suggest a mana base for a decklist based on color pip distribution.
+
+    Analyzes color requirements, recommends land count, and suggests format-legal
+    dual lands. Handles hybrid and phyrexian mana.
+    """
+    from mtg_mcp_server.workflows.mana_base import suggest_mana_base as impl
+
+    if not decklist:
+        raise ToolError("Provide at least one card in the decklist.")
+
+    try:
+        return await impl(
+            decklist,
+            format,
+            total_lands=total_lands,
+            bulk=_require_bulk(),
+        )
+    except ServiceError as exc:
+        raise ToolError(f"suggest_mana_base failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_PRICING)
+async def price_comparison(
+    cards: Annotated[list[str], Field(description="2-20 card names to compare prices")],
+) -> str:
+    """Compare prices across multiple cards using Scryfall bulk data.
+
+    Returns a markdown table with USD, USD foil, and EUR prices sorted by USD descending.
+    """
+    from mtg_mcp_server.workflows.pricing import price_comparison as impl
+
+    cards = list(dict.fromkeys(cards))  # Deduplicate, preserving order
+
+    if len(cards) < 2:
+        raise ToolError("Provide at least 2 cards to compare prices.")
+    if len(cards) > 20:
+        raise ToolError("Maximum 20 cards for price comparison.")
+
+    try:
+        return await impl(
+            cards,
+            bulk=_require_bulk(),
+        )
+    except ServiceError as exc:
+        raise ToolError(f"price_comparison failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Cross-Format Prompts
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.prompt()
+def build_deck(
+    concept: Annotated[
+        str,
+        Field(description="Deck concept or strategy (e.g. 'mono-red aggro', 'Azorius control')"),
+    ],
+    format: Annotated[
+        str, Field(description="Format to build for (e.g. 'modern', 'commander', 'standard')")
+    ],
+    budget: Annotated[float | None, Field(description="Optional max price per card in USD")] = None,
+) -> str:
+    """Guide building a deck from scratch for any format."""
+    budget_line = f" under ${budget:.2f} per card" if budget else ""
+    return f"""Build a {format} deck around the concept: {concept}{budget_line}.
+
+Step 1: Use bulk_format_search to find key cards matching the concept in {format}.
+  - Search for creatures, spells, and enablers that fit the strategy.
+
+Step 2: Use bulk_format_staples to find the most-played cards in {format} that complement the concept.
+
+Step 3: Assemble a decklist considering:
+  - Mana curve (most {format} decks peak at 2-3 CMC for 60-card, 3-4 for Commander)
+  - Color consistency (don't stretch the mana base too thin)
+  {"- Budget: filter cards under $" + f"{budget:.2f}" if budget else "- No budget constraint specified"}
+
+Step 4: Use deck_validate to verify the decklist is legal for {format}.
+
+Step 5: Use suggest_mana_base to get land recommendations.
+
+Present the final decklist with categories and total estimated cost."""
+
+
+@workflow_mcp.prompt()
+def evaluate_collection(
+    cards: Annotated[
+        str, Field(description="Comma-separated list of card names in your collection")
+    ],
+) -> str:
+    """Evaluate a collection of cards across formats."""
+    return f"""Evaluate this card collection for format playability and value:
+Cards: {cards}
+
+Step 1: Use bulk_card_in_formats for each card to see where it's legal.
+
+Step 2: Use price_comparison to see the current value of all cards.
+
+Step 3: Analysis:
+  - Which cards are format staples? (Check EDHREC rank, Modern/Legacy playability)
+  - Which cards have the highest value?
+  - Are there any banned cards that are only legal in specific formats?
+  - Group cards by the formats where they're most useful.
+
+Summarize: total collection value, best format fits, and any hidden gems."""
+
+
+@workflow_mcp.prompt()
+def format_intro(
+    format: Annotated[
+        str, Field(description="Format to learn about (e.g. 'modern', 'commander', 'pauper')")
+    ],
+) -> str:
+    """Introduce a Magic format with key rules and staple cards."""
+    return f"""Provide an introduction to the {format} format.
+
+Step 1: Explain the format rules:
+  - Deck size requirements
+  - Copy limits (4-of, singleton, etc.)
+  - Special rules (Commander tax, color identity, Pauper rarity restriction, etc.)
+  - Banned/restricted list highlights
+
+Step 2: Use bulk_ban_list to show the current banned cards in {format}.
+
+Step 3: Use bulk_format_staples to show the most-played cards in {format}.
+
+Step 4: For constructed formats, highlight:
+  - Top archetypes and strategies
+  - Key staple cards every player should know about
+  - Budget-friendly entry points
+
+Present as a beginner-friendly guide."""
+
+
+@workflow_mcp.prompt()
+def card_alternatives(
+    card_name: Annotated[str, Field(description="Card to find alternatives for")],
+    format: Annotated[str, Field(description="Format the alternatives must be legal in")],
+    budget: Annotated[float, Field(description="Max price per card in USD")],
+) -> str:
+    """Find budget alternatives to an expensive or unavailable card."""
+    return f"""Find alternatives to {card_name} for {format} under ${budget:.2f}.
+
+Step 1: Use scryfall_card_details to understand what {card_name} does — its role, effect, and stats.
+
+Step 2: Use bulk_similar_cards to find cards with similar effects in {format}.
+
+Step 3: Use price_comparison on the top candidates to verify they're within budget.
+
+Step 4: Evaluate each alternative:
+  - How close is the effect to the original?
+  - Any additional upsides or downsides?
+  - Format legality confirmed?
+
+Rank the top 3-5 alternatives with reasoning and price."""
