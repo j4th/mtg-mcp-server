@@ -104,6 +104,12 @@ async def mcp_client():
                 200, json=_load_json(SCRYFALL_FIXTURES / "rulings_sol_ring.json")
             )
         )
+        # Sets endpoint — regex for any set code
+        respx.get(url__regex=re.escape(SCRYFALL_BASE) + r"/sets/\w+").mock(
+            return_value=httpx.Response(
+                200, json=_load_json(SCRYFALL_FIXTURES / "set_dominaria.json")
+            )
+        )
 
         # --- Spellbook routes ---
         respx.get(f"{SPELLBOOK_BASE}/variants/").mock(
