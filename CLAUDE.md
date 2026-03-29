@@ -80,7 +80,8 @@ See @docs/ARCHITECTURE.md for full details.
 
 - Always work on a feature branch (`feat/description`). Never commit directly to main.
 - Commit atomically after each logical unit of work — don't batch changes into one big commit.
-- Before launching worktree agents: commit all changes, verify `git status` is clean. Agents branch from the last COMMITTED state — uncommitted work is invisible to them and will be lost.
+- Before launching worktree agents: commit all changes, verify `git status` is clean AND verify `git branch` shows you're on the correct feature branch. Agents branch from the last COMMITTED state of the CURRENT branch — if you're on the wrong branch or agents somehow branch from main, they'll miss all feature branch work. After launching, verify agent worktrees are based on the right commit.
+- Never blindly `cp` a file from a worktree over a file with scaffold changes. Always diff first (`diff <worktree-file> <main-file>`) or selectively merge. Worktree agents rewrite entire files — a copy will silently destroy scaffold additions.
 - Cherry-pick agent commits back to the feature branch. Discard agent rewrites of shared files (use scaffold versions).
 - After cherry-picking, diff against the prior phase's commit to verify nothing was reverted: `git diff <prior-commit>..HEAD -- <shared-files>`. Worktree agents rewrite entire files — if two phases touch the same files, the later cherry-pick silently clobbers the earlier phase's changes.
 - Cancel stale CI runs on the branch before pushing new commits.
