@@ -118,7 +118,7 @@ if _settings.enable_code_mode:
         mcp.add_transform(CodeMode())
         structlog.get_logger(service="startup").info("code_mode.enabled")
     except ImportError:
-        structlog.get_logger(service="startup").warning(
+        structlog.get_logger(service="startup").error(
             "code_mode.unavailable",
             hint='Install with: pip install "mtg-mcp-server[code-mode]"',
         )

@@ -9,6 +9,7 @@ conversion.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import TYPE_CHECKING
 
@@ -325,7 +326,7 @@ async def keyword_explain(
         try:
             example_cards = await bulk.search_by_text(keyword, limit=5)
         except Exception:
-            log.debug("keyword_explain.bulk_failed", keyword=keyword)
+            log.warning("keyword_explain.bulk_failed", keyword=keyword, exc_info=True)
 
     # Build markdown
     lines: list[str] = []
@@ -406,12 +407,13 @@ async def rules_interaction(
     log.info("rules_interaction.start", mechanic_a=mechanic_a, mechanic_b=mechanic_b)
     fmt = _get_rule_formatter(response_format)
 
-    # Look up both mechanics
-    glossary_a: GlossaryEntry | None = await rules.glossary_lookup(mechanic_a)
-    rules_a: list[Rule] = await rules.keyword_search(mechanic_a)
-
-    glossary_b: GlossaryEntry | None = await rules.glossary_lookup(mechanic_b)
-    rules_b: list[Rule] = await rules.keyword_search(mechanic_b)
+    # Look up both mechanics concurrently
+    glossary_a, rules_a, glossary_b, rules_b = await asyncio.gather(
+        rules.glossary_lookup(mechanic_a),
+        rules.keyword_search(mechanic_a),
+        rules.glossary_lookup(mechanic_b),
+        rules.keyword_search(mechanic_b),
+    )
 
     # Optional card lookups via bulk
     card_a: Card | None = None
@@ -420,11 +422,11 @@ async def rules_interaction(
         try:
             card_a = await bulk.get_card(mechanic_a)
         except Exception:
-            log.debug("rules_interaction.bulk_lookup_failed", name=mechanic_a)
+            log.warning("rules_interaction.bulk_lookup_failed", name=mechanic_a, exc_info=True)
         try:
             card_b = await bulk.get_card(mechanic_b)
         except Exception:
-            log.debug("rules_interaction.bulk_lookup_failed", name=mechanic_b)
+            log.warning("rules_interaction.bulk_lookup_failed", name=mechanic_b, exc_info=True)
 
     # Build markdown
     lines: list[str] = []
@@ -554,7 +556,7 @@ async def rules_scenario(
             if found:
                 all_rules[candidate] = found
         except Exception:
-            log.debug("rules_scenario.search_failed", keyword=candidate)
+            log.warning("rules_scenario.search_failed", keyword=candidate, exc_info=True)
 
     # Collect all unique rules (dedup by number)
     seen_numbers: set[str] = set()
@@ -651,7 +653,7 @@ async def combat_calculator(
                 if found:
                     keyword_rules[kw] = found
             except Exception:
-                log.debug("combat_calculator.keyword_search_failed", keyword=kw)
+                log.warning("combat_calculator.keyword_search_failed", keyword=kw, exc_info=True)
 
     # Resolve cards via bulk data
     attacker_cards: dict[str, Card] = {}
@@ -664,7 +666,7 @@ async def combat_calculator(
                     if card is not None:
                         target[name] = card
                 except Exception:
-                    log.debug("combat_calculator.bulk_failed", name=name)
+                    log.warning("combat_calculator.bulk_failed", name=name, exc_info=True)
 
     # Detect if first strike / double strike is relevant
     all_resolved = {**attacker_cards, **blocker_cards}

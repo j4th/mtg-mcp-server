@@ -29,6 +29,9 @@ _RULE_NUMBER_RE = re.compile(r"^(\d{3}\.\d+[a-z]?)\.?\s")
 # Section headers in the table of contents: "1. Game Concepts"
 _SECTION_HEADER_RE = re.compile(r"^(\d+)\.\s+(.+)$")
 
+# Delay before retrying a failed refresh (seconds)
+_REFRESH_RETRY_SECONDS = 300
+
 
 class RulesError(ServiceError):
     """Base exception for Comprehensive Rules service errors."""
@@ -94,14 +97,26 @@ class RulesService:
                 )
             except RulesError:
                 if is_refresh:
-                    log.warning("rules.refresh_failed", exc_info=True)
-                    self._loaded_at = time.monotonic() - self._refresh_seconds + 300
+                    log.warning(
+                        "rules.refresh_failed",
+                        exc_info=True,
+                        retry_in_seconds=_REFRESH_RETRY_SECONDS,
+                    )
+                    self._loaded_at = (
+                        time.monotonic() - self._refresh_seconds + _REFRESH_RETRY_SECONDS
+                    )
                     return
                 raise
             except Exception as exc:
                 if is_refresh:
-                    log.warning("rules.refresh_failed", exc_info=True)
-                    self._loaded_at = time.monotonic() - self._refresh_seconds + 300
+                    log.warning(
+                        "rules.refresh_failed",
+                        exc_info=True,
+                        retry_in_seconds=_REFRESH_RETRY_SECONDS,
+                    )
+                    self._loaded_at = (
+                        time.monotonic() - self._refresh_seconds + _REFRESH_RETRY_SECONDS
+                    )
                     return
                 raise RulesError(f"Unexpected error loading rules: {exc}") from exc
 
@@ -212,7 +227,13 @@ class RulesService:
                         f"HTTP {response.status_code} downloading rules from {self._rules_url}"
                     )
                 # Decode as UTF-8 and strip BOM if present
-                text = response.content.decode("utf-8-sig")
+                try:
+                    text = response.content.decode("utf-8-sig")
+                except UnicodeDecodeError as exc:
+                    raise RulesDownloadError(
+                        f"Rules file is not valid UTF-8 "
+                        f"(got {len(response.content)} bytes from {self._rules_url})"
+                    ) from exc
                 return text
         except httpx.RequestError as exc:
             raise RulesDownloadError(f"Network error downloading rules: {exc}") from exc
@@ -325,6 +346,13 @@ class RulesService:
             parent_number = _parent_rule_number(number)
             if parent_number and parent_number in rules:
                 rules[parent_number].subrules.append(rule)
+
+        # Sanity check: a valid Comprehensive Rules file should produce many rules
+        if not rules:
+            raise RulesError(
+                f"Parse produced no rules from {len(lines)} lines — "
+                "the rules file format may have changed"
+            )
 
         # Assign parsed data
         self._rules = rules

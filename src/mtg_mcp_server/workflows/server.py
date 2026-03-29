@@ -89,7 +89,14 @@ async def workflow_lifespan(server: FastMCP):
                 rules_url=settings.rules_url,
                 refresh_hours=settings.rules_refresh_hours,
             )
-            await _rules.ensure_loaded()
+            try:
+                await _rules.ensure_loaded()
+            except Exception:
+                _log.warning(
+                    "rules.startup_load_failed",
+                    exc_info=True,
+                    hint="Rules tools will attempt to load on first use",
+                )
         yield {}
     _scryfall = None
     _spellbook = None

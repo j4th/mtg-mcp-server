@@ -402,3 +402,27 @@ class TestStaleData:
             svc = RulesService(rules_url=_RULES_URL, refresh_hours=168)
             with pytest.raises(Exception, match="HTTP 500"):
                 await svc.ensure_loaded()
+
+    async def test_network_error_raises_download_error(self) -> None:
+        """Network-level failure (connection refused, DNS timeout) raises RulesDownloadError."""
+        with respx.mock:
+            respx.get(_RULES_URL).mock(side_effect=httpx.ConnectError("connection refused"))
+            svc = RulesService(rules_url=_RULES_URL, refresh_hours=168)
+            with pytest.raises(Exception, match="Network error"):
+                await svc.ensure_loaded()
+
+    async def test_network_error_on_refresh_serves_stale(self) -> None:
+        """Network error during refresh serves stale data."""
+        with respx.mock:
+            _mock_rules_download(respx)
+            svc = RulesService(rules_url=_RULES_URL, refresh_hours=0)
+            await svc.ensure_loaded()
+            rule = await svc.lookup_by_number("100.1")
+            assert rule is not None
+
+        with respx.mock:
+            respx.get(_RULES_URL).mock(side_effect=httpx.ConnectError("connection refused"))
+            svc._loaded_at = 0.0
+            await svc.ensure_loaded()
+            rule = await svc.lookup_by_number("100.1")
+            assert rule is not None
