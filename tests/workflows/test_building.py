@@ -221,6 +221,71 @@ class TestThemeSearch:
         # Should search for music-related terms
         assert result.data["theme"] == "music"
 
+    async def test_alias_sacrifice_maps_to_mechanical_theme(self, mock_bulk: AsyncMock) -> None:
+        """Common alias 'sacrifice' should use oracle text patterns, not name-literal search."""
+        viscera_seer = _mock_card(
+            "Viscera Seer",
+            oracle_text="Sacrifice a creature: Scry 1.",
+            type_line="Creature — Vampire Wizard",
+        )
+        mock_bulk.filter_cards = AsyncMock(return_value=[viscera_seer])
+
+        result = await theme_search("sacrifice", bulk=mock_bulk)
+
+        assert "Viscera Seer" in result.markdown
+        # Should use text_any with oracle text patterns, NOT name_contains
+        call_kwargs = mock_bulk.filter_cards.call_args.kwargs
+        assert "text_any" in call_kwargs
+        assert call_kwargs["text_any"] is not None
+        assert len(call_kwargs["text_any"]) > 1, (
+            "Should use multiple oracle text patterns, not just the literal word"
+        )
+        assert call_kwargs.get("name_contains") is None, (
+            "Mechanical themes should not filter by name — causes AND bug"
+        )
+
+    async def test_alias_lifegain_maps_to_mechanical_theme(self, mock_bulk: AsyncMock) -> None:
+        """Common alias 'lifegain' should use oracle text patterns."""
+        mock_bulk.filter_cards = AsyncMock(return_value=[])
+
+        await theme_search("lifegain", bulk=mock_bulk)
+
+        call_kwargs = mock_bulk.filter_cards.call_args.kwargs
+        assert "text_any" in call_kwargs
+        assert call_kwargs["text_any"] is not None
+        assert any("life" in pattern for pattern in call_kwargs["text_any"])
+
+    async def test_alias_ramp_maps_to_mechanical_theme(self, mock_bulk: AsyncMock) -> None:
+        """Common alias 'ramp' should use oracle text patterns."""
+        mock_bulk.filter_cards = AsyncMock(return_value=[])
+
+        await theme_search("ramp", bulk=mock_bulk)
+
+        call_kwargs = mock_bulk.filter_cards.call_args.kwargs
+        assert "text_any" in call_kwargs
+        assert call_kwargs["text_any"] is not None
+
+    async def test_fallback_uses_or_not_and(self, mock_bulk: AsyncMock) -> None:
+        """Generic fallback should search name OR text, not name AND text."""
+        # When type_contains returns nothing, fallback should find cards
+        # with theme in oracle text even if name doesn't contain it
+        phyrexian_altar = _mock_card(
+            "Phyrexian Altar",
+            oracle_text="Sacrifice a creature: Add one mana of any color.",
+            type_line="Artifact",
+        )
+        # First call (type_contains) returns nothing, second (text) returns card
+        mock_bulk.filter_cards = AsyncMock(side_effect=[[], [phyrexian_altar]])
+
+        result = await theme_search("some_unknown_theme", bulk=mock_bulk)
+
+        assert result.data["total_found"] > 0
+        # The second call should NOT have name_contains (which would AND with text_any)
+        second_call_kwargs = mock_bulk.filter_cards.call_args_list[1].kwargs
+        assert second_call_kwargs.get("name_contains") is None, (
+            "Fallback should not AND name_contains with text_any — causes false negatives"
+        )
+
     async def test_works_without_optional_backends(self, mock_bulk: AsyncMock) -> None:
         """Theme search works with only bulk data (no optional backends)."""
         card = _mock_card("Blood Artist", oracle_text="Whenever a creature dies...")

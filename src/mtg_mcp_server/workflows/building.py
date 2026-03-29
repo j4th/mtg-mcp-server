@@ -106,6 +106,93 @@ THEME_MAPPINGS: dict[str, dict[str, list[str] | str | None]] = {
             "prowess",
         ],
     },
+    "sacrifice": {
+        "text_any": [
+            "sacrifice a creature",
+            "sacrifice a permanent",
+            "sacrifice another",
+            "whenever you sacrifice",
+            "whenever a creature you control dies",
+        ],
+    },
+    "lifegain": {
+        "text_any": [
+            "you gain life",
+            "whenever you gain life",
+            "lifelink",
+            "pay life",
+        ],
+    },
+    "ramp": {
+        "text_any": [
+            "search your library for a basic land",
+            "add one mana of any color",
+            "add {C}",
+            "add {G}",
+            "search your library for a land card",
+        ],
+    },
+    "draw": {
+        "text_any": [
+            "draw a card",
+            "draw two cards",
+            "draw cards",
+            "whenever you draw",
+        ],
+    },
+    "discard": {
+        "text_any": [
+            "discard a card",
+            "each opponent discards",
+            "whenever a player discards",
+            "discard their hand",
+        ],
+    },
+    "counters": {
+        "text_any": [
+            "+1/+1 counter",
+            "proliferate",
+            "whenever a counter",
+            "put a counter",
+        ],
+    },
+    "removal": {
+        "text_any": [
+            "destroy target",
+            "exile target",
+            "deals damage to target",
+            "target creature gets -",
+        ],
+    },
+}
+
+# Aliases: common synonyms that map to canonical theme keys above.
+THEME_ALIASES: dict[str, str] = {
+    "sac": "sacrifice",
+    "aristocrat": "aristocrats",
+    "dies": "aristocrats",
+    "death triggers": "aristocrats",
+    "flicker": "blink",
+    "bounce": "blink",
+    "life gain": "lifegain",
+    "life": "lifegain",
+    "card draw": "draw",
+    "cantrip": "draw",
+    "mana ramp": "ramp",
+    "acceleration": "ramp",
+    "land ramp": "ramp",
+    "graveyard": "reanimator",
+    "recursion": "reanimator",
+    "burn": "removal",
+    "+1/+1": "counters",
+    "+1/+1 counters": "counters",
+    "proliferate": "counters",
+    "spells": "spellslinger",
+    "spellslinger": "spellslinger",
+    "control": "stax",
+    "tax": "stax",
+    "go wide": "tokens",
+    "token": "tokens",
 }
 
 # Abstract themes: search by card name and oracle text synonyms.
@@ -168,6 +255,8 @@ async def theme_search(
     log.info("theme_search.start", theme=theme)
 
     theme_lower = theme.lower().strip()
+    # Resolve aliases to canonical theme keys
+    theme_lower = THEME_ALIASES.get(theme_lower, theme_lower)
     ci_filter: frozenset[str] | None = None
     if color_identity:
         try:
@@ -221,10 +310,10 @@ async def theme_search(
         )
 
         if not cards:
-            # Fall back to text/name search
+            # Fall back to oracle text search (no name_contains — AND with
+            # text_any causes false negatives, returning only literal name matches)
             cards = await bulk.filter_cards(
                 text_any=[theme_lower],
-                name_contains=theme_lower,
                 color_identity=ci_filter,
                 format=format,
                 max_price=max_price,
