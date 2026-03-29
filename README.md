@@ -47,7 +47,13 @@ No API keys needed -- all data sources are public.
 
 The fastest way to get started. No Python install required. Works on mobile.
 
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+**Via the UI** (Claude Desktop or claude.ai): Settings → Connectors → Add custom connector → paste the URL:
+
+```
+https://mtg-mcp-server.fastmcp.app/mcp
+```
+
+**Via config file** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
 ```json
 {
@@ -65,6 +71,8 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 ```bash
 claude mcp add mtg -- uvx mtg-mcp-server
 ```
+
+Or via the UI: Settings → MCP Servers → Add server → enter `uvx mtg-mcp-server` as the command.
 
 ### Claude Desktop (local)
 
