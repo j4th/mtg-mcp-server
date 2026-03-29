@@ -20,12 +20,12 @@ pytestmark = pytest.mark.integration
 class TestToolRegistration:
     """Verify the orchestrator exposes the expected tools."""
 
-    async def test_all_40_tools_registered(self, mcp_client: Client):
-        """The orchestrator exposes exactly 40 tools."""
+    async def test_all_51_tools_registered(self, mcp_client: Client):
+        """The orchestrator exposes exactly 51 tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
-        # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 9 bulk + 11 workflows + 5 rules = 40
-        assert len(tools) == 40, f"Expected 40 tools, got {len(tools)}.\nTools: {tool_names}"
+        # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 9 bulk + 22 workflows + 5 rules = 51
+        assert len(tools) == 51, f"Expected 51 tools, got {len(tools)}.\nTools: {tool_names}"
 
     async def test_no_mtgjson_tools(self, mcp_client: Client):
         """No tool names contain 'mtgjson' (replaced by Scryfall bulk data)."""
@@ -140,15 +140,19 @@ class TestNewPromptsE2E:
     """New prompts are visible on the orchestrator."""
 
     async def test_new_prompts_listed(self, mcp_client: Client):
-        """All 8 prompts registered on the orchestrator."""
+        """All 17 prompts registered on the orchestrator."""
         prompts = await mcp_client.list_prompts()
         names = {p.name for p in prompts}
-        # 4 existing + 4 new
+        # 4 original + 4 cross-format + 1 rules + 8 format workflow prompts = 17
         assert "build_deck" in names
         assert "evaluate_collection" in names
         assert "format_intro" in names
         assert "card_alternatives" in names
-        assert len(prompts) == 9
+        assert "build_around_deck" in names
+        assert "build_tribal_deck" in names
+        assert "build_theme_deck" in names
+        assert "upgrade_precon" in names
+        assert len(prompts) == 17
 
 
 class TestPing:

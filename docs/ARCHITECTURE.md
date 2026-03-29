@@ -131,6 +131,7 @@ mtg-mcp/
 │       │   ├── seventeen_lands.py  # SeventeenLandsClient
 │       │   ├── edhrec.py           # EDHRECClient
 │       │   ├── scryfall_bulk.py    # ScryfallBulkClient (file-based, not BaseClient)
+│       │   ├── rules.py            # RulesService (local Comprehensive Rules parser)
 │       │   └── cache.py            # async_cached decorator, TTLCache helpers
 │       │
 │       ├── providers/              # FastMCP sub-servers (one per backend, independently runnable)
@@ -141,13 +142,30 @@ mtg-mcp/
 │       │   ├── edhrec.py           # edhrec_mcp = FastMCP("EDHREC")
 │       │   └── scryfall_bulk.py    # scryfall_bulk_mcp = FastMCP("Scryfall Bulk")
 │       │
+│       ├── utils/                  # Shared utilities (no MCP awareness)
+│       │   ├── __init__.py
+│       │   ├── color_identity.py   # Color identity parsing and validation
+│       │   ├── decklist.py         # Decklist parsing (4x Card Name format)
+│       │   ├── format_rules.py     # Format-specific rules (deck sizes, copy limits)
+│       │   ├── formatters.py       # Shared formatting helpers (ResponseFormat, markdown)
+│       │   ├── mana.py             # Mana cost parsing utilities
+│       │   └── query_parser.py     # Search query parsing for bulk data
+│       │
 │       └── workflows/              # Composed tools (registered on orchestrator, no namespace)
 │           ├── __init__.py
 │           ├── server.py           # workflow_mcp = FastMCP("Workflows"), multi-client lifespan + prompts
 │           ├── commander.py        # commander_overview, evaluate_upgrade, card_comparison, budget_upgrade
+│           ├── commander_depth.py  # commander_comparison, tribal_staples, precon_upgrade, color_identity_staples
 │           ├── draft.py            # draft_pack_pick, set_overview
+│           ├── draft_limited.py    # sealed_pool_build, draft_signal_read, draft_log_review
 │           ├── deck.py             # suggest_cuts
 │           ├── analysis.py         # deck_analysis
+│           ├── building.py         # theme_search, build_around, complete_deck
+│           ├── constructed.py      # rotation_check
+│           ├── validation.py       # deck_validate
+│           ├── mana_base.py        # suggest_mana_base
+│           ├── pricing.py          # price_comparison
+│           ├── rules.py            # rules_lookup, keyword_explain, rules_interaction, rules_scenario, combat_calculator
 │           └── card_resolver.py    # Bulk-data-first card resolution with Scryfall fallback
 │
 ├── tests/
@@ -162,10 +180,19 @@ mtg-mcp/
 │   │   └── ...
 │   ├── workflows/
 │   │   ├── test_commander.py       # commander_overview, evaluate_upgrade, card_comparison, budget_upgrade
+│   │   ├── test_commander_depth.py # commander_comparison, tribal_staples, precon_upgrade, color_identity_staples
 │   │   ├── test_draft.py           # draft_pack_pick, set_overview
+│   │   ├── test_draft_limited.py   # sealed_pool_build, draft_signal_read, draft_log_review
 │   │   ├── test_deck.py            # suggest_cuts
 │   │   ├── test_analysis.py        # deck_analysis
-│   │   └── test_workflow_server.py # Integration: tool registration + prompt registration
+│   │   ├── test_building.py        # theme_search, build_around, complete_deck
+│   │   ├── test_constructed.py     # rotation_check
+│   │   ├── test_validation.py      # deck_validate
+│   │   ├── test_mana_base.py       # suggest_mana_base
+│   │   ├── test_pricing.py         # price_comparison
+│   │   ├── test_rules.py           # Rules engine tools
+│   │   ├── test_prompts.py         # All 17 prompt registrations
+│   │   └── test_workflow_server.py # Integration: tool registration + error handling
 │   ├── integration/                # Fixture-mocked cross-component E2E tests
 │   │   ├── conftest.py             # Bulk client + orchestrator fixtures (respx-mocked)
 │   │   ├── test_bulk_data_e2e.py   # Bulk data pipeline: lookup, search, resources
@@ -178,8 +205,7 @@ mtg-mcp/
 │       ├── scryfall_bulk/          # Oracle Cards sample with adversarial entries
 │       ├── spellbook/              # Combos, bracket estimates, decklist combos
 │       ├── seventeen_lands/        # Card ratings, color ratings
-│       ├── edhrec/                 # Commander pages, card synergy
-│       └── scryfall_bulk/          # Oracle Cards sample with adversarial entries
+│       └── edhrec/                 # Commander pages, card synergy
 │
 ├── scripts/
 │   └── capture_fixtures.py
@@ -190,14 +216,15 @@ mtg-mcp/
     ├── SERVICE_CONTRACTS.md
     ├── CACHING_DESIGN.md
     ├── DATA_SOURCES.md
-    └── PROJECT_PLAN.md
+    ├── PROJECT_PLAN.md
+    └── ...                          # Spec and plan docs per branch
 ```
 
 ### Key Structural Decisions
 
 **`services/` vs `providers/`**: Services are plain Python classes with async methods that call external APIs. Providers are FastMCP server instances that register tools backed by services. Services are reusable outside MCP and independently testable.
 
-**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return formatted strings. Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `draft.py`, `deck.py`, `analysis.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`. `card_resolver.py` provides bulk-data-first card resolution with Scryfall fallback, used by `analysis.py` for rate-limit-friendly bulk lookups.
+**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return `WorkflowResult` objects (markdown + structured data). Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `commander_depth.py`, `draft.py`, `draft_limited.py`, `deck.py`, `analysis.py`, `building.py`, `constructed.py`, `validation.py`, `mana_base.py`, `pricing.py`, `rules.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`. `card_resolver.py` provides bulk-data-first card resolution with Scryfall fallback, used by `analysis.py` for rate-limit-friendly bulk lookups.
 
 **`types.py`**: Shared Pydantic models that services return and tools consume. Ensures type safety across the service → provider → workflow pipeline.
 

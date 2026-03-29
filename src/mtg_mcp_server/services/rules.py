@@ -300,11 +300,12 @@ class RulesService:
                 if section_match:
                     sections[section_match.group(1)] = section_match.group(2)
                     continue
-                # End of contents: hit "Glossary" or a numbered rule
-                if _RULE_NUMBER_RE.match(stripped) or stripped == "Glossary":
+                # End of contents: hit a numbered rule (fall through to process)
+                if _RULE_NUMBER_RE.match(stripped):
                     in_contents = False
-                    # Fall through to process this line
+                    # Fall through to process this line as a rule
                 else:
+                    # Skip non-section, non-rule lines in TOC (e.g. "Glossary", "Credits")
                     continue
 
             # Detect transition to glossary

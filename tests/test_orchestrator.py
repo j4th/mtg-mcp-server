@@ -328,7 +328,7 @@ class TestToolSchemaCompleteness:
         """Server exposes the expected number of tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
-        assert len(tools) == 40, f"Expected 40 tools, got {len(tools)}.\nTools: {tool_names}"
+        assert len(tools) == 51, f"Expected 51 tools, got {len(tools)}.\nTools: {tool_names}"
 
     async def test_no_context_parameter_exposed(self, mcp_client: Client):
         """No tool should expose 'ctx' (Context) as a user-visible parameter."""
@@ -350,7 +350,7 @@ class TestResourcePropagation:
     """Verify resource templates from mounted backends are visible on the orchestrator."""
 
     async def test_all_resource_templates_listed(self, mcp_client: Client):
-        """All 6 resource templates from backend providers are accessible."""
+        """All resource templates from backend providers are accessible."""
         templates = await mcp_client.list_resource_templates()
         uri_set = {t.uriTemplate for t in templates}
 
@@ -359,12 +359,18 @@ class TestResourcePropagation:
         expected_fragments = [
             "card/{name}",  # Scryfall card
             "rulings",  # Scryfall rulings
+            "set/{code}",  # Scryfall set
             "combo/{combo_id}",  # Spellbook combo
             "ratings",  # 17Lands ratings
             "staples",  # EDHREC staples
             "card-data/{name}",  # Scryfall bulk card-data
+            "format/{format}",  # Bulk format resources
+            "similar",  # Bulk similar cards
             "rules/{number}",  # Rules by number
             "glossary/{term}",  # Rules glossary
+            "theme/{theme}",  # Theme search
+            "tribe/{tribe}",  # Tribal staples
+            "signals",  # Draft signals
             # rules/keywords and rules/sections are static (no URI params)
             # so they appear in list_resources(), not list_resource_templates()
         ]
@@ -375,10 +381,10 @@ class TestResourcePropagation:
             )
 
     async def test_resource_template_count(self, mcp_client: Client):
-        """At least 6 resource templates are registered."""
+        """At least 16 resource templates are registered (18 total minus 2 static)."""
         templates = await mcp_client.list_resource_templates()
-        assert len(templates) >= 8, (
-            f"Expected >= 8 resource templates, got {len(templates)}.\n"
+        assert len(templates) >= 16, (
+            f"Expected >= 16 resource templates, got {len(templates)}.\n"
             f"Templates: {[t.uriTemplate for t in templates]}"
         )
 
@@ -405,6 +411,14 @@ class TestPromptCompleteness:
             "format_intro",
             "card_alternatives",
             "rules_question",
+            "build_around_deck",
+            "build_tribal_deck",
+            "build_theme_deck",
+            "upgrade_precon",
+            "sealed_session",
+            "draft_review",
+            "compare_commanders",
+            "rotation_plan",
         }
         assert expected.issubset(prompt_names), (
             f"Missing prompts: {expected - prompt_names}.\nAvailable: {prompt_names}"

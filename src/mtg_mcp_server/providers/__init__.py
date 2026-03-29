@@ -28,7 +28,9 @@ __all__ = [
     "TAGS_BUILD",
     "TAGS_COMBO",
     "TAGS_COMMANDER",
+    "TAGS_CONSTRUCTED",
     "TAGS_DRAFT",
+    "TAGS_LIMITED",
     "TAGS_LOOKUP",
     "TAGS_PRICING",
     "TAGS_RULES",
@@ -54,6 +56,8 @@ TAGS_PRICING = {"pricing", "stable"}
 TAGS_VALIDATE = {"validate", "all-formats", "stable"}
 TAGS_BUILD = {"build", "analyze", "all-formats", "stable"}
 TAGS_ALL_FORMATS = {"all-formats", "stable"}
+TAGS_CONSTRUCTED = {"constructed", "analysis", "stable"}
+TAGS_LIMITED = {"limited", "draft", "analysis", "stable"}
 TAGS_RULES = {"rules", "all-formats", "stable"}
 TAGS_BETA = {"beta"}
 
