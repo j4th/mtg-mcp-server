@@ -144,6 +144,145 @@ class TestValidationLive:
         assert "$" in text
 
 
+class TestRulesEngineLive:
+    """Hit the real rules engine (downloads Comprehensive Rules on first access)."""
+
+    async def test_rules_lookup_by_number(self, live_client):
+        result = await live_client.call_tool("rules_lookup", {"query": "704.5k"})
+        text = result.content[0].text
+        assert "704.5k" in text
+        assert "world" in text.lower()
+
+    async def test_keyword_explain(self, live_client):
+        result = await live_client.call_tool("keyword_explain", {"keyword": "deathtouch"})
+        text = result.content[0].text
+        assert "deathtouch" in text.lower()
+        assert "702" in text  # deathtouch rules section
+
+    async def test_rules_interaction(self, live_client):
+        result = await live_client.call_tool(
+            "rules_interaction", {"mechanic_a": "deathtouch", "mechanic_b": "trample"}
+        )
+        text = result.content[0].text
+        assert "deathtouch" in text.lower()
+        assert "trample" in text.lower()
+
+    async def test_rules_scenario(self, live_client):
+        result = await live_client.call_tool(
+            "rules_scenario",
+            {"scenario": "A 1/1 with deathtouch blocks a 5/5 creature"},
+        )
+        text = result.content[0].text
+        assert "deathtouch" in text.lower()
+
+    async def test_combat_calculator(self, live_client):
+        result = await live_client.call_tool(
+            "combat_calculator",
+            {"attackers": ["Typhoid Rats"], "blockers": ["Grizzly Bears"]},
+        )
+        text = result.content[0].text
+        assert "combat" in text.lower() or "damage" in text.lower()
+
+
+class TestDeckBuildingDepthLive:
+    """Branch B deck building tools against real data."""
+
+    async def test_build_around(self, live_client):
+        result = await live_client.call_tool(
+            "build_around",
+            {"cards": ["Muldrotha, the Gravetide"], "format": "commander"},
+        )
+        text = result.content[0].text
+        assert "Muldrotha" in text or len(text) > 100
+
+    async def test_complete_deck(self, live_client):
+        result = await live_client.call_tool(
+            "complete_deck",
+            {
+                "decklist": ["Sol Ring", "Spore Frog", "Sakura-Tribe Elder"],
+                "format": "commander",
+                "commander": "Muldrotha, the Gravetide",
+            },
+        )
+        text = result.content[0].text
+        assert len(text) > 100  # Should have gap analysis
+
+    async def test_precon_upgrade(self, live_client):
+        result = await live_client.call_tool(
+            "precon_upgrade",
+            {
+                "decklist": [
+                    "Sol Ring",
+                    "Spore Frog",
+                    "Sakura-Tribe Elder",
+                    "Mulldrifter",
+                    "Coiling Oracle",
+                    "Ravenous Chupacabra",
+                ],
+                "commander": "Muldrotha, the Gravetide",
+                "budget": 5.0,
+                "num_upgrades": 3,
+            },
+        )
+        text = result.content[0].text
+        assert len(text) > 50
+
+
+class TestLimitedLive:
+    """Branch B limited tools against real data."""
+
+    async def test_sealed_pool_build(self, live_client):
+        # Minimal pool — just enough to test the tool runs
+        pool = [
+            "Plains",
+            "Island",
+            "Swamp",
+            "Mountain",
+            "Forest",
+            "Serra Angel",
+            "Air Elemental",
+            "Doom Blade",
+            "Giant Growth",
+            "Lightning Bolt",
+            "Cancel",
+            "Grizzly Bears",
+            "Wind Drake",
+            "Glory Seeker",
+        ]
+        result = await live_client.call_tool("sealed_pool_build", {"pool": pool, "set_code": "FDN"})
+        text = result.content[0].text
+        assert len(text) > 50
+
+    async def test_draft_signal_read(self, live_client):
+        result = await live_client.call_tool(
+            "draft_signal_read",
+            {
+                "picks": ["Serra Angel", "Doom Blade", "Wind Drake"],
+                "set_code": "FDN",
+            },
+        )
+        text = result.content[0].text
+        assert "signal" in text.lower() or "color" in text.lower() or len(text) > 50
+
+    async def test_draft_log_review(self, live_client):
+        result = await live_client.call_tool(
+            "draft_log_review",
+            {
+                "picks": [
+                    "Serra Angel",
+                    "Doom Blade",
+                    "Wind Drake",
+                    "Lightning Bolt",
+                    "Grizzly Bears",
+                    "Cancel",
+                ],
+                "set_code": "FDN",
+            },
+        )
+        text = result.content[0].text
+        assert len(text) > 50
+
+
 class TestCrossFormatLive:
     """New cross-format tools against real data."""
 

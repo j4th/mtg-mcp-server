@@ -98,6 +98,86 @@ class TestParsing:
             first_rule = svc._rules.get("100.1")
             assert first_rule is not None
 
+    async def test_glossary_in_contents_section(self) -> None:
+        """Real WotC files list 'Glossary' and 'Credits' in Contents — parser must not
+        transition to glossary state from the TOC entry."""
+        fixture = _load_fixture_bytes().decode("utf-8-sig")
+        # Inject "Glossary" and "Credits" entries into the Contents section,
+        # matching the real Comprehensive Rules file structure.
+        # Only replace the FIRST occurrence (Contents entry), not the body header.
+        fixture = fixture.replace(
+            "7. Additional Rules\n\n1. Game Concepts",
+            "7. Additional Rules\n\nGlossary\n\nCredits\n\n1. Game Concepts",
+            1,
+        )
+        content = fixture.encode("utf-8-sig")
+        with respx.mock:
+            _mock_rules_download(respx, content=content)
+            svc = RulesService(rules_url=_RULES_URL, refresh_hours=168)
+            await svc.ensure_loaded()
+            assert len(svc._rules) > 0, "Parser found no rules — Glossary in TOC broke it"
+            assert svc._rules.get("100.1") is not None
+            assert svc._rules.get("704.5k") is not None
+            assert svc._glossary.get("deathtouch") is not None
+
+    async def test_cr_line_endings(self) -> None:
+        """WotC ships rules with bare CR (\\r) line endings — parser must handle them."""
+        fixture = _load_fixture_bytes().decode("utf-8-sig")
+        cr_content = fixture.replace("\r\n", "\n").replace("\n", "\r").encode("utf-8-sig")
+        with respx.mock:
+            _mock_rules_download(respx, content=cr_content)
+            svc = RulesService(rules_url=_RULES_URL, refresh_hours=168)
+            await svc.ensure_loaded()
+            assert len(svc._rules) > 0
+            assert svc._rules.get("100.1") is not None
+            assert svc._rules.get("704.5k") is not None
+            assert svc._glossary.get("deathtouch") is not None
+
+    async def test_crlf_line_endings(self) -> None:
+        """Parser handles CRLF (\\r\\n) line endings."""
+        fixture = _load_fixture_bytes().decode("utf-8-sig")
+        crlf_content = fixture.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8-sig")
+        with respx.mock:
+            _mock_rules_download(respx, content=crlf_content)
+            svc = RulesService(rules_url=_RULES_URL, refresh_hours=168)
+            await svc.ensure_loaded()
+            assert len(svc._rules) > 0
+            assert svc._rules.get("100.1") is not None
+            assert svc._glossary.get("deathtouch") is not None
+
+    async def test_mixed_line_endings(self) -> None:
+        """Parser handles mixed CR/CRLF/LF endings (real WotC files have this)."""
+        fixture = _load_fixture_bytes().decode("utf-8-sig")
+        lines = fixture.splitlines()
+        mixed_parts = []
+        for i, line in enumerate(lines):
+            if i % 3 == 0:
+                mixed_parts.append(line + "\r")
+            elif i % 3 == 1:
+                mixed_parts.append(line + "\r\n")
+            else:
+                mixed_parts.append(line + "\n")
+        mixed_content = "".join(mixed_parts).encode("utf-8-sig")
+        with respx.mock:
+            _mock_rules_download(respx, content=mixed_content)
+            svc = RulesService(rules_url=_RULES_URL, refresh_hours=168)
+            await svc.ensure_loaded()
+            assert len(svc._rules) > 0
+            assert svc._rules.get("704.5k") is not None
+
+    async def test_cr_paragraph_separators(self) -> None:
+        """Real WotC files use \\r\\r between paragraphs — parser must not choke."""
+        fixture = _load_fixture_bytes().decode("utf-8-sig")
+        # Replace blank lines (paragraph separators) with \r\r, rules with \r
+        cr_content = fixture.replace("\r\n", "\n").replace("\n\n", "\r\r").replace("\n", "\r")
+        cr_bytes = cr_content.encode("utf-8-sig")
+        with respx.mock:
+            _mock_rules_download(respx, content=cr_bytes)
+            svc = RulesService(rules_url=_RULES_URL, refresh_hours=168)
+            await svc.ensure_loaded()
+            assert len(svc._rules) > 0
+            assert svc._glossary.get("deathtouch") is not None
+
 
 # ---------------------------------------------------------------------------
 # lookup_by_number
