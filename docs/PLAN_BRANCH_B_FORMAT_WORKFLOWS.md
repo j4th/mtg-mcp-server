@@ -3,7 +3,7 @@
 > **Branch:** `feat/format-workflows`
 > **Base:** `feat/structured-output-rules` (Branch A)
 > **Prerequisite:** Branch A merged — all tools return `ToolResult`, Rules engine working, CodeMode ready
-> **Goal:** 11 new workflow tools + 8 prompts + 7 resources + comprehensive codebase review
+> **Goal:** 11 new workflow tools + 9 prompts + 7 resources + comprehensive codebase review
 > **Result:** 51 tools total, completing the v2.0 vision
 
 ## Context
@@ -43,6 +43,8 @@ Dispatch via `Agent` tool with `isolation: "worktree"`. Each agent gets a self-c
 | **Deck Building + Constructed** | `workflows/building.py`, `workflows/constructed.py`, `tests/workflows/test_building.py`, `tests/workflows/test_constructed.py` | `theme_search` (mechanical/tribal/abstract theme -> oracle text patterns), `build_around` (synergy detection from 1-5 cards), `complete_deck` (gap analysis + suggestions), `rotation_check` (Standard rotation tracking). Internal dependency: `build_around` and `complete_deck` call `theme_search`. |
 | **Commander Depth** | `workflows/commander_depth.py`, `tests/workflows/test_commander_depth.py` | `commander_comparison` (2-5 commanders side-by-side), `tribal_staples` (best cards for a creature type), `precon_upgrade` (MVP: decklist + commander, not precon name), `color_identity_staples` (top cards in a color identity). Import formatting helpers from existing `commander.py`. |
 | **Limited Expansion** | `workflows/draft_limited.py`, `tests/workflows/test_draft_limited.py` | `sealed_pool_build` (pool -> 1-3 deck builds), `draft_signal_read` (ALSA-based color openness signals), `draft_log_review` (pick-by-pick GIH WR analysis). Import helpers from existing `draft.py`. |
+
+**Additional prompt (scaffold phase):** `build_around_deck` — format-agnostic "build a deck around these cards/concept" prompt. Routes through `theme_search` (if concept) → `build_around` → `rotation_check` (if Standard) → `complete_deck` → `deck_validate`. Covers the "build around a win con or card" use case for Standard, Pioneer, Modern, etc.
 
 **Each agent must:**
 - Follow TDD (failing test first, per CLAUDE.md)
