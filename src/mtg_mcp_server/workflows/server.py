@@ -26,9 +26,12 @@ from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import (
     TAGS_BUILD,
     TAGS_COMMANDER,
+    TAGS_CONSTRUCTED,
     TAGS_DRAFT,
+    TAGS_LIMITED,
     TAGS_PRICING,
     TAGS_RULES,
+    TAGS_SEARCH,
     TAGS_VALIDATE,
     TOOL_ANNOTATIONS,
 )
@@ -470,6 +473,504 @@ async def set_overview(
         return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"17Lands error: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Deck Building Workflow Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH | TAGS_BUILD)
+async def theme_search(
+    theme: Annotated[
+        str,
+        Field(
+            description="Theme to search for — mechanical (aristocrats, voltron, tokens), tribal (goblin, merfolk), or abstract (music, death, ocean)"
+        ),
+    ],
+    color_identity: Annotated[
+        str | None, Field(description="Color identity filter (e.g. 'sultai', 'BUG', 'WR')")
+    ] = None,
+    format: Annotated[
+        str | None,
+        Field(description="Format legality filter (e.g. 'standard', 'modern', 'commander')"),
+    ] = None,
+    max_price: Annotated[float | None, Field(description="Maximum card price in USD")] = None,
+    limit: Annotated[int, Field(description="Maximum number of results")] = 20,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Find cards matching a theme — mechanical, tribal, or abstract/flavorful.
+
+    Maps themes to oracle text patterns and searches bulk data. Groups results
+    by relevance tier (strong match, moderate match, flavor match).
+    """
+    from mtg_mcp_server.workflows.building import theme_search as impl
+
+    if not theme.strip():
+        raise ToolError("Theme cannot be empty.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    theme,
+                    bulk=_require_bulk(),
+                    edhrec=_edhrec,
+                    color_identity=color_identity,
+                    format=format,
+                    max_price=max_price,
+                    limit=limit,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"theme_search failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BUILD)
+async def build_around(
+    cards: Annotated[list[str], Field(description="1-5 card names to build around")],
+    format: Annotated[
+        str,
+        Field(description="Format to build for (e.g. 'standard', 'modern', 'commander')"),
+    ],
+    budget: Annotated[float | None, Field(description="Maximum price per card in USD")] = None,
+    limit: Annotated[int, Field(description="Maximum number of suggestions")] = 20,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Find synergistic cards for 1-5 build-around cards in any format.
+
+    Analyzes oracle text for key mechanics, searches for synergies,
+    and checks combo potential. Groups results by role (enablers, payoffs, support).
+    """
+    from mtg_mcp_server.workflows.building import build_around as impl
+
+    cards = list(dict.fromkeys(cards))
+    if not cards:
+        raise ToolError("Provide at least 1 card to build around.")
+    if len(cards) > 5:
+        raise ToolError("Maximum 5 build-around cards.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    cards,
+                    format,
+                    bulk=_require_bulk(),
+                    spellbook=_require_spellbook(),
+                    edhrec=_edhrec,
+                    budget=budget,
+                    limit=limit,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except CardNotFoundError as exc:
+        raise ToolError(f"{exc}. Check spelling.") from exc
+    except ServiceError as exc:
+        raise ToolError(f"build_around failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_BUILD)
+async def complete_deck(
+    decklist: Annotated[
+        list[str], Field(description="Partial decklist — card names already chosen")
+    ],
+    format: Annotated[
+        str,
+        Field(description="Format to build for (e.g. 'standard', 'modern', 'commander')"),
+    ],
+    commander: Annotated[
+        str | None, Field(description="Commander name (required for Commander format)")
+    ] = None,
+    budget: Annotated[
+        float | None, Field(description="Maximum price per suggested card in USD")
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+    *,
+    ctx: Context,
+) -> ToolResult:
+    """Identify gaps in a partial decklist and suggest cards to fill them.
+
+    Analyzes mana curve, card roles, and format-specific ratios, then suggests
+    cards for underrepresented categories.
+    """
+    from mtg_mcp_server.workflows.building import complete_deck as impl
+
+    if not decklist:
+        raise ToolError("Provide at least one card in the decklist.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    decklist,
+                    format,
+                    bulk=_require_bulk(),
+                    edhrec=_edhrec,
+                    commander=commander,
+                    budget=budget,
+                    on_progress=lambda step, total: _progress(ctx, step, total),
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"complete_deck failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Commander Depth Workflow Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER)
+async def commander_comparison(
+    commanders: Annotated[
+        list[str], Field(description="2-5 commander names to compare head-to-head")
+    ],
+    ctx: Context,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Compare 2-5 commanders head-to-head: stats, combos, staples, popularity.
+
+    Side-by-side comparison table with mana cost, color identity, EDHREC rank,
+    combo count, and shared/unique staples.
+    """
+    from mtg_mcp_server.workflows.commander_depth import commander_comparison as impl
+
+    commanders = list(dict.fromkeys(commanders))
+    if len(commanders) < 2:
+        raise ToolError("Provide at least 2 commanders to compare.")
+    if len(commanders) > 5:
+        raise ToolError("Maximum 5 commanders can be compared.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    commanders,
+                    bulk=_require_bulk(),
+                    spellbook=_require_spellbook(),
+                    edhrec=_edhrec,
+                    on_progress=lambda step, total: _progress(ctx, step, total),
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except CardNotFoundError as exc:
+        raise ToolError(f"{exc}. Check spelling.") from exc
+    except ServiceError as exc:
+        raise ToolError(f"commander_comparison failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER | TAGS_SEARCH)
+async def tribal_staples(
+    tribe: Annotated[str, Field(description="Creature type (e.g. 'Goblin', 'Merfolk', 'Samurai')")],
+    color_identity: Annotated[
+        str | None, Field(description="Color identity filter (e.g. 'sultai', 'WR')")
+    ] = None,
+    format: Annotated[
+        str | None, Field(description="Format legality filter (e.g. 'commander', 'modern')")
+    ] = None,
+    limit: Annotated[int, Field(description="Maximum number of results")] = 20,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Best cards for a creature type — lords, synergy pieces, and top members.
+
+    Groups results by: lords/anthems, tribal synergy, best members, tribal support.
+    """
+    from mtg_mcp_server.workflows.commander_depth import tribal_staples as impl
+
+    if not tribe.strip():
+        raise ToolError("Tribe cannot be empty.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    tribe,
+                    bulk=_require_bulk(),
+                    edhrec=_edhrec,
+                    color_identity=color_identity,
+                    format=format,
+                    limit=limit,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"tribal_staples failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER | TAGS_BUILD)
+async def precon_upgrade(
+    decklist: Annotated[list[str], Field(description="Full precon decklist — card names")],
+    commander: Annotated[str, Field(description="Commander card name")],
+    budget: Annotated[float, Field(description="Maximum price per upgrade card in USD")] = 50.0,
+    num_upgrades: Annotated[int, Field(description="Number of upgrade suggestions")] = 10,
+    ctx: Context = None,  # type: ignore[assignment]
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Analyze and upgrade a Commander precon — identify weakest cards, suggest replacements.
+
+    Pairs each upgrade with a specific cut, explaining the synergy improvement.
+    """
+    from mtg_mcp_server.workflows.commander_depth import precon_upgrade as impl
+
+    if not decklist:
+        raise ToolError("Provide the precon decklist.")
+    if not commander.strip():
+        raise ToolError("Commander name cannot be empty.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    decklist,
+                    commander,
+                    bulk=_require_bulk(),
+                    spellbook=_require_spellbook(),
+                    edhrec=_edhrec,
+                    budget=budget,
+                    num_upgrades=num_upgrades,
+                    on_progress=lambda step, total: _progress(ctx, step, total) if ctx else None,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except CardNotFoundError as exc:
+        raise ToolError(f"{exc}. Check spelling.") from exc
+    except ServiceError as exc:
+        raise ToolError(f"precon_upgrade failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMMANDER | TAGS_SEARCH)
+async def color_identity_staples(
+    color_identity: Annotated[
+        str,
+        Field(description="Color identity (e.g. 'sultai', 'BUG', 'WR', 'mono-red')"),
+    ],
+    category: Annotated[
+        str | None,
+        Field(description="Card category filter (e.g. 'creatures', 'instants', 'lands')"),
+    ] = None,
+    limit: Annotated[int, Field(description="Maximum number of results")] = 20,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Top cards across ALL commanders in a color identity.
+
+    Uses EDHREC aggregated data when available, falls back to EDHREC rank from bulk data.
+    """
+    from mtg_mcp_server.workflows.commander_depth import color_identity_staples as impl
+
+    if not color_identity.strip():
+        raise ToolError("Color identity cannot be empty.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    color_identity,
+                    bulk=_require_bulk(),
+                    edhrec=_edhrec,
+                    category=category,
+                    limit=limit,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"color_identity_staples failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Limited Expansion Workflow Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LIMITED | TAGS_BUILD)
+async def sealed_pool_build(
+    pool: Annotated[
+        list[str], Field(description="Card names in the sealed pool (typically 84-90)")
+    ],
+    set_code: Annotated[str, Field(description="Three-letter set code (e.g. 'LCI', 'MKM')")],
+    ctx: Context,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Build 1-3 decks from a sealed pool using card quality and color pair analysis.
+
+    Evaluates each 2-color pair, selects best cards, and suggests land splits.
+    Uses 17Lands data when available for card quality scoring.
+    """
+    from mtg_mcp_server.workflows.draft_limited import sealed_pool_build as impl
+
+    if not pool:
+        raise ToolError("Provide at least one card in the sealed pool.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    pool,
+                    set_code,
+                    bulk=_require_bulk(),
+                    seventeen_lands=_seventeen_lands,
+                    on_progress=lambda step, total: _progress(ctx, step, total),
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"sealed_pool_build failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LIMITED)
+async def draft_signal_read(
+    picks: Annotated[list[str], Field(description="Cards already drafted, in pick order")],
+    set_code: Annotated[str, Field(description="Three-letter set code (e.g. 'LCI', 'MKM')")],
+    current_pack: Annotated[
+        list[str] | None,
+        Field(
+            description="Current pack contents — if provided, cards are ranked with signal context"
+        ),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Analyze draft picks and recommend a direction based on color signals.
+
+    Uses ALSA data to detect which colors are open (cards seen later than expected = open).
+    """
+    from mtg_mcp_server.workflows.draft_limited import draft_signal_read as impl
+
+    if not picks:
+        raise ToolError("Provide at least one pick.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    picks,
+                    set_code,
+                    bulk=_require_bulk(),
+                    seventeen_lands=_require_seventeen_lands(),
+                    current_pack=current_pack,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"draft_signal_read failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LIMITED)
+async def draft_log_review(
+    picks: Annotated[
+        list[str],
+        Field(description="Cards drafted in order (pack 1 pick 1 through pack 3 pick 14)"),
+    ],
+    set_code: Annotated[str, Field(description="Three-letter set code (e.g. 'LCI', 'MKM')")],
+    final_deck: Annotated[
+        list[str] | None,
+        Field(description="Final deck submitted — enables 'made the deck' analysis"),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Review a completed draft — pick-by-pick GIH WR analysis and key decision points.
+
+    Identifies where you could have taken a higher-WR card, pivot points,
+    and overall draft grade.
+    """
+    from mtg_mcp_server.workflows.draft_limited import draft_log_review as impl
+
+    if not picks:
+        raise ToolError("Provide at least one pick.")
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    picks,
+                    set_code,
+                    bulk=_require_bulk(),
+                    seventeen_lands=_require_seventeen_lands(),
+                    final_deck=final_deck,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"draft_log_review failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Constructed Format Workflow Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def rotation_check(
+    cards: Annotated[
+        list[str] | None,
+        Field(description="Card names to check for rotation — omit for general rotation info"),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Check Standard rotation status and identify which cards are rotating.
+
+    Shows sets currently in Standard with rotation dates. If cards provided,
+    identifies which are in rotating sets and suggests replacements.
+    """
+    from mtg_mcp_server.workflows.constructed import rotation_check as impl
+
+    try:
+        return ToolResult(
+            **(
+                await impl(
+                    scryfall=_require_scryfall(),
+                    bulk=_require_bulk(),
+                    cards=cards,
+                    response_format=response_format,
+                )
+            )._asdict()
+        )
+    except ServiceError as exc:
+        raise ToolError(f"rotation_check failed: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -1041,3 +1542,275 @@ Include the exact rule text for the most important rules.
 Important: MTG rules can be counterintuitive. Always cite the specific rule —
 never guess or assume based on "how it should work."
 """
+
+
+# ---------------------------------------------------------------------------
+# Format Workflow Prompts
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.prompt()
+def build_around_deck(
+    cards: Annotated[str, Field(description="Card names or win condition concept to build around")],
+    format: Annotated[
+        str, Field(description="Format to build for (e.g. 'standard', 'modern', 'commander')")
+    ],
+    budget: Annotated[float | None, Field(description="Max price per card in USD")] = None,
+) -> str:
+    """Build a deck around specific cards or a win condition in any format."""
+    budget_line = f" under ${budget:.2f} per card" if budget else ""
+    rotation_step = ""
+    if format.lower() == "standard":
+        rotation_step = """
+Step 3: Use rotation_check with key cards to ensure nothing rotates soon.
+  - Flag any cards rotating within 3 months.
+  - Suggest non-rotating alternatives if found.
+"""
+    return f"""Build a {format} deck around: {cards}{budget_line}.
+
+Step 1: Determine if this is a specific card or a concept:
+  - If specific cards: use build_around with those cards and format="{format}"
+  - If a concept/strategy: use theme_search to find the key payoff cards first,
+    then use build_around with those payoffs
+
+Step 2: From the synergy suggestions, assemble a core shell:
+  - Enablers: cards that set up the win condition
+  - Payoffs: cards that benefit from the strategy
+  - Protection/interaction: cards that protect the plan or disrupt opponents
+{rotation_step}
+Step {"4" if rotation_step else "3"}: Use complete_deck to fill remaining slots:
+  - Mana curve appropriate for {format}
+  - {"4x copies of key cards, format-legal" if format.lower() != "commander" else "Singleton requirement, color identity legal"}
+  {"- Budget: only suggest cards under $" + f"{budget:.2f}" if budget else ""}
+
+Step {"5" if rotation_step else "4"}: Use deck_validate to verify legality for {format}.
+
+Step {"6" if rotation_step else "5"}: Use suggest_mana_base for the land base.
+
+Present: final decklist with categories, total cost, and key synergy explanations."""
+
+
+@workflow_mcp.prompt()
+def build_tribal_deck(
+    tribe: Annotated[
+        str, Field(description="Creature type to build around (e.g. 'Goblin', 'Merfolk')")
+    ],
+    format: Annotated[str, Field(description="Format (e.g. 'commander', 'modern')")],
+    commander: Annotated[
+        str | None, Field(description="Commander name (for Commander format)")
+    ] = None,
+    budget: Annotated[float | None, Field(description="Max price per card in USD")] = None,
+) -> str:
+    """Build a tribal deck for any format."""
+    budget_line = f" under ${budget:.2f} per card" if budget else ""
+    cmdr_line = f"\nCommander: {commander}" if commander else ""
+    return f"""Build a {tribe} tribal deck for {format}{budget_line}.{cmdr_line}
+
+Step 1: Use tribal_staples to find the best {tribe} cards:
+  - Lords and anthems
+  - Tribal synergy pieces
+  - Best creatures of the type
+  - Universal tribal support (Kindred cards, "choose a creature type" effects)
+
+Step 2: Use build_around with the top 3-5 tribal payoffs and format="{format}".
+
+Step 3: Use suggest_mana_base to build the land base.
+
+Step 4: Use deck_validate to verify legality for {format}.
+
+Present: decklist with tribal density analysis, key synergies, and total cost."""
+
+
+@workflow_mcp.prompt()
+def build_theme_deck(
+    theme: Annotated[
+        str, Field(description="Deck theme (e.g. 'aristocrats', 'voltron', 'tokens', 'mill')")
+    ],
+    format: Annotated[str, Field(description="Format (e.g. 'standard', 'commander', 'modern')")],
+    color_identity: Annotated[
+        str | None, Field(description="Color constraint (e.g. 'sultai', 'WR')")
+    ] = None,
+    budget: Annotated[float | None, Field(description="Max price per card in USD")] = None,
+) -> str:
+    """Build a themed deck around a strategy or archetype."""
+    budget_line = f" under ${budget:.2f} per card" if budget else ""
+    color_line = f" in {color_identity}" if color_identity else ""
+    return f"""Build a {theme} deck for {format}{color_line}{budget_line}.
+
+Step 1: Use theme_search with theme="{theme}" to discover cards that fit:
+  - Look at strong matches (mechanically relevant oracle text)
+  - Note moderate matches (type line or partial oracle text)
+  - Consider flavor matches if building for fun
+
+Step 2: Use build_around with the top theme payoffs and format="{format}".
+
+Step 3: Use complete_deck to fill gaps:
+  - Ensure sufficient removal, card draw, ramp
+  - Balance curve for the format
+
+Step 4: Use deck_validate to verify legality.
+
+Step 5: Use suggest_mana_base for the land base.
+
+Present: final decklist organized by role, with theme density analysis."""
+
+
+@workflow_mcp.prompt()
+def upgrade_precon(
+    commander: Annotated[str, Field(description="Commander of the precon")],
+    budget: Annotated[float, Field(description="Total upgrade budget in USD")],
+) -> str:
+    """Guide upgrading a Commander precon."""
+    return f"""Upgrade the {commander} precon within a ${budget:.2f} total budget.
+
+The user should provide their full precon decklist. If they haven't, ask for it.
+
+Step 1: Use commander_overview to understand {commander}'s strategy and key synergies.
+
+Step 2: Use deck_analysis with the full precon decklist to identify:
+  - Mana curve issues
+  - Color pip requirements vs land base
+  - Combo density and bracket estimate
+
+Step 3: Use suggest_cuts to find the weakest cards in the precon.
+
+Step 4: Use precon_upgrade with the decklist, commander, and budget
+  to get paired upgrade suggestions (card in → card out).
+
+Step 5: Verify the upgraded list with deck_validate.
+
+Present: prioritized upgrade list with total cost, explaining each swap."""
+
+
+@workflow_mcp.prompt()
+def sealed_session(
+    set_code: Annotated[str, Field(description="Set code for the sealed format (e.g. 'LCI')")],
+) -> str:
+    """Guide a sealed deck building session."""
+    return f"""Sealed deck building session for {set_code}.
+
+The user should provide their sealed pool (84-90 card names from 6 packs).
+If they haven't, ask them to list their pool.
+
+Step 1: Use sealed_pool_build with the pool and set_code="{set_code}".
+  This will suggest 1-3 builds with color pairs, decklists, and mana curves.
+
+Step 2: For the recommended build:
+  - Explain why this color pair is strongest (card quality, curve, bombs)
+  - Highlight key cards and synergies
+  - Note sideboard options for tough matchups
+
+Step 3: If 17Lands data is available:
+  - Note which of the suggested cards have the best GIH WR
+  - Flag any cards that look good on paper but underperform statistically
+  - Check the archetype win rate for the suggested colors
+
+Help the user finalize their 40-card deck and plan sideboard adjustments."""
+
+
+@workflow_mcp.prompt()
+def draft_review(
+    set_code: Annotated[str, Field(description="Set code for the draft format (e.g. 'LCI')")],
+) -> str:
+    """Guide a post-draft review session."""
+    return f"""Post-draft review session for {set_code}.
+
+The user should provide their draft picks in order (P1P1 through P3P14).
+Optionally, they can also provide their final submitted deck.
+
+Step 1: Use draft_log_review with the picks and set_code="{set_code}".
+  This provides pick-by-pick GIH WR analysis.
+
+Step 2: Analyze key decision points:
+  - Where did you pass a significantly higher-WR card?
+  - When did you commit to colors? Was it the right time?
+  - Were there clear signals you missed or correctly read?
+
+Step 3: If final deck provided:
+  - What % of picks made the maindeck?
+  - Were there sideboard cards that should have been maindeck?
+  - Any cards that shouldn't have made the cut?
+
+Step 4: Use draft_signal_read with the first 6-8 picks to retroactively analyze
+  what colors were actually open during pack 1.
+
+Provide a draft grade and 2-3 specific improvements for next time."""
+
+
+@workflow_mcp.prompt()
+def compare_commanders(
+    commanders: Annotated[
+        str, Field(description="Comma-separated commander names to compare (2-5)")
+    ],
+) -> str:
+    """Compare commanders to help choose which to build."""
+    return f"""Compare these commanders: {commanders}
+
+Step 1: Use commander_comparison to get the side-by-side data:
+  - Stats, color identity, EDHREC popularity
+  - Combo count per commander
+  - Shared vs unique staples
+
+Step 2: For each commander, briefly note:
+  - Primary strategy and win conditions
+  - Power ceiling and floor
+  - Budget entry point (are the key cards expensive?)
+
+Step 3: Use spellbook_find_combos for each commander to compare combo density.
+
+Step 4: Recommendation:
+  - Which is most powerful? Most fun? Most budget-friendly?
+  - Which has the most room for personal expression vs solved builds?
+  - Match recommendation to the user's stated preferences if given.
+
+Give a clear recommendation with reasoning."""
+
+
+@workflow_mcp.prompt()
+def rotation_plan() -> str:
+    """Guide Standard rotation preparation."""
+    return """Standard rotation planning session.
+
+Step 1: Use rotation_check to see what sets are currently in Standard
+  and which are next to rotate.
+
+Step 2: If the user has a Standard deck, ask them to provide the decklist.
+  Use rotation_check with their card list to identify rotating cards.
+
+Step 3: For each rotating card:
+  - How critical is it to the deck's strategy?
+  - Use bulk_similar_cards to find replacements from non-rotating sets
+  - Use price_comparison to check prices of replacements
+
+Step 4: Assessment:
+  - How many cards rotate? Is the deck's core intact post-rotation?
+  - Estimated cost to replace rotating cards
+  - Should the user pivot to a different strategy?
+
+Present: rotation impact summary, replacement plan with costs, and recommendation."""
+
+
+# ---------------------------------------------------------------------------
+# Format Workflow Resources
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.resource("mtg://theme/{theme}")
+async def get_theme_mappings(theme: str) -> dict[str, object]:
+    """Theme keyword mappings — oracle text patterns that define a theme."""
+    # Populated by building.py when implemented
+    return {"theme": theme, "error": "Theme mappings not yet implemented"}
+
+
+@workflow_mcp.resource("mtg://tribe/{tribe}/staples")
+async def get_tribe_staples(tribe: str) -> dict[str, object]:
+    """Top cards for a creature type."""
+    # Populated by commander_depth.py when implemented
+    return {"tribe": tribe, "error": "Tribal staples not yet implemented"}
+
+
+@workflow_mcp.resource("mtg://draft/{set_code}/signals")
+async def get_draft_signals(set_code: str) -> dict[str, object]:
+    """Color openness heuristics for a draft format."""
+    # Populated by draft_limited.py when implemented
+    return {"set_code": set_code, "error": "Draft signals not yet implemented"}

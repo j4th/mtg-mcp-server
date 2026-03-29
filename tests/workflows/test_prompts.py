@@ -31,10 +31,10 @@ class TestPromptRegistration:
         assert "find_upgrades" in prompt_names
 
     async def test_prompt_count(self, mcp_client: Client):
-        """Exactly 9 prompts registered on the workflow server."""
+        """Exactly 17 prompts registered on the workflow server."""
         prompts = await mcp_client.list_prompts()
-        # 4 existing + 4 cross-format + 1 rules prompt
-        assert len(prompts) == 9
+        # 4 original + 4 cross-format + 1 rules + 8 format workflow prompts = 17
+        assert len(prompts) == 17
 
 
 # ---------------------------------------------------------------------------
