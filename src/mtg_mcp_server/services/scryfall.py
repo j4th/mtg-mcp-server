@@ -147,6 +147,22 @@ class ScryfallClient(BaseClient):
         return [Ruling.model_validate(r) for r in data["data"]]
 
     @async_cached(_sets_cache, key=_method_key)
+    async def get_sets(self) -> list[SetInfo]:
+        """List all Magic sets.
+
+        Returns:
+            List of SetInfo models.
+
+        Raises:
+            ScryfallError: On API errors.
+        """
+        try:
+            response = await self._get("/sets")
+        except ServiceError as exc:
+            raise ScryfallError(exc.message, status_code=exc.status_code) from exc
+        return [SetInfo.model_validate(s) for s in response.json()["data"]]
+
+    @async_cached(_sets_cache, key=_method_key)
     async def get_set(self, set_code: str) -> SetInfo:
         """Get set metadata by code.
 

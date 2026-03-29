@@ -31,6 +31,8 @@ __all__ = [
     "EDHRECCard",
     "EDHRECCardList",
     "EDHRECCommanderData",
+    "GlossaryEntry",
+    "Rule",
     "Ruling",
     "SetInfo",
 ]
@@ -343,3 +345,27 @@ class EDHRECCommanderData(BaseModel):
     commander_name: str
     cardlists: list[EDHRECCardList] = Field(default_factory=list)
     total_decks: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Comprehensive Rules
+# ---------------------------------------------------------------------------
+
+
+class Rule(BaseModel):
+    """A single rule from the MTG Comprehensive Rules.
+
+    Rule numbers follow the pattern ``section.subsection[letter]``
+    (e.g. ``"100.1"``, ``"704.5k"``).  Subrules are nested children.
+    """
+
+    number: str
+    text: str
+    subrules: list[Rule] = Field(default_factory=list)
+
+
+class GlossaryEntry(BaseModel):
+    """A glossary term from the MTG Comprehensive Rules."""
+
+    term: str
+    definition: str

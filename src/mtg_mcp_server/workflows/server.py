@@ -19,6 +19,7 @@ import structlog
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from mtg_mcp_server.config import Settings
@@ -27,11 +28,13 @@ from mtg_mcp_server.providers import (
     TAGS_COMMANDER,
     TAGS_DRAFT,
     TAGS_PRICING,
+    TAGS_RULES,
     TAGS_VALIDATE,
     TOOL_ANNOTATIONS,
 )
 from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient
+from mtg_mcp_server.services.rules import RulesService
 from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
@@ -45,6 +48,7 @@ _spellbook: SpellbookClient | None = None
 _seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
 _bulk: ScryfallBulkClient | None = None
+_rules: RulesService | None = None
 
 
 @lifespan
@@ -56,7 +60,7 @@ async def workflow_lifespan(server: FastMCP):
     when their corresponding ``Settings`` flag is enabled. All clients are torn down
     when the server shuts down.
     """
-    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk
+    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk, _rules
     settings = Settings()
     async with AsyncExitStack() as stack:
         _scryfall = await stack.enter_async_context(
@@ -80,12 +84,18 @@ async def workflow_lifespan(server: FastMCP):
             )
             _bulk = await stack.enter_async_context(client)
             _bulk.start_background_refresh()
+        if settings.enable_rules:
+            _rules = RulesService(
+                rules_url=settings.rules_url,
+                refresh_hours=settings.rules_refresh_hours,
+            )
         yield {}
     _scryfall = None
     _spellbook = None
     _seventeen_lands = None
     _edhrec = None
     _bulk = None
+    _rules = None
 
 
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan, mask_error_details=True)
@@ -124,6 +134,13 @@ def _require_bulk() -> ScryfallBulkClient:
     if _bulk is None:
         raise ToolError("Bulk data is not enabled. Set MTG_MCP_ENABLE_BULK_DATA=true.")
     return _bulk
+
+
+def _require_rules() -> RulesService:
+    """Return rules service or raise ToolError if the feature flag is off."""
+    if _rules is None:
+        raise ToolError("Rules engine is not enabled. Set MTG_MCP_ENABLE_RULES=true.")
+    return _rules
 
 
 _log = structlog.get_logger(service="workflows")
@@ -783,3 +800,225 @@ Step 4: Evaluate each alternative:
   - Format legality confirmed?
 
 Rank the top 3-5 alternatives with reasoning and price."""
+
+
+# ---------------------------------------------------------------------------
+# Rules Engine Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def rules_lookup(
+    query: Annotated[
+        str, Field(description="Rule number (e.g. '704.5k') or keyword to search for")
+    ],
+    section: Annotated[
+        str | None,
+        Field(
+            description="Narrow search to a section (e.g. 'combat', 'stack', 'lands', 'state-based')"
+        ),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Look up MTG Comprehensive Rules by number or keyword search.
+
+    Returns matching rules with full text, parent context, and subrules.
+    """
+    from mtg_mcp_server.workflows.rules import rules_lookup as impl
+
+    try:
+        result = await impl(
+            query,
+            section=section,
+            rules=_require_rules(),
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"rules_lookup failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def keyword_explain(
+    keyword: Annotated[
+        str, Field(description="MTG keyword to explain (e.g. 'trample', 'deathtouch')")
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Explain an MTG keyword with rules text, examples, and interactions.
+
+    Returns the rules definition, reminder text, and up to 5 example cards from bulk data.
+    """
+    from mtg_mcp_server.workflows.rules import keyword_explain as impl
+
+    try:
+        result = await impl(
+            keyword,
+            rules=_require_rules(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"keyword_explain failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def rules_interaction(
+    mechanic_a: Annotated[str, Field(description="First mechanic or card name")],
+    mechanic_b: Annotated[str, Field(description="Second mechanic or card name")],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Explain how two mechanics or cards interact under MTG rules.
+
+    Returns relevant rules, step-by-step resolution, and common misconceptions.
+    """
+    from mtg_mcp_server.workflows.rules import rules_interaction as impl
+
+    try:
+        result = await impl(
+            mechanic_a,
+            mechanic_b,
+            rules=_require_rules(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"rules_interaction failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def rules_scenario(
+    scenario: Annotated[
+        str, Field(description="Game scenario to resolve (describe the board state and action)")
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Resolve a game scenario step-by-step using MTG rules.
+
+    Covers priority, stack resolution, state-based actions, and triggers with rule citations.
+    """
+    from mtg_mcp_server.workflows.rules import rules_scenario as impl
+
+    try:
+        result = await impl(
+            scenario,
+            rules=_require_rules(),
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"rules_scenario failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def combat_calculator(
+    attackers: Annotated[list[str], Field(description="Attacking creature names or descriptions")],
+    blockers: Annotated[list[str], Field(description="Blocking creature names or descriptions")],
+    keywords: Annotated[
+        list[str] | None,
+        Field(
+            description="Additional keyword abilities to consider (e.g. 'deathtouch', 'trample')"
+        ),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Calculate combat step-by-step with keyword interactions.
+
+    Resolves declare attackers → declare blockers → damage steps → state-based actions.
+    Looks up card keywords from bulk data if card names are provided.
+    """
+    from mtg_mcp_server.workflows.rules import combat_calculator as impl
+
+    try:
+        result = await impl(
+            attackers,
+            blockers,
+            keywords=keywords,
+            rules=_require_rules(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"combat_calculator failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Rules Resources
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.resource("mtg://rules/{number}")
+async def get_rule(number: str) -> dict:
+    """Rule text by number (e.g. mtg://rules/704.5k)."""
+    rules = _require_rules()
+    rule = await rules.lookup_by_number(number)
+    return rule.model_dump(mode="json") if rule else {"error": f"Rule {number} not found"}
+
+
+@workflow_mcp.resource("mtg://rules/glossary/{term}")
+async def get_glossary_term(term: str) -> dict:
+    """Glossary definition by term."""
+    rules = _require_rules()
+    entry = await rules.glossary_lookup(term)
+    return entry.model_dump(mode="json") if entry else {"error": f"Term '{term}' not found"}
+
+
+@workflow_mcp.resource("mtg://rules/keywords")
+async def list_keywords() -> list[dict]:
+    """All keywords with brief definitions."""
+    rules = _require_rules()
+    return await rules.list_keywords()
+
+
+@workflow_mcp.resource("mtg://rules/sections")
+async def list_sections() -> list[dict]:
+    """Section index for the Comprehensive Rules."""
+    rules = _require_rules()
+    return await rules.list_sections()
+
+
+# ---------------------------------------------------------------------------
+# Rules Prompt
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.prompt()
+def rules_question(
+    question: Annotated[str, Field(description="The rules question to answer")],
+) -> str:
+    """Guide for answering an MTG rules question with citations."""
+    return f"""Answer this MTG rules question: {question}
+
+Step 1: Use rules_lookup to find the relevant rules. Try rule numbers if specific,
+or keyword search for the mechanic/concept in question.
+
+Step 2: If the question mentions specific cards, use scryfall_card_details or
+bulk_card_lookup to get their oracle text and keywords.
+
+Step 3: If the question involves keyword interactions, use keyword_explain
+for each keyword involved, then rules_interaction for the combination.
+
+Step 4: Explain the answer in plain language, citing specific rule numbers.
+Include the exact rule text for the most important rules.
+
+Important: MTG rules can be counterintuitive. Always cite the specific rule —
+never guess or assume based on "how it should work."
+"""

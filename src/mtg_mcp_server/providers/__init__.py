@@ -31,6 +31,7 @@ __all__ = [
     "TAGS_DRAFT",
     "TAGS_LOOKUP",
     "TAGS_PRICING",
+    "TAGS_RULES",
     "TAGS_SEARCH",
     "TAGS_VALIDATE",
     "TOOL_ANNOTATIONS",
@@ -53,6 +54,7 @@ TAGS_PRICING = {"pricing", "stable"}
 TAGS_VALIDATE = {"validate", "all-formats", "stable"}
 TAGS_BUILD = {"build", "analyze", "all-formats", "stable"}
 TAGS_ALL_FORMATS = {"all-formats", "stable"}
+TAGS_RULES = {"rules", "all-formats", "stable"}
 TAGS_BETA = {"beta"}
 
 # Attribution lines appended to tool outputs. These ensure compliance with
