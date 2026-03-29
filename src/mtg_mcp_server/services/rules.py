@@ -92,14 +92,17 @@ class RulesService:
                     glossary_count=len(self._glossary),
                     section_count=len(self._sections),
                 )
-            except (RulesError, Exception) as exc:
+            except RulesError:
                 if is_refresh:
                     log.warning("rules.refresh_failed", exc_info=True)
-                    # Retry sooner: 5 min from now instead of full interval
                     self._loaded_at = time.monotonic() - self._refresh_seconds + 300
                     return
-                if isinstance(exc, RulesError):
-                    raise
+                raise
+            except Exception as exc:
+                if is_refresh:
+                    log.warning("rules.refresh_failed", exc_info=True)
+                    self._loaded_at = time.monotonic() - self._refresh_seconds + 300
+                    return
                 raise RulesError(f"Unexpected error loading rules: {exc}") from exc
 
     # -------------------------------------------------------------------
@@ -347,9 +350,12 @@ def _parent_rule_number(number: str) -> str | None:
     return parts[0]
 
 
+_KEYWORD_RULE_RE = re.compile(r"\brule 702\.")
+
+
 def _is_keyword_glossary_entry(entry: GlossaryEntry) -> bool:
     """Check if a glossary entry references a 702.x rule (keyword ability)."""
-    return bool(re.search(r"\brule 702\.", entry.definition))
+    return bool(_KEYWORD_RULE_RE.search(entry.definition))
 
 
 def _rule_sort_key(number: str) -> tuple[int, int, str]:

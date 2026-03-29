@@ -17,9 +17,12 @@ import structlog
 from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from mtg_mcp_server.services.rules import RulesService
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
     from mtg_mcp_server.types import Card, GlossaryEntry, Rule
+    from mtg_mcp_server.utils.formatters import ResponseFormat
 
 log = structlog.get_logger(service="workflow.rules")
 
@@ -188,6 +191,11 @@ def _fmt_rule_detailed(rule: Rule) -> str:
     return f"**{rule.number}** {rule.text}"
 
 
+def _get_rule_formatter(response_format: ResponseFormat) -> Callable[[Rule], str]:
+    """Return the rule formatter matching the requested verbosity."""
+    return _fmt_rule_concise if response_format == "concise" else _fmt_rule_detailed
+
+
 def _is_rule_number(query: str) -> bool:
     """Check if a query looks like a rule number (e.g. '704.5k', '100.1')."""
     return bool(_RULE_NUMBER_RE.match(query.strip()))
@@ -217,7 +225,7 @@ async def rules_lookup(
     *,
     rules: RulesService,
     section: str | None = None,
-    response_format: str = "detailed",
+    response_format: ResponseFormat = "detailed",
 ) -> WorkflowResult:
     """Look up Magic rules by number or keyword search.
 
@@ -235,7 +243,7 @@ async def rules_lookup(
         WorkflowResult with formatted markdown and structured data.
     """
     log.info("rules_lookup.start", query=query, section=section)
-    fmt = _fmt_rule_concise if response_format == "concise" else _fmt_rule_detailed
+    fmt = _get_rule_formatter(response_format)
 
     found_rules: list[Rule] = []
 
@@ -288,7 +296,7 @@ async def keyword_explain(
     *,
     rules: RulesService,
     bulk: ScryfallBulkClient | None = None,
-    response_format: str = "detailed",
+    response_format: ResponseFormat = "detailed",
 ) -> WorkflowResult:
     """Explain a Magic keyword with glossary definition, rules, and examples.
 
@@ -305,7 +313,7 @@ async def keyword_explain(
         WorkflowResult with formatted markdown and structured data.
     """
     log.info("keyword_explain.start", keyword=keyword)
-    fmt = _fmt_rule_concise if response_format == "concise" else _fmt_rule_detailed
+    fmt = _get_rule_formatter(response_format)
 
     # Fetch glossary entry and rules in sequence (rules service is local, fast)
     glossary: GlossaryEntry | None = await rules.glossary_lookup(keyword)
@@ -378,7 +386,7 @@ async def rules_interaction(
     *,
     rules: RulesService,
     bulk: ScryfallBulkClient | None = None,
-    response_format: str = "detailed",
+    response_format: ResponseFormat = "detailed",
 ) -> WorkflowResult:
     """Explain how two mechanics interact with relevant rule citations.
 
@@ -396,7 +404,7 @@ async def rules_interaction(
         WorkflowResult with formatted markdown and structured data.
     """
     log.info("rules_interaction.start", mechanic_a=mechanic_a, mechanic_b=mechanic_b)
-    fmt = _fmt_rule_concise if response_format == "concise" else _fmt_rule_detailed
+    fmt = _get_rule_formatter(response_format)
 
     # Look up both mechanics
     glossary_a: GlossaryEntry | None = await rules.glossary_lookup(mechanic_a)
@@ -508,7 +516,7 @@ async def rules_scenario(
     scenario: str,
     *,
     rules: RulesService,
-    response_format: str = "detailed",
+    response_format: ResponseFormat = "detailed",
 ) -> WorkflowResult:
     """Provide rules framework for a game scenario.
 
@@ -525,7 +533,7 @@ async def rules_scenario(
         WorkflowResult with formatted markdown and structured data.
     """
     log.info("rules_scenario.start", scenario_len=len(scenario))
-    fmt = _fmt_rule_concise if response_format == "concise" else _fmt_rule_detailed
+    fmt = _get_rule_formatter(response_format)
 
     # Extract candidate keywords from the scenario
     words = re.findall(r"[a-zA-Z]+", scenario.lower())
@@ -605,7 +613,7 @@ async def combat_calculator(
     rules: RulesService,
     bulk: ScryfallBulkClient | None = None,
     keywords: list[str] | None = None,
-    response_format: str = "detailed",
+    response_format: ResponseFormat = "detailed",
 ) -> WorkflowResult:
     """Provide combat phase rules framework with card data.
 
@@ -629,7 +637,7 @@ async def combat_calculator(
         attackers=len(attackers),
         blockers=len(blockers),
     )
-    fmt = _fmt_rule_concise if response_format == "concise" else _fmt_rule_detailed
+    fmt = _get_rule_formatter(response_format)
 
     # Look up combat rules
     combat_rules: list[Rule] = await rules.keyword_search("combat")
@@ -649,20 +657,14 @@ async def combat_calculator(
     attacker_cards: dict[str, Card] = {}
     blocker_cards: dict[str, Card] = {}
     if bulk is not None:
-        for name in attackers:
-            try:
-                card = await bulk.get_card(name)
-                if card is not None:
-                    attacker_cards[name] = card
-            except Exception:
-                log.debug("combat_calculator.bulk_failed", name=name)
-        for name in blockers:
-            try:
-                card = await bulk.get_card(name)
-                if card is not None:
-                    blocker_cards[name] = card
-            except Exception:
-                log.debug("combat_calculator.bulk_failed", name=name)
+        for names, target in [(attackers, attacker_cards), (blockers, blocker_cards)]:
+            for name in names:
+                try:
+                    card = await bulk.get_card(name)
+                    if card is not None:
+                        target[name] = card
+                except Exception:
+                    log.debug("combat_calculator.bulk_failed", name=name)
 
     # Detect if first strike / double strike is relevant
     all_resolved = {**attacker_cards, **blocker_cards}

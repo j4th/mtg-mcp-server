@@ -89,6 +89,7 @@ async def workflow_lifespan(server: FastMCP):
                 rules_url=settings.rules_url,
                 refresh_hours=settings.rules_refresh_hours,
             )
+            await _rules.ensure_loaded()
         yield {}
     _scryfall = None
     _spellbook = None

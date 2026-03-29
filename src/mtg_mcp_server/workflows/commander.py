@@ -277,7 +277,7 @@ async def commander_overview(
 
         if spellbook_ok:
             lines.append(f"Combos: {len(combos)}")
-        elif not spellbook_ok:
+        else:
             lines.append(f"Combos: unavailable ({spellbook_error})")
 
         if edhrec_enabled and edhrec_ok and edhrec_data is not None:
