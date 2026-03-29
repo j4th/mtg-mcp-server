@@ -81,6 +81,69 @@ class TestScryfallLive:
         assert "Dominaria" in text
 
 
+class TestDeckBuildingLive:
+    """Hit real bulk data with deck building workflows."""
+
+    async def test_theme_search(self, live_client):
+        result = await live_client.call_tool(
+            "theme_search", {"theme": "sacrifice", "format": "commander", "limit": 5}
+        )
+        text = result.content[0].text
+        assert "sacrifice" in text.lower() or "Sacrifice" in text
+
+    async def test_tribal_staples(self, live_client):
+        result = await live_client.call_tool(
+            "tribal_staples", {"tribe": "Elf", "format": "commander"}
+        )
+        text = result.content[0].text
+        assert "Elf" in text
+
+    async def test_color_identity_staples(self, live_client):
+        result = await live_client.call_tool("color_identity_staples", {"color_identity": "simic"})
+        text = result.content[0].text
+        assert len(text) > 100  # Should have real card data
+
+    async def test_rotation_check(self, live_client):
+        result = await live_client.call_tool("rotation_check", {})
+        text = result.content[0].text
+        assert "Standard" in text
+
+
+class TestCommanderDepthLive:
+    """Hit real APIs with commander depth workflows."""
+
+    async def test_commander_comparison(self, live_client):
+        result = await live_client.call_tool(
+            "commander_comparison",
+            {"commanders": ["Muldrotha, the Gravetide", "Meren of Clan Nel Toth"]},
+        )
+        text = result.content[0].text
+        assert "Muldrotha" in text
+        assert "Meren" in text
+
+
+class TestValidationLive:
+    """Hit real bulk data with validation and utility workflows."""
+
+    async def test_deck_validate_catches_illegal(self, live_client):
+        result = await live_client.call_tool(
+            "deck_validate",
+            {
+                "decklist": ["4 Lightning Bolt", "4 Sol Ring", "52 Island"],
+                "format": "modern",
+            },
+        )
+        text = result.content[0].text
+        assert "INVALID" in text or "not legal" in text.lower()
+
+    async def test_price_comparison(self, live_client):
+        result = await live_client.call_tool(
+            "price_comparison", {"cards": ["Sol Ring", "Lightning Bolt"]}
+        )
+        text = result.content[0].text
+        assert "$" in text
+
+
 class TestCrossFormatLive:
     """New cross-format tools against real data."""
 
