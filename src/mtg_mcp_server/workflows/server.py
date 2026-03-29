@@ -985,7 +985,7 @@ async def combat_calculator(
 
 
 @workflow_mcp.resource("mtg://rules/{number}")
-async def get_rule(number: str) -> dict:
+async def get_rule(number: str) -> dict[str, object]:
     """Rule text by number (e.g. mtg://rules/704.5k)."""
     rules = _require_rules()
     rule = await rules.lookup_by_number(number)
@@ -993,7 +993,7 @@ async def get_rule(number: str) -> dict:
 
 
 @workflow_mcp.resource("mtg://rules/glossary/{term}")
-async def get_glossary_term(term: str) -> dict:
+async def get_glossary_term(term: str) -> dict[str, object]:
     """Glossary definition by term."""
     rules = _require_rules()
     entry = await rules.glossary_lookup(term)
@@ -1001,14 +1001,14 @@ async def get_glossary_term(term: str) -> dict:
 
 
 @workflow_mcp.resource("mtg://rules/keywords")
-async def list_keywords() -> list[dict]:
+async def list_keywords() -> list[dict[str, str]]:
     """All keywords with brief definitions."""
     rules = _require_rules()
     return await rules.list_keywords()
 
 
 @workflow_mcp.resource("mtg://rules/sections")
-async def list_sections() -> list[dict]:
+async def list_sections() -> list[dict[str, str]]:
     """Section index for the Comprehensive Rules."""
     rules = _require_rules()
     return await rules.list_sections()

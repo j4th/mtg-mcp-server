@@ -137,7 +137,7 @@ _KEYWORD_INTERACTIONS: dict[str, list[tuple[str, str]]] = {
         ),
         (
             "protection",
-            "Can't assign damage to a creature with protection — all damage tramples through",
+            "Must still assign lethal damage to protected blockers before trampling over (damage is then prevented by protection)",
         ),
     ],
     "flying": [
@@ -257,9 +257,13 @@ async def rules_lookup(
         # Keyword search
         found_rules = await rules.keyword_search(query)
 
-    # Apply section filter
+    # Apply section filter — resolve text names to numeric prefixes
     if section and found_rules:
-        found_rules = [r for r in found_rules if r.number.startswith(section)]
+        resolved = await rules.resolve_section(section)
+        if resolved is not None:
+            found_rules = [r for r in found_rules if r.number.startswith(resolved)]
+        else:
+            found_rules = []
 
     # Build markdown
     lines: list[str] = []
@@ -369,7 +373,7 @@ async def keyword_explain(
         lines.append("")
 
     # Build data
-    data: dict = {
+    data: dict[str, object] = {
         "keyword": keyword,
         "glossary": glossary.model_dump(mode="json") if glossary else None,
         "rules": [r.model_dump(mode="json") for r in related_rules],
@@ -749,7 +753,7 @@ async def combat_calculator(
             lines.append("")
 
     # Build data
-    data: dict = {
+    data: dict[str, object] = {
         "attackers": [
             {
                 "name": name,

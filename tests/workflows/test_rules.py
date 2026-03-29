@@ -38,6 +38,9 @@ def _make_rules() -> AsyncMock:
             ),
         )
     )
+    mock.resolve_section = AsyncMock(
+        side_effect=lambda s: s if s.replace(".", "").isdigit() else None
+    )
     mock.keyword_search = AsyncMock(
         return_value=[
             Rule(number="702.2a", text="Deathtouch is a static ability."),

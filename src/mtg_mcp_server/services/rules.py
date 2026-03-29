@@ -191,6 +191,24 @@ class RulesService:
             for num, name in sorted(self._sections.items(), key=lambda x: int(x[0]))
         ]
 
+    async def resolve_section(self, section: str) -> str | None:
+        """Resolve a section name or number to a numeric prefix.
+
+        Accepts either a numeric prefix (e.g. "7") which is returned as-is,
+        or a text name (e.g. "combat", "stack") which is matched case-insensitively
+        against section names.  Returns ``None`` if no match is found.
+        """
+        await self.ensure_loaded()
+        # Already numeric — return directly
+        if section.replace(".", "").isdigit():
+            return section
+        # Text name — search sections for a substring match
+        lower = section.lower()
+        for num, name in self._sections.items():
+            if lower in name.lower():
+                return num
+        return None
+
     async def section_rules(self, section_prefix: str) -> list[Rule]:
         """Return all rules whose number starts with the given prefix."""
         await self.ensure_loaded()
@@ -223,8 +241,16 @@ class RulesService:
             ) as http:
                 response = await http.get(self._rules_url)
                 if response.status_code != 200:
+                    hint = ""
+                    if response.status_code == 404:
+                        hint = (
+                            " — WotC changes the rules URL with each update (~4x/year). "
+                            "Set MTG_MCP_RULES_URL to the current URL from "
+                            "https://magic.wizards.com/en/rules"
+                        )
                     raise RulesDownloadError(
-                        f"HTTP {response.status_code} downloading rules from {self._rules_url}"
+                        f"HTTP {response.status_code} downloading rules "
+                        f"from {self._rules_url}{hint}"
                     )
                 # Decode as UTF-8 and strip BOM if present
                 try:
