@@ -82,6 +82,7 @@ See @docs/ARCHITECTURE.md for full details.
 - Commit atomically after each logical unit of work — don't batch changes into one big commit.
 - Before launching worktree agents: commit all changes, verify `git status` is clean. Agents branch from the last COMMITTED state — uncommitted work is invisible to them and will be lost.
 - Cherry-pick agent commits back to the feature branch. Discard agent rewrites of shared files (use scaffold versions).
+- After cherry-picking, diff against the prior phase's commit to verify nothing was reverted: `git diff <prior-commit>..HEAD -- <shared-files>`. Worktree agents rewrite entire files — if two phases touch the same files, the later cherry-pick silently clobbers the earlier phase's changes.
 - Cancel stale CI runs on the branch before pushing new commits.
 
 ## PR Workflow
