@@ -639,7 +639,7 @@ async def precon_upgrade(
     if on_progress is not None:
         await on_progress(1, 4)
 
-    await bulk.get_cards(decklist)  # Ensure data is loaded / warm
+    await bulk.get_cards(decklist)
 
     # Step 2/4: Analyze for cuts (combo data + synergy data)
     if on_progress is not None:
@@ -724,6 +724,11 @@ async def precon_upgrade(
                 try:
                     price = float(card_data.prices.usd)
                 except ValueError:
+                    log.warning(
+                        "precon_upgrade.bad_price",
+                        card=ecard.name,
+                        price_raw=card_data.prices.usd,
+                    )
                     continue
                 if price <= budget:
                     upgrade_candidates.append((ecard, price))

@@ -358,7 +358,7 @@ Search for cards matching a mechanical, tribal, or abstract theme via oracle tex
 
 | Field | Detail |
 |-------|--------|
-| Input | `theme: str` (e.g. "sacrifice", "lifegain", "tokens"), `format: str | None = None`, `color_identity: str | None = None`, `limit: int = 20` |
+| Input | `theme: str` (e.g. "sacrifice", "lifegain", "tokens"), `color_identity: str | None = None`, `format: str | None = None`, `max_price: float | None = None`, `limit: int = 20` |
 | Output | Markdown with: cards grouped by relevance tier (direct match, related, support) with oracle text excerpts |
 | Backends | Bulk data (required) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
@@ -368,9 +368,9 @@ Detect synergies from 1-5 key cards and find cards that work with them.
 
 | Field | Detail |
 |-------|--------|
-| Input | `cards: list[str]` (1-5 card names), `format: str | None = None`, `color_identity: str | None = None` |
+| Input | `cards: list[str]` (1-5 card names), `format: str` (required), `budget: float | None = None`, `limit: int = 20` |
 | Output | Markdown with: resolved cards, detected keywords/mechanics, synergy candidates grouped by category, combo potential |
-| Backends | Bulk data (required) + Spellbook (optional) |
+| Backends | Bulk data (required) + Spellbook (required) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `complete_deck`
@@ -400,7 +400,7 @@ Best cards for a creature type within a color identity.
 
 | Field | Detail |
 |-------|--------|
-| Input | `tribe: str` (e.g. "Elf", "Zombie"), `color_identity: str` (e.g. "golgari"), `format: str | None = None` |
+| Input | `tribe: str` (e.g. "Elf", "Zombie"), `color_identity: str | None = None` (e.g. "golgari"), `format: str | None = None` |
 | Output | Markdown with: lords, synergy pieces, tribe members, support cards — each with oracle text and price |
 | Backends | Bulk data (required) + EDHREC (optional) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
@@ -410,7 +410,7 @@ Analyze a precon decklist and suggest swaps — pair weakest cards with upgrade 
 
 | Field | Detail |
 |-------|--------|
-| Input | `decklist: list[str]`, `commander: str`, `budget: float | None = None` |
+| Input | `decklist: list[str]`, `commander: str`, `budget: float = 50.0` |
 | Output | Markdown with: data source status, ranked swap pairs (cut → add with reasoning), upgrade priority based on synergy delta |
 | Backends | Bulk data (required) + Spellbook (required) + EDHREC (optional) |
 | Scoring | Cuts scored by low synergy + low inclusion. Upgrades ranked by synergy improvement |
@@ -423,8 +423,8 @@ Top-played cards across all commanders in a color identity.
 |-------|--------|
 | Input | `color_identity: str` (e.g. "simic", "UG"), `category: str | None = None` (e.g. "creatures") |
 | Output | Markdown with: staple cards ranked by inclusion rate, synergy scores, prices |
-| Backends | EDHREC (required) + Bulk data (optional, for prices) |
-| Error | Returns message if EDHREC disabled |
+| Backends | Bulk data (required) + EDHREC (optional, for enrichment) |
+| Partial failure | Degrades gracefully when EDHREC is disabled — falls back to EDHREC rank from bulk data |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `sealed_pool_build`
@@ -458,7 +458,7 @@ Review a completed draft — pick-by-pick GIH WR analysis with overall grade.
 | Input | `picks: list[str]` (P1P1 through P3P14), `set_code: str`, `final_deck: list[str] | None = None` |
 | Output | Markdown with: pick-by-pick table (pick#, name, GIH WR, verdict), average GIH WR, letter grade, optional deck inclusion analysis |
 | Backends | Bulk data (required) + 17Lands (required) |
-| Grading | A (≥60% avg GIH WR) through F (<48%) |
+| Grading | A (≥60% avg GIH WR) through F (<50%) |
 | Error | Raises `ToolError` if 17Lands disabled |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -597,19 +597,19 @@ Guide a budget upgrade session for a Commander deck.
 | Output | Multi-step prompt: use `budget_upgrade` for ranked suggestions, use `evaluate_upgrade` on top 5, evaluate by synergy/$, combo potential, inclusion rate, recommend top 3-5 |
 
 ### `build_deck`
-Guide building a new Commander deck from scratch.
+Guide building a deck from scratch for any format.
 
 | Field | Detail |
 |-------|--------|
-| Input | `commander: str` |
-| Output | Multi-step prompt: commander overview, staples, combos, mana base |
+| Input | `concept: str`, `format: str`, `budget: float | None = None` |
+| Output | Multi-step prompt: format search for key cards, format staples, mana curve/color assembly, deck_validate, suggest_mana_base |
 
 ### `evaluate_collection`
 Evaluate a card collection for trade and deck-building value.
 
 | Field | Detail |
 |-------|--------|
-| Input | `cards: list[str]` |
+| Input | `cards: str` (comma-separated list of card names) |
 | Output | Multi-step prompt: price lookup, format legality, Commander staple potential |
 
 ### `format_intro`
@@ -625,8 +625,8 @@ Find alternatives to a card for budget or format reasons.
 
 | Field | Detail |
 |-------|--------|
-| Input | `card: str`, `reason: str` |
-| Output | Multi-step prompt: card analysis, similar card search, comparison |
+| Input | `card_name: str`, `format: str`, `budget: float` |
+| Output | Multi-step prompt: card analysis, similar card search, price comparison, ranked alternatives |
 
 ### `rules_question`
 Ask a rules question with full Comprehensive Rules citations.
@@ -645,20 +645,20 @@ Build a deck around specific cards or a win condition in any format.
 | Output | Multi-step prompt: theme/synergy search → build_around → rotation_check (if Standard) → complete_deck → deck_validate |
 
 ### `build_tribal_deck`
-Build a tribal Commander deck around a creature type.
+Build a tribal deck for any format.
 
 | Field | Detail |
 |-------|--------|
-| Input | `tribe: str`, `commander: str` |
-| Output | Multi-step prompt: tribal_staples → commander_overview → complete_deck |
+| Input | `tribe: str`, `format: str`, `commander: str | None = None`, `budget: float | None = None` |
+| Output | Multi-step prompt: tribal_staples → build_around → suggest_mana_base → deck_validate |
 
 ### `build_theme_deck`
-Build a theme-based Commander deck.
+Build a themed deck around a strategy or archetype.
 
 | Field | Detail |
 |-------|--------|
-| Input | `theme: str`, `commander: str` |
-| Output | Multi-step prompt: theme_search → build_around → complete_deck |
+| Input | `theme: str`, `format: str`, `color_identity: str | None = None`, `budget: float | None = None` |
+| Output | Multi-step prompt: theme_search → build_around → complete_deck → deck_validate → suggest_mana_base |
 
 ### `upgrade_precon`
 Upgrade a precon Commander deck with a budget.
@@ -697,8 +697,8 @@ Plan for Standard rotation — identify rotating cards and replacements.
 
 | Field | Detail |
 |-------|--------|
-| Input | `format: str` |
-| Output | Multi-step prompt: rotation_check → card_alternatives for rotating staples |
+| Input | *(no parameters)* |
+| Output | Multi-step prompt: rotation_check → bulk_similar_cards for replacements → price_comparison |
 
 ---
 
@@ -712,7 +712,7 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 |-----|-------------|
 | `mtg://card/{name}` | Card data as JSON by exact name |
 | `mtg://card/{name}/rulings` | Card rulings as JSON by card name |
-| `mtg://scryfall/set/{code}` | Set metadata as JSON by set code |
+| `mtg://set/{code}` | Set metadata as JSON by set code |
 
 ### Spellbook Resources
 
@@ -737,9 +737,10 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 | URI | Description |
 |-----|-------------|
 | `mtg://card-data/{name}` | Card data from Scryfall bulk data as JSON |
-| `mtg://bulk/format/{format}/legal-cards` | Legal cards in a format |
-| `mtg://bulk/format/{format}/banned` | Banned cards in a format |
-| `mtg://bulk/card/{name}/formats` | Format legality for a card |
+| `mtg://format/{format}/legal-cards` | Legal cards in a format |
+| `mtg://format/{format}/banned` | Banned cards in a format |
+| `mtg://card/{name}/formats` | Format legality for a card |
+| `mtg://card/{name}/similar` | Similar cards by type, keywords, or mana cost |
 
 ### Rules Resources
 

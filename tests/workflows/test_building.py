@@ -266,7 +266,7 @@ class TestBuildAround:
             oracle_text="If a creature dying causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.",
             type_line="Legendary Creature - Human Advisor",
         )
-        mock_bulk.get_card = AsyncMock(return_value=aristocrat)
+        mock_bulk.get_cards = AsyncMock(return_value={"Teysa Karlov": aristocrat})
 
         # Synergistic cards
         seer = _mock_card(
@@ -282,7 +282,7 @@ class TestBuildAround:
             spellbook=mock_spellbook,
         )
 
-        assert result.data["build_around_cards"] is not None
+        assert result.data["build_around_cards"] == ["Teysa Karlov"]
         assert "Teysa Karlov" in result.markdown
 
     async def test_multiple_build_around_cards(
@@ -291,7 +291,7 @@ class TestBuildAround:
         """Handles multiple build-around cards."""
         card1 = _mock_card("Card A", oracle_text="When a creature dies...")
         card2 = _mock_card("Card B", oracle_text="Sacrifice a creature...")
-        mock_bulk.get_card = AsyncMock(side_effect=[card1, card2])
+        mock_bulk.get_cards = AsyncMock(return_value={"Card A": card1, "Card B": card2})
         mock_bulk.filter_cards = AsyncMock(return_value=[])
 
         result = await build_around(
@@ -307,7 +307,7 @@ class TestBuildAround:
     async def test_combo_detection(self, mock_bulk: AsyncMock, mock_spellbook: AsyncMock) -> None:
         """Spellbook combos are included in results."""
         card = _mock_card("Thassa's Oracle", oracle_text="When Thassa's Oracle enters...")
-        mock_bulk.get_card = AsyncMock(return_value=card)
+        mock_bulk.get_cards = AsyncMock(return_value={"Thassa's Oracle": card})
         mock_bulk.filter_cards = AsyncMock(return_value=[])
 
         combo = Combo(
@@ -333,7 +333,7 @@ class TestBuildAround:
     async def test_budget_filter(self, mock_bulk: AsyncMock, mock_spellbook: AsyncMock) -> None:
         """Budget filter excludes expensive cards from suggestions."""
         card = _mock_card("Budget Card", oracle_text="Tap: Draw a card.", usd="0.50")
-        mock_bulk.get_card = AsyncMock(return_value=card)
+        mock_bulk.get_cards = AsyncMock(return_value={"Budget Card": card})
         mock_bulk.filter_cards = AsyncMock(return_value=[card])
 
         result = await build_around(
@@ -353,7 +353,7 @@ class TestBuildAround:
             oracle_text="Flying",
             legalities={"modern": "legal"},
         )
-        mock_bulk.get_card = AsyncMock(return_value=card)
+        mock_bulk.get_cards = AsyncMock(return_value={"Modern Card": card})
         mock_bulk.filter_cards = AsyncMock(return_value=[])
 
         result = await build_around(
@@ -369,7 +369,7 @@ class TestBuildAround:
         self, mock_bulk: AsyncMock, mock_spellbook: AsyncMock
     ) -> None:
         """Handles build-around cards that cannot be resolved."""
-        mock_bulk.get_card = AsyncMock(return_value=None)
+        mock_bulk.get_cards = AsyncMock(return_value={"Nonexistent Card": None})
 
         result = await build_around(
             ["Nonexistent Card"],
@@ -393,7 +393,7 @@ class TestBuildAround:
             oracle_text="Death triggers double",
             type_line="Legendary Creature - Human Advisor",
         )
-        mock_bulk.get_card = AsyncMock(return_value=card)
+        mock_bulk.get_cards = AsyncMock(return_value={"Teysa Karlov": card})
 
         mock_edhrec.commander_top_cards = AsyncMock(
             return_value=EDHRECCommanderData(
@@ -429,7 +429,7 @@ class TestBuildAround:
     async def test_concise_format(self, mock_bulk: AsyncMock, mock_spellbook: AsyncMock) -> None:
         """Concise format produces shorter output."""
         card = _mock_card("Test Card", oracle_text="Test oracle text")
-        mock_bulk.get_card = AsyncMock(return_value=card)
+        mock_bulk.get_cards = AsyncMock(return_value={"Test Card": card})
         mock_bulk.filter_cards = AsyncMock(return_value=[])
 
         result = await build_around(

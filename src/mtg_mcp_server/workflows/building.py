@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from mtg_mcp_server.services.edhrec import EDHRECClient
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
     from mtg_mcp_server.services.spellbook import SpellbookClient
-    from mtg_mcp_server.types import Card, Combo, EDHRECCard
+    from mtg_mcp_server.types import Card, Combo
 
 log = structlog.get_logger(service="workflow.building")
 
@@ -176,7 +176,11 @@ async def theme_search(
         try:
             ci_filter = parse_color_identity(color_identity)
         except ValueError:
-            ci_filter = None
+            return WorkflowResult(
+                markdown=f"Unrecognized color identity: '{color_identity}'. "
+                "Try names like 'sultai' or letter codes like 'BUG'.",
+                data={"theme": theme, "error": f"Invalid color identity: {color_identity}"},
+            )
 
     cards: list[Card] = []
 
@@ -389,17 +393,6 @@ async def build_around(
             continue
         all_combos.extend(result_item)
 
-    # Step 5: EDHREC enrichment (commander format only)
-    edhrec_suggestions: list[EDHRECCard] = []
-    if edhrec is not None and format.lower() == "commander" and resolved:
-        # Use first resolved card as commander proxy
-        try:
-            edhrec_data = await edhrec.commander_top_cards(resolved[0].name)
-            for cardlist in edhrec_data.cardlists:
-                edhrec_suggestions.extend(cardlist.cardviews)
-        except Exception:
-            log.warning("build_around.edhrec_error", exc_info=True)
-
     # Build output
     lines: list[str] = []
 
@@ -479,7 +472,6 @@ async def build_around(
             for c in synergy_cards[:limit]
         ],
         "combos_found": len(all_combos),
-        "edhrec_suggestions": len(edhrec_suggestions),
     }
     return WorkflowResult(markdown="\n".join(lines), data=data)
 
@@ -609,16 +601,6 @@ async def complete_deck(
             current = len(categories.get(cat, []))
             if current < low:
                 gaps[cat] = low - current
-
-    # Get EDHREC suggestions for commander format
-    edhrec_staples: list[EDHRECCard] = []
-    if edhrec is not None and commander and format.lower() == "commander":
-        try:
-            edhrec_data = await edhrec.commander_top_cards(commander)
-            for cardlist in edhrec_data.cardlists:
-                edhrec_staples.extend(cardlist.cardviews)
-        except Exception:
-            log.warning("complete_deck.edhrec_error", exc_info=True)
 
     # Search for suggestions in underrepresented categories
     suggestions: dict[str, list[Card]] = {}

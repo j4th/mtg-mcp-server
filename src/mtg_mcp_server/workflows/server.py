@@ -1,7 +1,9 @@
 """Workflow MCP server — composed tools calling multiple backend services.
 
 This module is the wiring layer between MCP and the pure workflow functions
-in ``commander.py``, ``draft.py``, ``deck.py``, and ``analysis.py``.  Each tool
+in ``commander.py``, ``commander_depth.py``, ``draft.py``, ``draft_limited.py``,
+``deck.py``, ``analysis.py``, ``building.py``, ``constructed.py``,
+``validation.py``, ``mana_base.py``, ``pricing.py``, and ``rules.py``.  Each tool
 here wraps a pure async function, injecting the service clients from the
 module-level state and converting service exceptions to ``ToolError``.
 
@@ -513,20 +515,17 @@ async def theme_search(
         raise ToolError("Theme cannot be empty.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    theme,
-                    bulk=_require_bulk(),
-                    edhrec=_edhrec,
-                    color_identity=color_identity,
-                    format=format,
-                    max_price=max_price,
-                    limit=limit,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            theme,
+            bulk=_require_bulk(),
+            edhrec=_edhrec,
+            color_identity=color_identity,
+            format=format,
+            max_price=max_price,
+            limit=limit,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"theme_search failed: {exc}") from exc
 
@@ -559,20 +558,17 @@ async def build_around(
         raise ToolError("Maximum 5 build-around cards.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    cards,
-                    format,
-                    bulk=_require_bulk(),
-                    spellbook=_require_spellbook(),
-                    edhrec=_edhrec,
-                    budget=budget,
-                    limit=limit,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            cards,
+            format,
+            bulk=_require_bulk(),
+            spellbook=_require_spellbook(),
+            edhrec=_edhrec,
+            budget=budget,
+            limit=limit,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except CardNotFoundError as exc:
         raise ToolError(f"{exc}. Check spelling.") from exc
     except ServiceError as exc:
@@ -612,20 +608,17 @@ async def complete_deck(
         raise ToolError("Provide at least one card in the decklist.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    decklist,
-                    format,
-                    bulk=_require_bulk(),
-                    edhrec=_edhrec,
-                    commander=commander,
-                    budget=budget,
-                    on_progress=lambda step, total: _progress(ctx, step, total),
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            decklist,
+            format,
+            bulk=_require_bulk(),
+            edhrec=_edhrec,
+            commander=commander,
+            budget=budget,
+            on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"complete_deck failed: {exc}") from exc
 
@@ -660,18 +653,17 @@ async def commander_comparison(
         raise ToolError("Maximum 5 commanders can be compared.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    commanders,
-                    bulk=_require_bulk(),
-                    spellbook=_require_spellbook(),
-                    edhrec=_edhrec,
-                    on_progress=lambda step, total: _progress(ctx, step, total),
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            commanders,
+            bulk=_require_bulk(),
+            spellbook=_require_spellbook(),
+            edhrec=_edhrec,
+            on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
     except CardNotFoundError as exc:
         raise ToolError(f"{exc}. Check spelling.") from exc
     except ServiceError as exc:
@@ -703,19 +695,16 @@ async def tribal_staples(
         raise ToolError("Tribe cannot be empty.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    tribe,
-                    bulk=_require_bulk(),
-                    edhrec=_edhrec,
-                    color_identity=color_identity,
-                    format=format,
-                    limit=limit,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            tribe,
+            bulk=_require_bulk(),
+            edhrec=_edhrec,
+            color_identity=color_identity,
+            format=format,
+            limit=limit,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"tribal_staples failed: {exc}") from exc
 
@@ -744,21 +733,18 @@ async def precon_upgrade(
         raise ToolError("Commander name cannot be empty.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    decklist,
-                    commander,
-                    bulk=_require_bulk(),
-                    spellbook=_require_spellbook(),
-                    edhrec=_edhrec,
-                    budget=budget,
-                    num_upgrades=num_upgrades,
-                    on_progress=lambda step, total: _progress(ctx, step, total) if ctx else None,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            decklist,
+            commander,
+            bulk=_require_bulk(),
+            spellbook=_require_spellbook(),
+            edhrec=_edhrec,
+            budget=budget,
+            num_upgrades=num_upgrades,
+            on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except CardNotFoundError as exc:
         raise ToolError(f"{exc}. Check spelling.") from exc
     except ServiceError as exc:
@@ -791,18 +777,15 @@ async def color_identity_staples(
         raise ToolError("Color identity cannot be empty.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    color_identity,
-                    bulk=_require_bulk(),
-                    edhrec=_edhrec,
-                    category=category,
-                    limit=limit,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            color_identity,
+            bulk=_require_bulk(),
+            edhrec=_edhrec,
+            category=category,
+            limit=limit,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"color_identity_staples failed: {exc}") from exc
 
@@ -835,18 +818,15 @@ async def sealed_pool_build(
         raise ToolError("Provide at least one card in the sealed pool.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    pool,
-                    set_code,
-                    bulk=_require_bulk(),
-                    seventeen_lands=_seventeen_lands,
-                    on_progress=lambda step, total: _progress(ctx, step, total),
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            pool,
+            set_code,
+            bulk=_require_bulk(),
+            seventeen_lands=_seventeen_lands,
+            on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"sealed_pool_build failed: {exc}") from exc
 
@@ -876,18 +856,15 @@ async def draft_signal_read(
         raise ToolError("Provide at least one pick.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    picks,
-                    set_code,
-                    bulk=_require_bulk(),
-                    seventeen_lands=_require_seventeen_lands(),
-                    current_pack=current_pack,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            picks,
+            set_code,
+            bulk=_require_bulk(),
+            seventeen_lands=_require_seventeen_lands(),
+            current_pack=current_pack,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"draft_signal_read failed: {exc}") from exc
 
@@ -919,18 +896,15 @@ async def draft_log_review(
         raise ToolError("Provide at least one pick.")
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    picks,
-                    set_code,
-                    bulk=_require_bulk(),
-                    seventeen_lands=_require_seventeen_lands(),
-                    final_deck=final_deck,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            picks,
+            set_code,
+            bulk=_require_bulk(),
+            seventeen_lands=_require_seventeen_lands(),
+            final_deck=final_deck,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"draft_log_review failed: {exc}") from exc
 
@@ -959,16 +933,13 @@ async def rotation_check(
     from mtg_mcp_server.workflows.constructed import rotation_check as impl
 
     try:
-        return ToolResult(
-            **(
-                await impl(
-                    scryfall=_require_scryfall(),
-                    bulk=_require_bulk(),
-                    cards=cards,
-                    response_format=response_format,
-                )
-            )._asdict()
+        result = await impl(
+            scryfall=_require_scryfall(),
+            bulk=_require_bulk(),
+            cards=cards,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"rotation_check failed: {exc}") from exc
 
@@ -1798,19 +1769,22 @@ Present: rotation impact summary, replacement plan with costs, and recommendatio
 @workflow_mcp.resource("mtg://theme/{theme}")
 async def get_theme_mappings(theme: str) -> dict[str, object]:
     """Theme keyword mappings — oracle text patterns that define a theme."""
-    # Populated by building.py when implemented
-    return {"theme": theme, "error": "Theme mappings not yet implemented"}
+    from mtg_mcp_server.workflows.building import THEME_MAPPINGS
+
+    theme_lower = theme.lower().strip()
+    if theme_lower in THEME_MAPPINGS:
+        mapping = THEME_MAPPINGS[theme_lower]
+        return {"theme": theme, "patterns": {k: v for k, v in mapping.items()}}
+    return {"theme": theme, "available_themes": sorted(THEME_MAPPINGS.keys())}
 
 
 @workflow_mcp.resource("mtg://tribe/{tribe}/staples")
 async def get_tribe_staples(tribe: str) -> dict[str, object]:
-    """Top cards for a creature type."""
-    # Populated by commander_depth.py when implemented
-    return {"tribe": tribe, "error": "Tribal staples not yet implemented"}
+    """Top cards for a creature type — requires bulk data at runtime."""
+    return {"tribe": tribe, "note": "Use the tribal_staples tool for full results"}
 
 
 @workflow_mcp.resource("mtg://draft/{set_code}/signals")
 async def get_draft_signals(set_code: str) -> dict[str, object]:
-    """Color openness heuristics for a draft format."""
-    # Populated by draft_limited.py when implemented
-    return {"set_code": set_code, "error": "Draft signals not yet implemented"}
+    """Color openness heuristics — requires 17Lands data at runtime."""
+    return {"set_code": set_code, "note": "Use the draft_signal_read tool for full results"}

@@ -131,6 +131,7 @@ mtg-mcp/
 │       │   ├── seventeen_lands.py  # SeventeenLandsClient
 │       │   ├── edhrec.py           # EDHRECClient
 │       │   ├── scryfall_bulk.py    # ScryfallBulkClient (file-based, not BaseClient)
+│       │   ├── rules.py            # RulesService (local Comprehensive Rules parser)
 │       │   └── cache.py            # async_cached decorator, TTLCache helpers
 │       │
 │       ├── providers/              # FastMCP sub-servers (one per backend, independently runnable)
@@ -204,8 +205,7 @@ mtg-mcp/
 │       ├── scryfall_bulk/          # Oracle Cards sample with adversarial entries
 │       ├── spellbook/              # Combos, bracket estimates, decklist combos
 │       ├── seventeen_lands/        # Card ratings, color ratings
-│       ├── edhrec/                 # Commander pages, card synergy
-│       └── scryfall_bulk/          # Oracle Cards sample with adversarial entries
+│       └── edhrec/                 # Commander pages, card synergy
 │
 ├── scripts/
 │   └── capture_fixtures.py
@@ -223,7 +223,7 @@ mtg-mcp/
 
 **`services/` vs `providers/`**: Services are plain Python classes with async methods that call external APIs. Providers are FastMCP server instances that register tools backed by services. Services are reusable outside MCP and independently testable.
 
-**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return formatted strings. Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `draft.py`, `deck.py`, `analysis.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`. `card_resolver.py` provides bulk-data-first card resolution with Scryfall fallback, used by `analysis.py` for rate-limit-friendly bulk lookups.
+**`workflows/`**: Pure async functions that accept service clients as keyword parameters and return `WorkflowResult` objects (markdown + structured data). Registered as tools on a separate FastMCP server (`workflow_mcp`) mounted without a namespace. The function modules (`commander.py`, `commander_depth.py`, `draft.py`, `draft_limited.py`, `deck.py`, `analysis.py`, `building.py`, `constructed.py`, `validation.py`, `mana_base.py`, `pricing.py`, `rules.py`) have zero MCP imports — `server.py` wraps them as tools and converts service exceptions to `ToolError`. This separation avoids circular imports and makes unit testing trivial with `AsyncMock`. `card_resolver.py` provides bulk-data-first card resolution with Scryfall fallback, used by `analysis.py` for rate-limit-friendly bulk lookups.
 
 **`types.py`**: Shared Pydantic models that services return and tools consume. Ensures type safety across the service → provider → workflow pipeline.
 
