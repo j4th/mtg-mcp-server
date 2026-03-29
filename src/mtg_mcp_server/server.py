@@ -103,6 +103,20 @@ mcp.mount(workflow_mcp)
 # LLM context windows. Most tool outputs are well under 10KB.
 mcp.add_middleware(ResponseLimitingMiddleware(max_size=500_000))
 
+# CodeMode: experimental transform that replaces individual tools with meta-tools
+# for discovery and code execution. Useful at 40+ tools to reduce LLM context.
+if _settings.enable_code_mode:
+    try:
+        from fastmcp.experimental.transforms.code_mode import CodeMode
+
+        mcp.add_transform(CodeMode())
+        structlog.get_logger(service="startup").info("code_mode.enabled")
+    except ImportError:
+        structlog.get_logger(service="startup").warning(
+            "code_mode.unavailable",
+            hint='Install with: pip install "mtg-mcp-server[code-mode]"',
+        )
+
 
 # Ping is a local health check — no network access, so openWorldHint=False.
 _PING_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
