@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [ready_for_review, reopened]
 
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
     runs-on: ubuntu-latest
@@ -25,10 +29,25 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Read CLAUDE.md first — it defines the project conventions.
+
+            Review this PR for:
+            1. Correctness — logic errors, edge cases, wrong exception types
+            2. Error handling — missing `from exc` on raises, swallowed exceptions
+            3. Data bugs — optional numeric fields checked with truthiness instead of `is not None`
+            4. Architecture — service/provider/workflow layer boundary violations
+            5. Security — secrets in code, unsanitized input
+
+            Do NOT flag style, formatting, naming, or missing docstrings on unchanged code.
+
+            Use inline comments for specific issues with severity (critical/warning/suggestion).
+            Post a summary comment with verdict and issue counts.
           claude_args: >-
             --allowedTools
-            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search:*)"
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
           show_full_output: true
