@@ -710,9 +710,9 @@ async def tribal_staples(
 async def precon_upgrade(
     decklist: Annotated[list[str], Field(description="Full precon decklist — card names")],
     commander: Annotated[str, Field(description="Commander card name")],
+    ctx: Context,
     budget: Annotated[float, Field(description="Maximum price per upgrade card in USD")] = 50.0,
     num_upgrades: Annotated[int, Field(description="Number of upgrade suggestions")] = 10,
-    ctx: Context = None,  # type: ignore[assignment]
     response_format: Annotated[
         Literal["detailed", "concise"],
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
