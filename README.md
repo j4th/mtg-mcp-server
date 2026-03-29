@@ -16,6 +16,19 @@
 
 > Built on data from [Scryfall](https://scryfall.com), [Commander Spellbook](https://commanderspellbook.com), [17Lands](https://www.17lands.com), and [EDHREC](https://edhrec.com). See [Data Sources & Attribution](#data-sources--attribution) for details and usage terms.
 
+## Table of Contents
+
+- [What You Can Do](#what-you-can-do) — example prompts and real tool output
+- [Install](#install) — hosted, Claude Code, Claude Desktop, PyPI, development
+- [Configuration](#configuration) — environment variables and feature flags
+- [Tools](#tools) — all 51 tools across 10 domains
+- [Architecture](#architecture) — FastMCP 3.x mount system
+- [Stack](#stack) — Python 3.12+, FastMCP, httpx, Pydantic
+- [Development](#development) — mise commands for testing, linting, typechecking
+- [Documentation](#documentation) — cookbook, architecture, tool reference, and more
+- [Status](#status) — current tool/test counts
+- [Data Sources & Attribution](#data-sources--attribution) — Scryfall, Spellbook, 17Lands, EDHREC
+
 ## What You Can Do
 
 Ask your AI assistant questions like these and it will use the MTG tools automatically:
@@ -38,6 +51,42 @@ Ask your AI assistant questions like these and it will use the MTG tools automat
 **Rules**
 - "How do deathtouch and trample interact?"
 - "Resolve this combat scenario: my 3/3 with first strike blocks their 5/5 with trample"
+
+### See It in Action
+
+> "Compare Muldrotha, Meren, and Karador as graveyard commanders"
+
+```
+                     Muldrotha            Meren               Karador
+Mana Cost            {3}{B}{G}{U}         {2}{B}{G}           {5}{W}{B}{G}
+Color Identity       BGU (Sultai)         BG (Golgari)        BGW (Abzan)
+Stats                6/6                  3/4                  3/4
+EDHREC Rank          #1,137               #1,476              #9,894
+Total Decks          22,460               19,919              6,305
+Combo Count          10                   1                   10
+
+Top Staples:
+  Muldrotha           Spore Frog (+53%), Sakura-Tribe Elder (+36%), Eternal Witness (+27%)
+  Meren               Spore Frog (+70%), Sakura-Tribe Elder (+55%), Viscera Seer (+52%)
+  Karador             Karmic Guide (+51%), Satyr Wayfinder (+49%), Sun Titan (+48%)
+```
+
+> "What are the best commons in Foundations for draft?"
+
+```
+Foundations (FDN) — PremierDraft · Median GIH WR: 54.7%
+
+Rank  Card               Color  GIH WR   ALSA   IWD      Games
+1     Bake into a Pie    B      58.4%    3.1    +5.3%    354,741
+2     Burst Lightning    R      58.2%    3.3    +3.0%    338,888
+3     Refute             U      58.1%    5.3    +4.3%    321,280
+4     Stab               B      57.9%    3.4    +4.5%    376,569
+5     Dazzling Angel     W      57.8%    3.2    +2.4%    317,648
+
+Trap rares: Doubling Season (39.4%), Thousand-Year Storm (35.2%) ...
+```
+
+More examples with real tool output in the [Cookbook](docs/COOKBOOK.md).
 
 ## Install
 

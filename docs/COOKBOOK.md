@@ -1,8 +1,8 @@
 # MTG MCP Cookbook
 
-Practical workflows for getting the most out of the MTG MCP server. Each recipe shows the prompts you would type and how the server's tools chain together behind the scenes. For installation, see the [README](../README.md).
+Practical workflows for getting the most out of the MTG MCP server. Each recipe shows the prompts you would type, the real tool output you will see, and how the server's tools chain together behind the scenes. For installation, see the [README](../README.md).
 
-All examples use natural language. The server's tools are invoked automatically by your AI assistant based on your request -- you never need to call tool names directly.
+All examples use natural language. The server's tools are invoked automatically by your AI assistant based on your request -- you never need to call tool names directly. The example outputs below are real responses from the server.
 
 ---
 
@@ -20,11 +20,44 @@ You are considering building a deck around a commander and want the full picture
 
 > Tell me everything about Muldrotha, the Gravetide as a commander.
 
-This pulls card data from Scryfall, top combos from Commander Spellbook, and staple cards from EDHREC into a single overview. Follow up to dig deeper into combos:
+This pulls card data from Scryfall, top combos from Commander Spellbook, and staple cards from EDHREC into a single overview.
+
+**Example output:**
+
+```
+Muldrotha, the Gravetide {3}{B}{G}{U}
+Legendary Creature — Elemental Avatar (6/6)
+EDHREC Rank: #1137 · Price: $0.69
+
+During each of your turns, you may play a land and cast a permanent spell
+of each permanent type from your graveyard.
+
+--- Top Combos ---
+1. Muldrotha + Kaya's Ghostform + Altar of Dementia + Lotus Petal
+   → Infinite death triggers, Infinite ETB, Infinite LTB
+2. Muldrotha + Displacer Kitten + Lotus Petal
+   → Infinite colored mana, Infinite storm count
+3. Muldrotha + Mindslaver
+   → Control one opponent on each of their turns (Lock)
+4. Muldrotha + Phyrexian Altar + Kaya's Ghostform
+   → Infinite death triggers, Infinite ETB, Infinite LTB
+5. Muldrotha + Displacer Kitten + Lion's Eye Diamond
+   → Infinite colored mana, Infinite storm count
+
+--- EDHREC Staples (22,460 decks) ---
+High Synergy:
+  Spore Frog              synergy +53%  inclusion 60%  (13,486 decks)
+  Seal of Primordium      synergy +45%  inclusion 49%  (11,116 decks)
+  Kaya's Ghostform        synergy +43%  inclusion 48%  (10,887 decks)
+Top Cards:
+  Eternal Witness          synergy +27%  inclusion 53%  (11,971 decks)
+  Animate Dead             synergy +29%  inclusion 42%  (9,416 decks)
+  The Gitrog Monster       synergy +27%  inclusion 42%  (9,368 decks)
+```
+
+Follow up to dig deeper into combos:
 
 > What other combos does Muldrotha enable in Sultai? Show me up to 20.
-
-**What you get:** A commander profile with mana cost, type, oracle text, EDHREC rank, top 5 combos with step-by-step instructions, and the 10 most-played cards with synergy scores and inclusion rates.
 
 **Tips:** If you want to see how a commander stacks up against alternatives, jump to the "Compare Commanders" recipe below.
 
@@ -53,7 +86,7 @@ The server identifies the weakest cards by synergy score and pairs each cut with
 >
 > (paste updated decklist)
 
-**What you get:** Ranked swap pairs (cut this, add that) with reasoning, followed by a legality check covering deck size, color identity, copy limits, and banned cards.
+**What you get:** Ranked swap pairs (cut this, add that) with reasoning. The server scores each card by EDHREC synergy and inclusion rate, protects combo pieces, and suggests replacements ranked by synergy improvement. This is followed by a legality check covering deck size, color identity, copy limits, and banned cards.
 
 **Tips:** Adjust the budget parameter by being specific: "under $50 total" or "no card over $5". Use the `upgrade_precon` prompt for a guided multi-step session.
 
@@ -80,6 +113,20 @@ Start with the big picture:
 Identify your theme:
 
 > Search for cards with a "proliferate" theme in WUBG colors, legal in Commander, under $5 each.
+
+**Example output** (from `theme_search`)**:**
+
+```
+Theme: counters (mapped from "proliferate")
+10 cards found in WUBG, Commander-legal, under $5.00
+
+  Greta, Sweettooth Scourge      {1}{B}{G}  Legendary Creature   $0.16
+  Pteramander                     {U}        Creature             $0.09
+  Warden of the First Tree        {G}        Creature             $0.25
+  Yorvo, Lord of Garenbrig        {G}{G}{G}  Legendary Creature   $0.33
+  Long List of the Ents           {G}        Enchantment — Saga   $0.17
+  ...
+```
 
 Build around your key pieces:
 
@@ -116,7 +163,27 @@ Torn between 2-3 commanders for a new deck.
 
 > Compare Muldrotha, Meren of Clan Nel Toth, and Karador Ghost Chieftain as graveyard commanders.
 
-**What you get:** A side-by-side comparison table with mana cost, color identity, type, EDHREC rank, combo count, top staples, and unique strengths for each commander.
+**Example output:**
+
+```
+                     Muldrotha            Meren               Karador
+Mana Cost            {3}{B}{G}{U}         {2}{B}{G}           {5}{W}{B}{G}
+Color Identity       BGU (Sultai)         BG (Golgari)        BGW (Abzan)
+Stats                6/6                  3/4                  3/4
+EDHREC Rank          #1,137               #1,476              #9,894
+Total Decks          22,460               19,919              6,305
+Combo Count          10                   1                   10
+
+Top Staples:
+  Muldrotha           Spore Frog (+53%), Sakura-Tribe Elder (+36%), Eternal Witness (+27%)
+  Meren               Spore Frog (+70%), Sakura-Tribe Elder (+55%), Viscera Seer (+52%)
+  Karador             Karmic Guide (+51%), Satyr Wayfinder (+49%), Sun Titan (+48%)
+
+Shared across all:   Sakura-Tribe Elder, Eternal Witness, Spore Frog
+Unique to Muldrotha: Blue card advantage, plays ANY permanent type from graveyard
+Unique to Meren:     Lower mana cost, experience counter scaling
+Unique to Karador:   White removal/recursion, cost reduction from graveyard size
+```
 
 **Tips:** Follow up with `commander_overview` on whichever one interests you most. The `compare_commanders` prompt adds combo and staple analysis on top.
 
@@ -135,9 +202,20 @@ You want to improve an existing deck without spending much.
 
 > Suggest budget upgrades for my Atraxa deck where each card costs under $3.
 
+**Example output** (from `budget_upgrade`)**:**
+
+```
+Budget Upgrades for Atraxa, Praetors' Voice (under $3.00/card)
+
+Rank  Card                    Synergy  Inclusion  Price   Synergy/$
+1     Thrummingbird           +20%     51%        $0.20   0.80
+2     Astral Cornucopia       +19%     45%        $0.30   0.63
+3     Tezzeret's Gambit       +20%     48%        $0.32   0.63
+```
+
 Review the top suggestions in detail:
 
-> Evaluate adding Flux Channeler to my Atraxa deck.
+> Evaluate adding Thrummingbird to my Atraxa deck.
 
 Compare your top candidates head-to-head:
 
@@ -163,9 +241,42 @@ You want to study a format before sitting down to draft.
 
 > Show me the top commons and uncommons for Foundations Premier Draft.
 
-> What are the best color pair archetypes in Foundations? Use dates from February 1 to March 15, 2025.
+**Example output** (from `set_overview`)**:**
 
-**What you get:** Top 10 commons and top 10 uncommons ranked by Games-in-Hand Win Rate, a list of trap rares (those performing below the median), and archetype win rates by color pair.
+```
+Foundations (FDN) — PremierDraft
+Median GIH WR: 54.7%
+
+--- Top 10 Commons ---
+Rank  Card               Color  GIH WR   ALSA   IWD      Games
+1     Bake into a Pie    B      58.4%    3.1    +5.3%    354,741
+2     Burst Lightning    R      58.2%    3.3    +3.0%    338,888
+3     Refute             U      58.1%    5.3    +4.3%    321,280
+4     Stab               B      57.9%    3.4    +4.5%    376,569
+5     Dazzling Angel     W      57.8%    3.2    +2.4%    317,648
+6     Luminous Rebuke    W      57.7%    3.9    +2.4%    293,089
+7     Helpful Hunter     W      57.6%    3.5    +2.0%    346,467
+8     Bigfin Bouncer     U      57.6%    4.5    +3.8%    330,544
+9     Banishing Light    W      57.5%    2.8    +2.5%    302,846
+10    Felidar Savior     W      57.4%    3.7    +2.1%    304,559
+
+--- Top 10 Uncommons ---
+Rank  Card                 Color  GIH WR   ALSA   IWD      Games
+1     Dreadwing Scavenger  UB     61.4%    4.1    +9.2%    133,795
+2     Mischievous Mystic   U      60.4%    2.7    +6.8%    152,402
+3     Micromancer          U      59.3%    4.5    +5.1%    124,194
+4     Faebloom Trick       U      59.3%    3.2    +5.1%    151,980
+5     Empyrean Eagle       WU     59.2%    4.2    +4.0%    100,637
+
+--- Trap Rares (below median GIH WR) ---
+  Doubling Season        G      39.4%  ← Iconic card, terrible in limited
+  Thousand-Year Storm    UR     35.2%  ← Lowest win rate in the set
+  Painful Quandary       B      45.0%
+  Niv-Mizzet, Visionary  UR     47.0%
+  ...and 25 more rares/mythics below 54.7%
+```
+
+> What are the best color pair archetypes in Foundations? Use dates from February 1 to March 15, 2025.
 
 **Tips:** The `draft_strategy` prompt gives you a structured study session including heuristic thresholds for what counts as a good ALSA or IWD. Use `keyword_explain` if you encounter unfamiliar set mechanics.
 
@@ -180,11 +291,24 @@ Mid-draft, staring at a pack, not sure what to take.
 
 **Prompts:**
 
-> Rank these cards for my Foundations draft pack: Pacifism, Goblin Striker, Air Elemental, Giant Growth, Divination, Elite Vanguard, Llanowar Elves, Mind Rot, Serra Angel, Cancel, Raging Goblin, Pillarfield Ox, Raise Dead, Naturalize. Set code is FDN. My picks so far are Pacifism, Serra Angel, Swords to Plowshares, Elite Vanguard.
+> Rank these cards for my Foundations draft pack: Serra Angel, Pacifism, Air Elemental, Giant Growth, Llanowar Elves, Mind Rot, Cancel, Elite Vanguard. Set code FDN. My picks so far are Pacifism and Serra Angel.
+
+**Example output:**
+
+```
+FDN PremierDraft — Pack Rankings (current picks: Pacifism, Serra Angel → W)
+
+Rank  Card             Color  Rarity    GIH WR   ALSA   IWD      Games
+1     Llanowar Elves   G      common    56.9%    3.4    +2.9%    232,793  [off-color]
+2     Serra Angel      W      uncommon  54.8%    3.3    +0.4%    87,260   [on-color]
+3     Giant Growth     G      common    54.1%    6.7    -0.2%    111,372  [off-color]
+
+No 17Lands data: Pacifism, Air Elemental, Mind Rot, Cancel, Elite Vanguard
+```
 
 **What you get:** A table ranking each card by GIH Win Rate with color, rarity, ALSA, and IWD. When you provide your current picks, cards are tagged as on-color or off-color based on your draft direction.
 
-**Tips:** Include your current picks for color-fit analysis. Cards with fewer than 500 games in the 17Lands dataset will show "no data."
+**Tips:** Include your current picks for color-fit analysis. Cards with fewer than 500 games in the 17Lands dataset will show "no data." Use the full card name as printed -- 17Lands uses Arena card names which may differ from some reprints.
 
 ---
 
@@ -248,7 +372,21 @@ You have a decklist and want to make sure it is legal and has a solid mana base.
 > 4 Lightning Bolt
 > 4 Monastery Swiftspear
 > 4 Goblin Guide
+> 4 Lava Spike
+> 4 Rift Bolt
 > ... (paste full decklist)
+
+**Example output** (from `deck_validate`)**:**
+
+```
+Format: Modern
+Status: ✓ VALID
+
+Total cards: 60
+Unique cards resolved: 14/14
+Legality issues: None
+Copy limit violations: None
+```
 
 If it passes, optimize the lands:
 
@@ -281,6 +419,22 @@ Then find what to cut:
 
 > What are the 5 weakest cards I should cut from this deck?
 
+**Example output** (from `suggest_cuts`)**:**
+
+```
+Cut Candidates for Muldrotha, the Gravetide
+Sources: Spellbook ✓  EDHREC ✓
+
+Rank  Card                 Score   Synergy  Inclusion  Combo?
+1     Nihil Spellbomb      1.88    +6%      6%         No
+2     Vessel of Nascency   1.87    +6%      7%         No
+3     Caustic Caterpillar   1.73    +13%     14%        No
+4     Reclamation Sage     1.66    +12%     22%        No
+5     Life from the Loam   1.58    +13%     29%        No
+
+Higher score = more cuttable. Combo pieces are protected (score -2.0).
+```
+
 **What you get:** A full health report with mana curve distribution, color pip requirements, combo and bracket analysis, total deck budget, the 5 lowest-synergy cards, and a data sources summary. The cut suggestions rank cards by synergy and inclusion rate while protecting combo pieces.
 
 **Tips:** The `deck_health_check` prompt runs both analyses together and provides prioritized recommendations. Follow up with `budget_upgrade` to find replacements for the cards you cut.
@@ -304,6 +458,32 @@ Start with the mechanic interaction:
 
 > How do deathtouch and trample interact when blocking?
 
+**Example output** (from `rules_interaction`)**:**
+
+```
+--- Deathtouch (Rule 702.2) ---
+"A creature with toughness greater than 0 that's been dealt damage by a
+source with deathtouch since the last time state-based actions were checked
+is destroyed as a state-based action." (702.2b)
+
+"Any nonzero amount of combat damage assigned to a creature by a source
+with deathtouch is considered to be lethal damage for the purposes of
+determining if a proposed combat damage assignment is valid, regardless
+of that creature's toughness." (702.2c)
+
+--- Trample (Rule 702.19) ---
+"The controller of an attacking creature with trample first assigns damage
+to the creature(s) blocking it. Once all those blocking creatures are
+assigned lethal damage, any excess damage is assigned as its controller
+chooses among those blocking creatures and the player..." (702.19b)
+
+--- Interaction ---
+Only 1 damage needs to be assigned to each blocker for lethal (702.2c + 702.19b).
+A 6/6 with deathtouch and trample blocked by a 5/5: the attacker assigns
+just 1 damage to the blocker (lethal due to deathtouch per 702.2c) and
+the remaining 5 tramples through to the defending player.
+```
+
 Get a ruling for the specific board state:
 
 > My opponent attacks with a 6/6 trample creature. I block with a 2/2 deathtouch creature. How is damage assigned and what happens?
@@ -312,7 +492,21 @@ If a keyword is unfamiliar:
 
 > Explain the ward keyword and how it works.
 
-**What you get:** Rules citations from the Comprehensive Rules for each mechanic, an explanation of how they interact, and a step-by-step walkthrough of your specific scenario with rule numbers. Keyword explanations include the glossary definition, related rules, and example cards that have the keyword.
+**Example output** (from `keyword_explain`)**:**
+
+```
+Ward (Rule 702.21)
+
+"Whenever this permanent becomes the target of a spell or ability an
+opponent controls, counter that spell or ability unless that player
+pays [cost]." (702.21a)
+
+Ward is a triggered ability, not a static one — it goes on the stack
+and can be responded to. The cost varies by card (mana, life, discard, etc.).
+
+Note: Ward only triggers from opponents' spells/abilities. Your own spells
+targeting your creature with ward will not trigger it.
+```
 
 **Tips:** The `rules_question` prompt guides a full rules inquiry with citations. Use `combat_calculator` for complex multi-creature combat scenarios where you need the full step-by-step combat phase breakdown.
 
