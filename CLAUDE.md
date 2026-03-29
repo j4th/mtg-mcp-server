@@ -86,6 +86,16 @@ See @docs/ARCHITECTURE.md for full details.
 - After cherry-picking, diff against the prior phase's commit to verify nothing was reverted: `git diff <prior-commit>..HEAD -- <shared-files>`. Worktree agents rewrite entire files — if two phases touch the same files, the later cherry-pick silently clobbers the earlier phase's changes.
 - Cancel stale CI runs on the branch before pushing new commits.
 
+## Agent Dispatch Strategy
+
+Use the most parallel approach that fits the task. Prefer this hierarchy:
+
+1. **Parallel agents** (`superpowers:dispatching-parallel-agents`) — Independent file domains, no shared state. Best for plan phases with exclusive-file agent tables.
+2. **Subagent-driven development** (`superpowers:subagent-driven-development`) — Fresh subagent per task with two-stage review (spec compliance then code quality). Best for sequential implementation where tasks depend on each other.
+3. **Sequential** — Only when tasks are tightly coupled or share files that can't be split.
+
+When a plan has an agent table with exclusive files, use parallel agents. When tasks must be sequential but benefit from review gates, use subagent-driven development. Always commit before launching worktree agents.
+
 ## PR Workflow
 
 - Always create PRs as drafts (`gh pr create --draft`). Claude review triggers on `ready_for_review`, not `opened`.
