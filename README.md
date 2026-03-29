@@ -307,7 +307,7 @@ MTG (orchestrator)
 ├── draft (namespace: draft_)           -> 17Lands data
 ├── edhrec (namespace: edhrec_)         -> EDHREC (scraped, feature-flagged)
 ├── bulk (namespace: bulk_)             -> Scryfall Oracle Cards bulk data
-└── workflows (no namespace)            -> 30 composed tools + rules engine
+└── workflows (no namespace)            -> 27 tools (22 composed + 5 rules)
 ```
 
 Services are pure async API clients. Providers register MCP tools. Workflows compose across services with partial failure tolerance. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
@@ -357,7 +357,7 @@ mise run fix          # Auto-fix lint and format issues
 
 ## Status
 
-51 tools, 17 prompts, 18 resource templates. 973 tests at 89% coverage.
+51 tools, 17 prompts, 18 resource templates. 989 tests at 88% coverage.
 
 | Phase | What | Status |
 |-------|------|--------|
@@ -365,7 +365,7 @@ mise run fix          # Auto-fix lint and format issues
 | 1 | Scryfall backend (4 tools) | Done |
 | 2 | Spellbook + 17Lands + EDHREC backends (9 tools) | Done |
 | 3 | Workflow tools -- commander, draft, deck (4 tools) | Done |
-| 4 | TTL caching + Scryfall bulk data provider (6 tools) | Done |
+| 4 | TTL caching + Scryfall bulk data provider (2 tools) | Done |
 | 5 | Analysis & comparison workflows, prompts, resources (4 tools) | Done |
 | Branch A | Structured output, rules engine, validation tools (17 tools) | Done |
 | Branch B | Format workflows -- deck building, commander depth, limited, constructed (11 tools) | Done |

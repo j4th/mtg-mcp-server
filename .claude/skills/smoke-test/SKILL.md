@@ -42,7 +42,7 @@ For each call: note PASS / FAIL (with detail) / SKIP (tool unavailable or featur
 | `bulk_card_search(query="Lightning", search_field="name")` | Lightning Bolt in results |
 | `bulk_card_search(query="Creature", search_field="type", limit=3)` | Creature type lines |
 
-If bulk tools unavailable (older server), try `mtgjson_card_lookup` / `mtgjson_card_search` and SKIP the regression check.
+If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_search` and SKIP the regression check.
 
 ### 3. Spellbook (sequential — need combo ID from search)
 

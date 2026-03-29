@@ -49,8 +49,8 @@ Thirteen new prompts guide multi-step workflows: building decks from scratch, up
 | Tools | 23 | 51 |
 | Prompts | 4 | 17 |
 | Resources | 6 | 18 |
-| Tests | 374 | 973 |
-| Coverage | 92% | 89% |
+| Tests | 374 | 989 |
+| Coverage | 92% | 88% |
 
 ## Getting Started
 
