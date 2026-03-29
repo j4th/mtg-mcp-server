@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Cookbook & Usage Examples
+    url: https://github.com/j4th/mtg-mcp-server/blob/main/docs/COOKBOOK.md
+    about: Check the cookbook for usage recipes before requesting a feature
+  - name: Tool Reference
+    url: https://github.com/j4th/mtg-mcp-server/blob/main/docs/TOOL_DESIGN.md
+    about: Full reference for all 51 tools, 17 prompts, and 18 resources

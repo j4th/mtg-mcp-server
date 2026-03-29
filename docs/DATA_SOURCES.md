@@ -22,16 +22,17 @@ These have official or well-documented REST APIs with clear access patterns.
 | **Client libraries** | Numerous. We build our own with httpx. | `commander-spellbook` npm package. `pyedhrec` includes some. We build our own. |
 | **Notes** | The foundation everything else builds on. Card identity resolution for all other services. Cannot paywall access to Scryfall data per ToS. | Open source (MIT). Powers EDHREC's combo feature. Bracket labels map to 1-4 scale. |
 
-### MTGJSON (Supplementary Tier 1)
+### Scryfall Oracle Cards Bulk Data (Supplementary Tier 1)
 
 | | |
 |---|---|
-| **URL** | `https://mtgjson.com` |
-| **What it has** | Canonical open-source card database as JSON files. AllCards, AllSets, full deck data. Same underlying data as Scryfall but in downloadable bulk format. |
+| **URL** | Discovered via `https://api.scryfall.com/bulk-data` (Oracle Cards type) |
+| **What it has** | Every unique card as a JSON array — same shape as Scryfall API responses. Includes oracle text, types, colors, mana costs, legalities, prices (USD/EUR/foil), images, EDHREC rank, keywords. |
 | **Auth** | None. Public downloads. |
-| **Access method** | Static JSON file downloads. No REST API for queries — download and parse locally. |
-| **Rate limit** | N/A (file downloads). |
-| **Use case** | Local cache/reference layer to reduce Scryfall API calls for basic card lookups. Not needed immediately — Scryfall API is sufficient. |
+| **Access method** | JSON file download (~30MB). Parsed into in-memory dict for O(1) lookups. |
+| **Rate limit** | N/A (file download). |
+| **Use case** | Rate-limit-free card lookup and search. Returns full `Card` objects (same as Scryfall API). Used by workflows for bulk card resolution. Replaces MTGJSON, which lacked prices, legalities, and images. |
+| **Notes** | Behind `MTG_MCP_ENABLE_BULK_DATA` feature flag (default `true`). Refreshes every 12h (configurable via `MTG_MCP_BULK_DATA_REFRESH_HOURS`). Non-playable layouts (tokens, emblems, art series) filtered during loading. |
 
 ---
 
@@ -50,7 +51,7 @@ These provide critical data but lack official public APIs. Access is through und
 | **Docs** | No official API docs. Community blog posts and tools document the endpoints. Joel Nitta's R tutorial covers public datasets well. | No docs. `pyedhrec` library source code is the best reference. EDHREC FAQ describes data sourcing. | No docs. Community reverse-engineering via network inspection. |
 | **Fragility** | Medium. The card_ratings endpoint has been stable for years and is used by multiple community tools. Could break or get locked down. | High. Scraping undocumented JSON endpoints. EDHREC can change internal structure at any time. Must be behind a feature flag. | High. No official API commitment. Could change or add auth requirements. |
 | **Key metrics / data** | GIH WR (Games In Hand Win Rate) is the primary card quality metric. IWD (Improvement When Drawn) shows how much drawing a card helps. ALSA (Average Last Seen At) shows how late a card wheels. 17Lands user base skews above average — baseline WR is ~56%, not 50%. | Synergy score (+/- percentage vs average deck), inclusion rate (% of decks running the card), number of decks analyzed, card categories (creatures, enchantments, etc.), salt scores. | Deck lists with card counts, categories, tags. Collection with conditions, languages, foil status. Price tracking via TCGPlayer/Cardmarket. |
-| **Our priority** | Phase 4. Critical for draft/sealed analytics and Lorwyn Eclipsed prep. | Phase 5. Critical for Commander upgrade recommendations. Behind feature flag due to fragility. | Deferred. Would enable cross-referencing owned collection against upgrade suggestions, but access is unreliable. |
+| **Our priority** | Complete (Phase 2). Critical for draft/sealed analytics. | Complete (Phase 2). Critical for Commander upgrade recommendations. Behind feature flag due to fragility. | Deferred. Would enable cross-referencing owned collection against upgrade suggestions, but access is unreliable. |
 
 ---
 
@@ -72,13 +73,14 @@ Useful for specific use cases but not core to the initial build.
 
 ## Access Pattern Summary
 
-| Source | Auth | Method | Stability | Our Phase |
-|--------|------|--------|-----------|-----------|
-| Scryfall | None (headers required) | REST API | Rock solid | Phase 1 |
-| Commander Spellbook | None | REST API | Solid (open source) | Phase 2 |
-| MTGJSON | None | File download | Solid | Phase 4 (implemented) |
-| 17Lands | None | Undocumented REST + bulk CSV | Stable but unofficial | Phase 3 |
-| EDHREC | None | Reverse-engineered JSON | Fragile — feature flag | Phase 4 |
+| Source | Auth | Method | Stability | Status |
+|--------|------|--------|-----------|--------|
+| Scryfall API | None (headers required) | REST API | Rock solid | Complete |
+| Scryfall Bulk Data | None | File download | Rock solid | Complete (replaced MTGJSON) |
+| Commander Spellbook | None | REST API | Solid (open source) | Complete |
+| 17Lands | None | Undocumented REST + bulk CSV | Stable but unofficial | Complete |
+| EDHREC | None | Reverse-engineered JSON | Fragile — feature flag | Complete |
+| Comprehensive Rules | None | File download | Stable (Wizards-hosted) | Complete |
 | Moxfield | User-Agent header | Reverse-engineered REST | Fragile | Deferred |
 | Spicerack | None | Documented REST API | Solid | Deferred |
 | Archidekt | None | Reverse-engineered REST | Fragile | Deferred |

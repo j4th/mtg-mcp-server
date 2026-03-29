@@ -5,6 +5,106 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-29
+
+v2.0.0 marks the feature-complete milestone for the MTG MCP server. This is not a
+breaking change -- all existing tools retain their parameters and behavior. The major
+version signals the scope of new capabilities added since v1.0.0.
+
+### Added
+
+#### Scryfall Bulk Data Provider (9 tools, namespace: `bulk`)
+- `bulk_card_lookup` -- Rate-limit-free card lookup from Scryfall Oracle Cards bulk data
+- `bulk_card_search` -- Rate-limit-free card search by name, type, or oracle text
+- `bulk_format_legality` -- Check card legality in a format
+- `bulk_format_search` -- Search for cards legal in a specific format
+- `bulk_format_staples` -- Top-played cards in a format by EDHREC rank
+- `bulk_ban_list` -- Banned/restricted cards for a format
+- `bulk_card_in_formats` -- Card legality across all formats
+- `bulk_random_card` -- Random card with optional format/type filter
+- `bulk_similar_cards` -- Find cards similar by type, keywords, or mana cost
+
+#### Scryfall Tools
+- `scryfall_whats_new` -- Recently released or previewed cards
+- `scryfall_set_info` -- Set metadata by set code
+
+#### Rules Engine (5 tools)
+- `rules_lookup` -- Look up rules by number or keyword search
+- `keyword_explain` -- Explain a keyword with rules, glossary, and example cards
+- `rules_interaction` -- How two mechanics interact with rule citations
+- `rules_scenario` -- Resolve a game scenario with relevant rules framework
+- `combat_calculator` -- Step-by-step combat phases with keyword interactions
+- Local Comprehensive Rules parser service (RulesService)
+
+#### Deck Building Workflows (3 tools)
+- `theme_search` -- Search for cards matching a mechanical or tribal theme via oracle text
+- `build_around` -- Detect synergies from key cards and find cards that work with them
+- `complete_deck` -- Gap analysis and card suggestions to fill out a partial decklist
+
+#### Commander Depth Workflows (4 tools)
+- `commander_comparison` -- Compare 2-5 commanders head-to-head across data, combos, popularity
+- `tribal_staples` -- Best cards for a creature type within a color identity
+- `precon_upgrade` -- Analyze a precon decklist and suggest swap pairs
+- `color_identity_staples` -- Top-played cards across all commanders in a color identity
+
+#### Limited Workflows (3 tools)
+- `sealed_pool_build` -- Suggest best 40-card sealed deck builds from a card pool
+- `draft_signal_read` -- Analyze draft picks to detect open color signals
+- `draft_log_review` -- Review a completed draft with pick-by-pick GIH WR analysis and grade
+
+#### Constructed Workflow
+- `rotation_check` -- Check Standard rotation status and which cards are in rotating sets
+
+#### Cross-Format Tools (3 tools)
+- `deck_validate` -- Validate a decklist against format construction rules
+- `suggest_mana_base` -- Suggest lands based on color pip distribution
+- `price_comparison` -- Compare prices across multiple cards
+
+#### Prompts (13 new, 17 total)
+- `build_deck` -- Guide building a deck from scratch for any format
+- `evaluate_collection` -- Evaluate a card collection for trade and deck-building value
+- `format_intro` -- Introduction to a Magic format with key cards and strategies
+- `card_alternatives` -- Find alternatives to a card for budget or format reasons
+- `rules_question` -- Ask a rules question with Comprehensive Rules citations
+- `build_around_deck` -- Build a deck around specific cards or a win condition
+- `build_tribal_deck` -- Build a tribal deck for any format
+- `build_theme_deck` -- Build a themed deck around a strategy or archetype
+- `upgrade_precon` -- Upgrade a precon Commander deck with a budget
+- `sealed_session` -- Guide a sealed deck building session
+- `draft_review` -- Review a completed draft with analysis and grade
+- `compare_commanders` -- Compare commanders to choose between them
+- `rotation_plan` -- Plan for Standard rotation with replacements
+
+#### Resources (12 new templates, 18 total)
+- `mtg://set/{code}` -- Set metadata as JSON
+- `mtg://format/{format}/legal-cards` -- Legal cards in a format
+- `mtg://format/{format}/banned` -- Banned cards in a format
+- `mtg://card/{name}/formats` -- Format legality for a card
+- `mtg://card/{name}/similar` -- Similar cards by type, keywords, or mana cost
+- `mtg://rules/{number}` -- Rule text by number
+- `mtg://rules/glossary/{term}` -- Glossary definition for a term
+- `mtg://rules/keywords` -- List of all keywords with rule references
+- `mtg://rules/sections` -- List of all rule sections
+- `mtg://theme/{theme}` -- Cards matching a theme
+- `mtg://tribe/{tribe}/staples` -- Staple cards for a creature type
+- `mtg://draft/{set_code}/signals` -- Draft color openness signals
+
+#### Infrastructure
+- Structured output: all tools return `ToolResult` with structured `data` dict alongside markdown
+- `ResponseFormat` support (markdown/json) via shared formatters
+- Utility modules: color identity parser, format rules, query parser, mana cost parser, decklist parser
+- CodeMode transform behind feature flag (`MTG_MCP_ENABLE_CODE_MODE`)
+- Live smoke tests in CI on pull requests
+- Claude Code review integration
+- Dependabot enabled
+
+### Changed
+- Replaced MTGJSON with Scryfall Oracle Cards bulk data (~30MB) for richer card info including prices, legalities, images, and EDHREC rank. The `mtgjson_` namespace is replaced by `bulk_`. The `MTG_MCP_ENABLE_MTGJSON` flag is replaced by `MTG_MCP_ENABLE_BULK_DATA`.
+- `mtg://card-data/{name}` resource now backed by Scryfall bulk data instead of MTGJSON
+- Card resolver utility uses Scryfall bulk data first (instead of MTGJSON) with Scryfall API fallback
+
+[2.0.0]: https://github.com/j4th/mtg-mcp-server/compare/v1.2.3...v2.0.0
+
 ## [1.2.0] - 2026-03-24
 
 ### Added

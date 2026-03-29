@@ -377,100 +377,93 @@ These are undocumented internal endpoints. They WILL break eventually. Design th
 
 ---
 
-## MTGJSON
+## Scryfall Bulk Data
 
-**Status:** Open-source card data project. Bulk JSON file downloads. No rate limits.
+**Status:** Official Scryfall bulk data download. Same data as the API but available as a file. Replaced MTGJSON in Phase 4.
 
 ### Connection Details
 
 | Field | Value |
 |-------|-------|
-| Data URL | `https://mtgjson.com/api/v5/AtomicCards.json.gz` (~20MB gzipped, ~120MB uncompressed) |
-| Auth | None (public downloads) |
-| Rate limit | N/A (file download, not API) |
+| Discovery URL | `https://api.scryfall.com/bulk-data` |
+| Auth | None (public download) |
+| Rate limit | N/A (file download) |
 | Update frequency | Daily |
-| Documentation | https://mtgjson.com/data-models/ |
+| Documentation | https://scryfall.com/docs/api/bulk-data |
 
 ### Data File
 
-**`AtomicCards.json.gz`** — Oracle-level card data keyed by display name.
+The Oracle Cards bulk data is discovered via the `/bulk-data` endpoint, which returns a JSON list of available bulk data types. The `oracle_cards` type contains one JSON object per unique card name.
 
-Gzip-compressed JSON file. After decompression, the structure is:
-```json
-{
-  "data": {
-    "Sol Ring": [
-      {
-        "name": "Sol Ring",
-        "manaCost": "{1}",
-        "type": "Artifact",
-        "text": "{T}: Add {C}{C}.",
-        "colors": [],
-        "colorIdentity": [],
-        "types": ["Artifact"],
-        "subtypes": [],
-        "supertypes": [],
-        "keywords": [],
-        "power": null,
-        "toughness": null,
-        "manaValue": 1.0
-      }
-    ],
-    "Muldrotha, the Gravetide": [
-      { "..." : "..." }
-    ]
-  }
-}
-```
-
-Each card name maps to an array of printings. We use `printings[0]` for oracle data (oracle text is the same across all printings).
-
-### Key Fields Extracted
-
-| MTGJSON Field | Our Model Field | Notes |
-|---------------|-----------------|-------|
-| `name` | `name` | Display name (front face for DFCs) |
-| `manaCost` | `mana_cost` | Mana cost string (e.g. `"{3}{B}{G}{U}"`) |
-| `type` | `type_line` | Full type line |
-| `text` | `oracle_text` | Oracle text |
-| `colors` | `colors` | Color list |
-| `colorIdentity` | `color_identity` | Color identity list |
-| `types` | `types` | Card types (e.g. `["Creature"]`) |
-| `subtypes` | `subtypes` | Subtypes (e.g. `["Elemental", "Avatar"]`) |
-| `supertypes` | `supertypes` | Supertypes (e.g. `["Legendary"]`) |
-| `keywords` | `keywords` | Keywords (e.g. `["Flying", "Trample"]`) |
-| `power` | `power` | Power (nullable) |
-| `toughness` | `toughness` | Toughness (nullable) |
-| `manaValue` | `mana_value` | Converted mana cost as float |
-
-### What MTGJSON Does NOT Have
-
-- **Prices** — Must use Scryfall for price data
-- **Rulings** — Must use Scryfall for official rulings
-- **Images** — No image URIs
-- **Set-specific data** — AtomicCards is oracle-level, not printing-level
-- **Legalities** — Not in the atomic data
-- **EDHREC rank** — Not included
-
-### Double-Faced Card (DFC) Handling
-
-AtomicCards keys DFCs by their full display name with `//` separator (e.g. `"Jace, Vryn's Prodigy // Jace, Telepath Unbound"`). The `name` field in each printing contains only the front face name. Our service keys lookups by both:
-- The front face name (from `printing.name`)
-- The full `//` name (from the dict key)
-
-This allows lookup by either `"Jace, Vryn's Prodigy"` or `"Jace, Vryn's Prodigy // Jace, Telepath Unbound"`.
+Card objects in the bulk data use the **same shape** as Scryfall API responses — no field mapping needed. The `Card` Pydantic model parses both API and bulk data responses identically.
 
 ### Service Architecture
 
-Unlike other services, MTGJSON is **not** a `BaseClient` subclass. It's a file-based service that:
-1. Downloads `AtomicCards.json.gz` lazily on first access (not at startup)
-2. Decompresses and parses into `dict[str, MTGJSONCard]` keyed by lowercase name
-3. Maintains a separate `list[MTGJSONCard]` for substring search
-4. Refreshes when `MTG_MCP_MTGJSON_REFRESH_HOURS` has elapsed (default 24h)
-5. On refresh failure with existing data, serves stale data rather than failing
+`ScryfallBulkClient` is **not** a `BaseClient` subclass. It's a file-based service that:
+1. Discovers the download URL via Scryfall's `/bulk-data` endpoint
+2. Downloads the Oracle Cards JSON file lazily on first access (not at startup)
+3. Parses into `dict[str, Card]` keyed by lowercase name for O(1) lookups
+4. Filters out non-playable layouts (art_series, token, double_faced_token, emblem, vanguard, planar, scheme, augment, host) to prevent overwriting real cards
+5. Runs background refresh via `start_background_refresh()` every `MTG_MCP_BULK_DATA_REFRESH_HOURS` (default 12h)
+6. On refresh failure with existing data, serves stale data rather than failing
+
+### Key Methods
+
+- `get_card(name)` — O(1) exact-name lookup
+- `get_cards(names)` — Batch exact-name lookup
+- `search_cards(query, limit)` — Name substring search
+- `search_by_type(type_query, limit)` — Type line search
+- `search_by_text(text_query, limit)` — Oracle text search
+- `filter_cards(**criteria)` — Multi-criteria filtering (format, type, color identity, etc.)
 
 ### Feature Flag
 
-Behind `MTG_MCP_ENABLE_MTGJSON` (default `true`). When disabled:
-- Provider is not mounted on the orchestrator
-- Workflow tools skip MTGJSON lookups and go directly to Scryfall
+Behind `MTG_MCP_ENABLE_BULK_DATA` (default `true`). When disabled:
+- The bulk data provider is not mounted on the orchestrator
+- Workflow tools skip bulk data lookups and go directly to Scryfall API
+
+---
+
+## Comprehensive Rules
+
+**Status:** Official Wizards of the Coast text file. Updated ~4 times per year with new set releases.
+
+### Connection Details
+
+| Field | Value |
+|-------|-------|
+| URL | `https://media.wizards.com/2025/downloads/MagicCompRules%2020250404.txt` |
+| Auth | None (public download) |
+| Rate limit | N/A (file download) |
+| Update frequency | ~4 times per year (with each standard set release) |
+
+### Data File
+
+Plain-text file containing the full Comprehensive Rules of Magic: The Gathering. Parsed into three indexes:
+
+1. **Rules index** — `dict[str, Rule]` keyed by rule number (e.g. "704.5k"). Each `Rule` contains: `number`, `text`, `parent_number`, `subrules` list.
+2. **Glossary index** — `dict[str, GlossaryEntry]` keyed by lowercase term. Each entry contains: `term`, `definition`.
+3. **Sections index** — `dict[str, str]` mapping section numbers to names (e.g. "7" -> "Additional Rules").
+
+### Service Architecture
+
+`RulesService` is **not** a `BaseClient` subclass. It's a file-based service that:
+1. Downloads the Comprehensive Rules text file lazily on first access
+2. Parses rules, glossary, and section headers into in-memory indexes
+3. Tracks keyword rule numbers (702.x rules) for keyword-specific lookups
+4. Refreshes when `MTG_MCP_RULES_REFRESH_HOURS` has elapsed (default 168h / weekly)
+5. On refresh failure with existing data, serves stale data rather than failing
+
+### Key Methods
+
+- `lookup_by_number(number)` — Exact rule number lookup
+- `search_rules(query, section)` — Keyword search across rule text, optionally scoped to a section
+- `glossary_lookup(term)` — Glossary term lookup
+- `list_keywords()` — All keywords with brief definitions (702.x rules)
+- `list_sections()` — Section index for the Comprehensive Rules
+
+### Feature Flag
+
+Behind `MTG_MCP_ENABLE_RULES` (default `true`). When disabled:
+- Rules tools return a ToolError indicating the feature is disabled
+- No downloads are attempted

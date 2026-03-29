@@ -33,11 +33,11 @@ If you discover a security vulnerability in this project, please report it throu
 
 All upstream APIs used by this server are public and require no authentication tokens:
 
-- Scryfall (public API, requires only User-Agent header)
+- Scryfall (public API and bulk data downloads, requires only User-Agent header)
 - Commander Spellbook (public API)
 - 17Lands (public data endpoints)
 - EDHREC (public JSON endpoints)
-- MTGJSON (public file downloads)
+- Comprehensive Rules (public file download from Wizards of the Coast)
 
 There are no API keys, OAuth tokens, or credentials stored or transmitted by this server.
 

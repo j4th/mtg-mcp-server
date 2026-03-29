@@ -85,9 +85,9 @@ endpoints.
 
 ---
 
-## MTGJSON
+## MTGJSON (historical)
 
-Bulk card data provided by [MTGJSON](https://mtgjson.com).
+Bulk card data was originally provided by [MTGJSON](https://mtgjson.com). As of v2.0.0, MTGJSON has been replaced by Scryfall Oracle Cards bulk data. Attribution is retained here for historical versions.
 
 MTGJSON is open source under the MIT License:
 

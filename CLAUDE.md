@@ -152,4 +152,4 @@ Copy `.env.example` to `.env` to configure. All values have sensible defaults �
 - @docs/TOOL_DESIGN.md — Tool naming, inputs/outputs, prompts, resources
 - @docs/SERVICE_CONTRACTS.md — API endpoints, rate limits, response shapes, caching
 - @docs/DATA_SOURCES.md — All data sources evaluated, auth methods, stability, access patterns
-- @docs/PROJECT_PLAN.md — Phased implementation plan
+- @docs/CACHING_DESIGN.md — TTL cache strategy, per-method TTLs, Scryfall bulk data design

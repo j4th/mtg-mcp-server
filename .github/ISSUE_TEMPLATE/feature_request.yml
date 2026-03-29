@@ -1,0 +1,78 @@
+name: Feature Request
+description: Suggest a new tool, workflow, data source, or enhancement
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What kind of feature is this?
+      options:
+        - New tool (add a tool to an existing backend)
+        - New workflow (compose multiple backends)
+        - New data source (integrate a new API or dataset)
+        - New prompt (guided multi-step workflow template)
+        - New resource (mtg:// URI endpoint)
+        - Enhancement (improve an existing tool or workflow)
+        - Infrastructure (CI, testing, packaging, deployment)
+        - Documentation (docs, examples, cookbook recipes)
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe the problem you're trying to solve or the workflow you'd like to improve.
+      placeholder: "As a Commander player, I want to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: A clear description of what you'd like to happen. Include example prompts or tool names if you have ideas.
+      placeholder: |
+        A `metagame_snapshot` tool that shows the top 10 commanders in a color identity
+        with their combo counts and average deck price.
+
+  - type: checkboxes
+    id: data-sources
+    attributes:
+      label: Data Sources
+      description: Which data source(s) would this feature involve?
+      options:
+        - label: Scryfall (card data, prices, rulings)
+        - label: Scryfall Bulk Data (rate-limit-free lookups)
+        - label: Commander Spellbook (combos, bracket estimation)
+        - label: 17Lands (draft win rates, archetype stats)
+        - label: EDHREC (commander staples, synergy scores)
+        - label: Comprehensive Rules (rules engine)
+        - label: New data source (describe below)
+
+  - type: textarea
+    id: new-data-source
+    attributes:
+      label: New Data Source Details
+      description: If proposing a new data source, describe the API/endpoint, auth requirements, and what data it provides.
+      placeholder: |
+        Source: https://example.com/api
+        Auth: None / API key / OAuth
+        Data: What it provides and why it's valuable
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or workarounds you've considered.
+
+  - type: checkboxes
+    id: complexity
+    attributes:
+      label: Complexity Estimate
+      description: How complex do you think this is? (Helps us label issues for new contributors)
+      options:
+        - label: This could be a good first issue (single file, follows existing patterns)
+        - label: This is moderate complexity (new service or provider, follows established patterns)
+        - label: This is complex (new architecture, multiple backends, new patterns)

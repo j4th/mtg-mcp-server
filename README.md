@@ -12,44 +12,63 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-A Magic: The Gathering MCP server for AI assistants. Search cards, analyze draft formats, explore Commander combos, evaluate deck upgrades — all from Claude Code, Claude Desktop, or any MCP client.
+51 tools, 17 prompts, and 18 resources that give AI assistants deep access to Magic: The Gathering -- card data, combos, draft analytics, Commander metagame, deck building, rules engine, and more. Works with Claude Code, Claude Desktop, or any MCP client.
 
-> **Built on data from [Scryfall](https://scryfall.com), [Commander Spellbook](https://commanderspellbook.com), [17Lands](https://www.17lands.com), [EDHREC](https://edhrec.com), and [MTGJSON](https://mtgjson.com).** See [Data Sources & Attribution](#data-sources--attribution) for details and usage terms.
+> Built on data from [Scryfall](https://scryfall.com), [Commander Spellbook](https://commanderspellbook.com), [17Lands](https://www.17lands.com), and [EDHREC](https://edhrec.com). See [Data Sources & Attribution](#data-sources--attribution) for details and usage terms.
 
-## What It Does
+## What You Can Do
 
-**Card Data** (via Scryfall) — Search the full MTG card database, check prices, look up rulings, verify format legality.
+Ask your AI assistant questions like these and it will use the MTG tools automatically:
 
-**Combo Discovery** (via Commander Spellbook) — Find combos for any commander or card, estimate deck bracket/power level.
+**Commander**
+- "Show me everything about Muldrotha as a commander"
+- "What are the best budget upgrades for my Atraxa deck under $5?"
+- "Compare Muldrotha vs Meren vs Karador as graveyard commanders"
 
-**Draft Analytics** (via 17Lands) — Card win rates by set and archetype, format speed analysis, draft pick recommendations.
+**Draft & Limited**
+- "What are the best commons in Foundations for draft?"
+- "Rank these cards for my draft pack: Bitter Triumph, Monstrous Rage, Torch the Tower"
+- "Build a sealed deck from this pool: [list]"
 
-**Commander Metagame** (via EDHREC) — Top cards by commander, synergy scores, inclusion rates, average decklists.
+**Deck Building**
+- "Validate my Modern decklist"
+- "Suggest a mana base for my 3-color Commander deck"
+- "Find cards that synergize with sacrifice themes in Golgari"
 
-**Composed Workflows** — Higher-level tools that cross-reference multiple sources: commander overviews, upgrade evaluations, sealed pool analysis, deck audits.
+**Rules**
+- "How do deathtouch and trample interact?"
+- "Resolve this combat scenario: my 3/3 with first strike blocks their 5/5 with trample"
 
 ## Install
 
-Requires Python 3.12+. No API keys needed — all data sources are public.
+No API keys needed -- all data sources are public.
 
-```bash
-# Run directly with uvx (no install needed)
-uvx mtg-mcp-server
+### Hosted (zero setup)
 
-# Or install globally
-uv tool install mtg-mcp-server
+The fastest way to get started. No Python install required. Works on mobile.
 
-# Or install in a project
-uv add mtg-mcp-server
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "mtg": {
+      "type": "url",
+      "url": "https://mtg-mcp-server.fastmcp.app/mcp"
+    }
+  }
+}
 ```
 
-## Connect to Claude Code
+### Claude Code
 
 ```bash
 claude mcp add mtg -- uvx mtg-mcp-server
 ```
 
-Or add to your MCP config (`.mcp.json` or `~/.claude/settings.json`):
+### Claude Desktop (local)
+
+Runs on your machine. Requires Python 3.12+.
 
 ```json
 {
@@ -62,65 +81,31 @@ Or add to your MCP config (`.mcp.json` or `~/.claude/settings.json`):
 }
 ```
 
-Then in Claude Code:
-
-```
-> Search for Sultai creatures with CMC 3 or less that are legal in Commander
-> What combos does Muldrotha enable?
-> Show me draft ratings for the top BG commons in Lorwyn Eclipsed
-> Evaluate adding Spore Frog to my Muldrotha deck, cutting Eternal Skylord
-```
-
-## Connect to Claude Desktop
-
-Add to your Claude Desktop config:
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "mtg": {
-      "command": "uvx",
-      "args": ["mtg-mcp-server"]
-    }
-  }
-}
-```
-
-## Configuration
-
-All settings use `MTG_MCP_` environment variables with sensible defaults. No configuration required to get started.
+### PyPI
 
 ```bash
-# Disable optional backends
-MTG_MCP_ENABLE_EDHREC=false    # EDHREC scrapes undocumented endpoints
-MTG_MCP_ENABLE_17LANDS=false   # 17Lands rate-limits aggressively
-MTG_MCP_ENABLE_MTGJSON=false   # MTGJSON downloads ~100MB bulk file on first use
+# Run directly (no install)
+uvx mtg-mcp-server
 
-# Pass env vars to uvx
-uvx --env MTG_MCP_ENABLE_EDHREC=false mtg-mcp-server
+# Install globally
+uv tool install mtg-mcp-server
+
+# Add to a project
+uv add mtg-mcp-server
 ```
 
-See `.env.example` for all available options.
-
-## Local Install (from source)
-
-If you want to run from a local checkout instead of PyPI:
+### Development
 
 ```bash
 git clone https://github.com/j4th/mtg-mcp-server.git
 cd mtg-mcp-server
-mise install && mise run setup
+mise install          # Installs Python 3.12, uv, ruff, ty
+mise run setup        # Creates venv, installs dependencies
 
-# Run the server directly
-uv run mtg-mcp-server
-
-# Or use uvx with a local path
-uvx --from /path/to/mtg-mcp-server mtg-mcp-server
+uv run mtg-mcp-server # Run the server
 ```
 
-Claude Code config for a local install:
+Claude Code config for local development:
 
 ```json
 {
@@ -133,21 +118,126 @@ Claude Code config for a local install:
 }
 ```
 
-## Development
+## Configuration
+
+All settings use `MTG_MCP_` environment variables. Everything works out of the box with sensible defaults.
 
 ```bash
-git clone https://github.com/j4th/mtg-mcp-server.git
-cd mtg-mcp-server
-mise install          # Installs Python, uv, ruff, ty
-mise run setup        # Creates venv, installs dependencies
+# Feature flags for optional backends
+MTG_MCP_ENABLE_EDHREC=false       # EDHREC (scrapes undocumented endpoints)
+MTG_MCP_ENABLE_17LANDS=false      # 17Lands (rate-limits aggressively)
+MTG_MCP_ENABLE_BULK_DATA=false    # Scryfall bulk data (~30MB download on first use)
+MTG_MCP_ENABLE_RULES=false        # Comprehensive Rules engine
 
-mise run check        # Full quality gate: lint + format + typecheck + test
-mise run test         # pytest with coverage
-mise run lint         # ruff check + format check
-mise run typecheck    # ty check
-mise run dev          # MCP Inspector for interactive testing
-mise run fix          # Auto-fix lint and format issues
+# Pass env vars through uvx
+uvx --env MTG_MCP_ENABLE_EDHREC=false mtg-mcp-server
 ```
+
+See `.env.example` for all available options including base URLs, rate limits, and cache settings.
+
+## Tools
+
+51 tools across 10 domains. See [docs/TOOL_DESIGN.md](docs/TOOL_DESIGN.md) for full input/output details.
+
+### Card Data (`scryfall_*`)
+
+| Tool | Description |
+|------|-------------|
+| `search_cards` | Search using full Scryfall syntax (`f:commander id:sultai t:creature`) |
+| `card_details` | Full card data by exact or fuzzy name |
+| `card_price` | Current USD, EUR, and foil prices |
+| `card_rulings` | Official rulings and clarifications |
+| `set_info` | Set metadata by code |
+| `whats_new` | Recently released or previewed cards |
+
+### Bulk Data (`bulk_*`)
+
+| Tool | Description |
+|------|-------------|
+| `card_lookup` | Rate-limit-free card lookup by exact name |
+| `card_search` | Search by name, type, or oracle text |
+| `format_legality` | Check if a card is legal in a format |
+| `format_search` | Search for cards legal in a specific format |
+| `format_staples` | Top-played cards in a format by EDHREC rank |
+| `ban_list` | Banned and restricted cards for a format |
+| `card_in_formats` | Card legality across all formats |
+| `random_card` | Random card, optionally filtered by format or type |
+| `similar_cards` | Find cards similar by type, keywords, or mana cost |
+
+### Combos (`spellbook_*`)
+
+| Tool | Description |
+|------|-------------|
+| `find_combos` | Search for combos by card name and color identity |
+| `combo_details` | Step-by-step combo instructions by ID |
+| `find_decklist_combos` | Find combos present in a decklist |
+| `estimate_bracket` | Estimate Commander bracket for a decklist |
+
+### Draft Analytics (`draft_*`)
+
+| Tool | Description |
+|------|-------------|
+| `card_ratings` | Win rates and draft data for cards in a set (17Lands) |
+| `archetype_stats` | Win rates by color pair for a set |
+
+### Commander Metagame (`edhrec_*`)
+
+| Tool | Description |
+|------|-------------|
+| `commander_staples` | Most-played cards for a commander with synergy scores |
+| `card_synergy` | Synergy data for a card with a specific commander |
+
+### Commander Workflows
+
+| Tool | Description |
+|------|-------------|
+| `commander_overview` | Full commander profile from all sources |
+| `evaluate_upgrade` | Assess whether a card is worth adding to a deck |
+| `card_comparison` | Compare 2-5 cards side-by-side for a commander |
+| `budget_upgrade` | Budget-constrained upgrade suggestions ranked by synergy/$ |
+| `commander_comparison` | Compare 2-5 commanders head-to-head |
+| `color_identity_staples` | Top-played cards across all commanders in a color identity |
+
+### Deck Building
+
+| Tool | Description |
+|------|-------------|
+| `theme_search` | Find cards matching a mechanical or tribal theme |
+| `build_around` | Detect synergies from key cards and find complements |
+| `complete_deck` | Gap analysis and suggestions for a partial decklist |
+| `tribal_staples` | Best cards for a creature type in a color identity |
+| `precon_upgrade` | Analyze a precon and suggest swap pairs |
+| `suggest_cuts` | Identify the weakest cards to cut from a decklist |
+| `deck_analysis` | Full decklist health check (curve, colors, combos, budget) |
+| `deck_validate` | Validate a decklist against format construction rules |
+| `suggest_mana_base` | Suggest lands based on color pip distribution |
+| `price_comparison` | Compare prices across multiple cards |
+
+### Draft Workflows
+
+| Tool | Description |
+|------|-------------|
+| `draft_pack_pick` | Rank cards in a draft pack using 17Lands data |
+| `set_overview` | Top commons/uncommons and trap rares for a format |
+| `sealed_pool_build` | Suggest the best 40-card builds from a sealed pool |
+| `draft_signal_read` | Detect open colors from draft picks |
+| `draft_log_review` | Pick-by-pick review of a completed draft with grade |
+
+### Constructed
+
+| Tool | Description |
+|------|-------------|
+| `rotation_check` | Standard rotation status and rotating cards |
+
+### Rules Engine
+
+| Tool | Description |
+|------|-------------|
+| `rules_lookup` | Look up rules by number or keyword |
+| `keyword_explain` | Explain a keyword with rules and example cards |
+| `rules_interaction` | How two mechanics interact with rule citations |
+| `rules_scenario` | Rules framework for a game scenario |
+| `combat_calculator` | Step-by-step combat phases with keyword interactions |
 
 ## Architecture
 
@@ -155,15 +245,15 @@ Built on **FastMCP 3.x**. Each data source is an independent sub-server mounted 
 
 ```
 MTG (orchestrator)
-├── scryfall (namespace: scryfall_)     → Scryfall REST API
-├── spellbook (namespace: spellbook_)   → Commander Spellbook API
-├── draft (namespace: draft_)           → 17Lands data
-├── edhrec (namespace: edhrec_)         → EDHREC (scraped)
-├── mtgjson (namespace: mtgjson_)       → MTGJSON bulk data
-└── workflows (no namespace)            → Composed tools: commander_overview, etc.
+├── scryfall (namespace: scryfall_)     -> Scryfall REST API
+├── spellbook (namespace: spellbook_)   -> Commander Spellbook API
+├── draft (namespace: draft_)           -> 17Lands data
+├── edhrec (namespace: edhrec_)         -> EDHREC (scraped, feature-flagged)
+├── bulk (namespace: bulk_)             -> Scryfall Oracle Cards bulk data
+└── workflows (no namespace)            -> 30 composed tools + rules engine
 ```
 
-Services are pure async API clients. Providers register MCP tools. Workflows compose across services. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
+Services are pure async API clients. Providers register MCP tools. Workflows compose across services with partial failure tolerance. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
 
 ## Stack
 
@@ -177,28 +267,62 @@ Services are pure async API clients. Providers register MCP tools. Workflows com
 | Tooling | mise, ruff, ty (Astral) |
 | Testing | pytest, respx, pytest-asyncio |
 
+## Development
+
+```bash
+git clone https://github.com/j4th/mtg-mcp-server.git
+cd mtg-mcp-server
+mise install          # Installs Python, uv, ruff, ty
+mise run setup        # Creates venv, installs dependencies
+
+mise run check        # Full quality gate: lint + typecheck + tests
+mise run check:quick  # Fast gate: lint + typecheck + affected tests only
+mise run test         # All tests with coverage
+mise run test:quick   # Only tests affected by recent changes
+mise run lint         # ruff check + format check
+mise run typecheck    # ty check
+mise run dev          # MCP Inspector for interactive testing
+mise run fix          # Auto-fix lint and format issues
+```
+
+## Documentation
+
+| Doc | What it covers |
+|-----|----------------|
+| [COOKBOOK.md](docs/COOKBOOK.md) | Usage recipes -- Commander, draft, deck building, rules workflows |
+| [TOOL_DESIGN.md](docs/TOOL_DESIGN.md) | Full reference for all 51 tools, 17 prompts, 18 resources |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture, FastMCP patterns, design decisions |
+| [SERVICE_CONTRACTS.md](docs/SERVICE_CONTRACTS.md) | API endpoints, rate limits, response shapes per backend |
+| [DATA_SOURCES.md](docs/DATA_SOURCES.md) | All data sources with auth, stability, and access patterns |
+| [CACHING_DESIGN.md](docs/CACHING_DESIGN.md) | TTL cache strategy and Scryfall bulk data design |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, TDD workflow, code style, PR process |
+| [CHANGELOG.md](CHANGELOG.md) | Version history in Keep a Changelog format |
+
 ## Status
 
-All planned phases are **complete**: 23 tools, 4 prompts, 6 resources, 374 tests at 92% coverage.
+51 tools, 17 prompts, 18 resource templates. 973 tests at 89% coverage.
 
 | Phase | What | Status |
 |-------|------|--------|
 | 0 | Project scaffold | Done |
 | 1 | Scryfall backend (4 tools) | Done |
 | 2 | Spellbook + 17Lands + EDHREC backends (9 tools) | Done |
-| 3 | Workflow tools — commander, draft, deck (4 tools) | Done |
-| 4 | TTL caching + MTGJSON bulk provider (2 tools) | Done |
+| 3 | Workflow tools -- commander, draft, deck (4 tools) | Done |
+| 4 | TTL caching + Scryfall bulk data provider (6 tools) | Done |
 | 5 | Analysis & comparison workflows, prompts, resources (4 tools) | Done |
+| Branch A | Structured output, rules engine, validation tools (17 tools) | Done |
+| Branch B | Format workflows -- deck building, commander depth, limited, constructed (11 tools) | Done |
 
 ## Data Sources & Attribution
 
 This project composes data from multiple third-party services:
 
-- **[Scryfall](https://scryfall.com)** — Card database, prices, rulings, search ([API guidelines](https://scryfall.com/docs/api))
-- **[Commander Spellbook](https://commanderspellbook.com)** — Combo search, bracket estimation ([MIT license](https://github.com/SpaceCowMedia/commander-spellbook-backend))
-- **[17Lands](https://www.17lands.com)** — Draft card ratings, archetype win rates ([usage guidelines](https://www.17lands.com/usage_guidelines))
-- **[EDHREC](https://edhrec.com)** — Commander staples, synergy scores (undocumented endpoints, behind feature flag)
-- **[MTGJSON](https://mtgjson.com)** — Bulk card data for rate-limit-free lookups ([MIT license](https://mtgjson.com/license/))
+- **[Scryfall](https://scryfall.com)** -- Card database, prices, rulings, search, bulk data ([API guidelines](https://scryfall.com/docs/api))
+- **[Commander Spellbook](https://commanderspellbook.com)** -- Combo search, bracket estimation ([MIT license](https://github.com/SpaceCowMedia/commander-spellbook-backend))
+- **[17Lands](https://www.17lands.com)** -- Draft card ratings, archetype win rates ([usage guidelines](https://www.17lands.com/usage_guidelines))
+- **[EDHREC](https://edhrec.com)** -- Commander staples, synergy scores (undocumented endpoints, behind feature flag)
+
+Scryfall bulk data (Oracle Cards) replaced MTGJSON in v2.0 for richer card information including prices, legalities, images, and EDHREC rank.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for full license texts and usage terms.
 
@@ -208,4 +332,4 @@ mtg-mcp-server is unofficial Fan Content permitted under the [Fan Content Policy
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT -- see [LICENSE](LICENSE)

@@ -56,8 +56,8 @@
                     "isSecret": false
                 },
                 {
-                    "name": "MTG_MCP_ENABLE_MTGJSON",
-                    "description": "Enable MTGJSON bulk card data for rate-limit-free lookups (~100 MB download)",
+                    "name": "MTG_MCP_ENABLE_BULK_DATA",
+                    "description": "Enable Scryfall Oracle Cards bulk data for rate-limit-free lookups (~30 MB download)",
                     "default": "true",
                     "isSecret": false
                 },
@@ -68,9 +68,15 @@
                     "isSecret": false
                 },
                 {
-                    "name": "MTG_MCP_MTGJSON_REFRESH_HOURS",
-                    "description": "Hours between MTGJSON bulk data refreshes",
-                    "default": "24",
+                    "name": "MTG_MCP_BULK_DATA_REFRESH_HOURS",
+                    "description": "Hours between Scryfall bulk data refreshes",
+                    "default": "12",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_ENABLE_RULES",
+                    "description": "Enable Comprehensive Rules engine for rules lookup and keyword tools",
+                    "default": "true",
                     "isSecret": false
                 },
                 {
