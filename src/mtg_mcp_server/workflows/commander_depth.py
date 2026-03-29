@@ -22,6 +22,7 @@ import structlog
 
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
 from mtg_mcp_server.workflows import WorkflowResult
+from mtg_mcp_server.workflows.commander import _fmt_synergy
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -42,11 +43,6 @@ _MAX_UNIQUE_STAPLES = 3
 # ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
-
-
-def _fmt_synergy(value: float) -> str:
-    """Format a synergy score with sign prefix (e.g. '+61%' or '-5%')."""
-    return f"+{value:.0%}" if value >= 0 else f"{value:.0%}"
 
 
 def _fmt_price(card: Card) -> str:

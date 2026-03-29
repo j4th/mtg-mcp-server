@@ -138,7 +138,9 @@ When PR review comments come in:
 - **Phase 2** (Spellbook + 17Lands + EDHREC): Complete — 9 tools across 3 backends
 - **Phase 3** (Workflow tools): Complete — 4 workflow tools (commander_overview, evaluate_upgrade, draft_pack_pick, suggest_cuts)
 - **Phase 4** (Caching + Bulk Data): Complete — TTL caching on all 12 service methods, Scryfall bulk data provider (2 tools: card_lookup, card_search). Replaced MTGJSON with Scryfall Oracle Cards bulk data for richer card info (prices, legalities, images, EDHREC rank).
-- **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for bulk-data-first lookups with Scryfall fallback. Tool tagging via `tags` parameter. 437 tests, 92% coverage.
+- **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for bulk-data-first lookups with Scryfall fallback. Tool tagging via `tags` parameter.
+- **Branch A** (Structured Output + Rules): Complete — All tools return `ToolResult` with structured `data` dict. Rules engine (5 tools: rules_lookup, keyword_explain, rules_interaction, rules_scenario, combat_calculator). Additional workflow tools: deck_validate, suggest_mana_base, price_comparison. Scryfall whats_new + set_info tools. 7 new bulk tools. 5 new prompts. 40 tools total.
+- **Branch B** (Format Workflows): Complete — 11 new workflow tools across 4 domains: Deck Building (theme_search, build_around, complete_deck), Commander Depth (commander_comparison, tribal_staples, precon_upgrade, color_identity_staples), Limited (sealed_pool_build, draft_signal_read, draft_log_review), Constructed (rotation_check). 8 new prompts. 51 tools, 17 prompts, 16 resource templates. 973 tests, 89% coverage.
 
 ## Environment
 

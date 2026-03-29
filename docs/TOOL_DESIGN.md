@@ -46,6 +46,26 @@ Get official rulings and clarifications for a card.
 | Backend | `ScryfallClient.get_card_by_name()` → `ScryfallClient.get_rulings()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
+### `scryfall_set_info`
+Get set metadata by set code.
+
+| Field | Detail |
+|-------|--------|
+| Input | `set_code: str` (e.g. "dom", "mkm") |
+| Output | Set name, code, release date, set type, card count, icon URI |
+| Backend | `ScryfallClient.get_set()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `scryfall_whats_new`
+Get recently released or previewed cards.
+
+| Field | Detail |
+|-------|--------|
+| Input | `days: int = 7` |
+| Output | List of recently released cards with names, sets, rarities |
+| Backend | `ScryfallClient.search_cards()` (date filter) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
 ---
 
 ## Commander Spellbook Backend (namespace: `spellbook`)
@@ -162,6 +182,76 @@ Search for Magic cards in Scryfall bulk data by name, type, or oracle text. Rate
 | Backend | `ScryfallBulkClient.search_cards()` / `search_by_type()` / `search_by_text()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
+### `bulk_format_legality`
+Check if a card is legal in a format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `card_name: str`, `format: str` |
+| Output | Legality status (legal, not_legal, banned, restricted) with details |
+| Backend | `ScryfallBulkClient.get_card()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `bulk_format_search`
+Search for cards legal in a specific format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `query: str`, `limit: int = 20` |
+| Output | Formatted list of format-legal matching cards |
+| Backend | `ScryfallBulkClient.filter_cards()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `bulk_format_staples`
+Top-played cards in a format (by EDHREC rank).
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `card_type: str | None = None`, `limit: int = 20` |
+| Output | Ranked list of staple cards in the format |
+| Backend | `ScryfallBulkClient.filter_cards()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `bulk_ban_list`
+Get banned/restricted cards for a format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str` |
+| Output | List of banned and restricted cards for the format |
+| Backend | `ScryfallBulkClient.filter_cards()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `bulk_card_in_formats`
+Check a card's legality across all formats.
+
+| Field | Detail |
+|-------|--------|
+| Input | `card_name: str` |
+| Output | Table of format legality (legal/not_legal/banned/restricted per format) |
+| Backend | `ScryfallBulkClient.get_card()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `bulk_random_card`
+Get a random card, optionally filtered by format or type.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str | None = None`, `card_type: str | None = None` |
+| Output | Random card with full details |
+| Backend | `ScryfallBulkClient.filter_cards()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `bulk_similar_cards`
+Find cards similar to a given card by type, keywords, or mana cost.
+
+| Field | Detail |
+|-------|--------|
+| Input | `card_name: str`, `limit: int = 10` |
+| Output | List of similar cards with shared attributes highlighted |
+| Backend | `ScryfallBulkClient.get_card()` + `filter_cards()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
 ---
 
 ## Workflow Tools (orchestrator, no namespace)
@@ -263,11 +353,216 @@ Draft format overview — top commons/uncommons and trap rares.
 | Progress | Reports progress (1/2 fetching, 2/2 analyzing) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
+### `theme_search`
+Search for cards matching a mechanical, tribal, or abstract theme via oracle text patterns.
+
+| Field | Detail |
+|-------|--------|
+| Input | `theme: str` (e.g. "sacrifice", "lifegain", "tokens"), `format: str | None = None`, `color_identity: str | None = None`, `limit: int = 20` |
+| Output | Markdown with: cards grouped by relevance tier (direct match, related, support) with oracle text excerpts |
+| Backends | Bulk data (required) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `build_around`
+Detect synergies from 1-5 key cards and find cards that work with them.
+
+| Field | Detail |
+|-------|--------|
+| Input | `cards: list[str]` (1-5 card names), `format: str | None = None`, `color_identity: str | None = None` |
+| Output | Markdown with: resolved cards, detected keywords/mechanics, synergy candidates grouped by category, combo potential |
+| Backends | Bulk data (required) + Spellbook (optional) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `complete_deck`
+Gap analysis and card suggestions to fill out a partial decklist.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `format: str`, `commander: str | None = None` |
+| Output | Markdown with: current deck composition, format-specific target size, category gaps (creatures, removal, card draw, etc.), suggested cards per gap |
+| Backends | Bulk data (required) + EDHREC (optional) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `commander_comparison`
+Compare 2-5 commanders head-to-head across card data, combos, and EDHREC popularity.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commanders: list[str]` (2-5 names) |
+| Output | Markdown comparison table with: mana cost, type, color identity, EDHREC rank, combo count, top staples, unique strengths |
+| Backends | Bulk data (required) + Spellbook (required) + EDHREC (optional) |
+| Partial failure | EDHREC failure degrades to N/A for staple data |
+| Progress | Reports progress (1/3 resolving, 2/3 fetching data, 3/3 formatting) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `tribal_staples`
+Best cards for a creature type within a color identity.
+
+| Field | Detail |
+|-------|--------|
+| Input | `tribe: str` (e.g. "Elf", "Zombie"), `color_identity: str` (e.g. "golgari"), `format: str | None = None` |
+| Output | Markdown with: lords, synergy pieces, tribe members, support cards — each with oracle text and price |
+| Backends | Bulk data (required) + EDHREC (optional) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `precon_upgrade`
+Analyze a precon decklist and suggest swaps — pair weakest cards with upgrade candidates.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `commander: str`, `budget: float | None = None` |
+| Output | Markdown with: data source status, ranked swap pairs (cut → add with reasoning), upgrade priority based on synergy delta |
+| Backends | Bulk data (required) + Spellbook (required) + EDHREC (optional) |
+| Scoring | Cuts scored by low synergy + low inclusion. Upgrades ranked by synergy improvement |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `color_identity_staples`
+Top-played cards across all commanders in a color identity.
+
+| Field | Detail |
+|-------|--------|
+| Input | `color_identity: str` (e.g. "simic", "UG"), `category: str | None = None` (e.g. "creatures") |
+| Output | Markdown with: staple cards ranked by inclusion rate, synergy scores, prices |
+| Backends | EDHREC (required) + Bulk data (optional, for prices) |
+| Error | Returns message if EDHREC disabled |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `sealed_pool_build`
+Suggest the best 40-card sealed deck builds from a card pool.
+
+| Field | Detail |
+|-------|--------|
+| Input | `pool: list[str]` (card names, typically 84-90), `set_code: str` |
+| Output | Markdown with: top 1-3 two-color builds ranked by total score, per-build card list grouped by type, mana curve, removal/bomb counts |
+| Backends | Bulk data (required) + 17Lands (optional, for GIH WR scoring) |
+| Scoring | GIH WR when available, heuristic fallback (rarity + bomb/removal detection) |
+| Progress | Reports progress (1/3 resolving, 2/3 evaluating pairs, 3/3 formatting) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `draft_signal_read`
+Analyze draft picks to detect open color signals and recommend direction.
+
+| Field | Detail |
+|-------|--------|
+| Input | `picks: list[str]` (in draft order), `set_code: str`, `current_pack: list[str] | None = None` |
+| Output | Markdown with: color commitment analysis, ALSA-based openness signals per color, recommended direction, optional current pack ranking |
+| Backends | Bulk data (required) + 17Lands (required) |
+| Error | Raises `ToolError` if 17Lands disabled |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `draft_log_review`
+Review a completed draft — pick-by-pick GIH WR analysis with overall grade.
+
+| Field | Detail |
+|-------|--------|
+| Input | `picks: list[str]` (P1P1 through P3P14), `set_code: str`, `final_deck: list[str] | None = None` |
+| Output | Markdown with: pick-by-pick table (pick#, name, GIH WR, verdict), average GIH WR, letter grade, optional deck inclusion analysis |
+| Backends | Bulk data (required) + 17Lands (required) |
+| Grading | A (≥60% avg GIH WR) through F (<48%) |
+| Error | Raises `ToolError` if 17Lands disabled |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `rotation_check`
+Check Standard rotation status and which cards are in rotating sets.
+
+| Field | Detail |
+|-------|--------|
+| Input | `cards: list[str] | None = None` |
+| Output | Markdown with: Standard-legal sets sorted by release date, rotation timing, optional per-card rotation status |
+| Backends | Scryfall API (sets) + Bulk data (card legality) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `deck_validate`
+Validate a decklist against format construction rules.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `format: str`, `commander: str | None = None`, `sideboard: list[str] | None = None` |
+| Output | Markdown with: VALID/INVALID status, per-card legality issues, deck size check, copy limit violations, color identity violations (Commander), rarity check (Pauper) |
+| Backends | Bulk data (required) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `suggest_mana_base`
+Suggest a mana base based on color pip distribution.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `format: str`, `total_lands: int | None = None` |
+| Output | Markdown with: color pip analysis, recommended land count, basic land distribution, format-legal dual land suggestions |
+| Backends | Bulk data (required) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `price_comparison`
+Compare prices across multiple cards using bulk data.
+
+| Field | Detail |
+|-------|--------|
+| Input | `cards: list[str]` |
+| Output | Markdown price table with: USD, USD foil, EUR per card, total cost |
+| Backends | Bulk data (required) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+---
+
+## Rules Engine Tools (orchestrator, no namespace)
+
+Rules tools provide access to the Magic: The Gathering Comprehensive Rules. Backed by a local rules parser service.
+
+### `rules_lookup`
+Look up rules by number or keyword search.
+
+| Field | Detail |
+|-------|--------|
+| Input | `query: str` (rule number like "704.5k" or keyword like "deathtouch"), `section: str | None = None` |
+| Output | Markdown with: matching rules with full text, parent/child rules, cross-references |
+| Backends | RulesService (local) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `keyword_explain`
+Explain a Magic keyword with glossary definition, rules, and example cards.
+
+| Field | Detail |
+|-------|--------|
+| Input | `keyword: str` (e.g. "deathtouch", "trample") |
+| Output | Markdown with: glossary definition, related rules, example cards (if bulk data available) |
+| Backends | RulesService (local) + Bulk data (optional, for card examples) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `rules_interaction`
+Explain how two mechanics interact with relevant rule citations.
+
+| Field | Detail |
+|-------|--------|
+| Input | `mechanic_a: str`, `mechanic_b: str` |
+| Output | Markdown with: rules for each mechanic, interaction analysis, relevant rule citations |
+| Backends | RulesService (local) + Bulk data (optional, for card lookups) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `rules_scenario`
+Provide rules framework for a game scenario.
+
+| Field | Detail |
+|-------|--------|
+| Input | `scenario: str` (game situation description) |
+| Output | Markdown with: extracted keywords/concepts, relevant rules per concept, organized framework for LLM reasoning |
+| Backends | RulesService (local) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `combat_calculator`
+Provide combat phase rules framework with card data.
+
+| Field | Detail |
+|-------|--------|
+| Input | `attackers: list[str]`, `blockers: list[str]`, `keywords: list[str] | None = None` |
+| Output | Markdown with: step-by-step combat phases, attacker/blocker card data, relevant combat rules, keyword interactions |
+| Backends | RulesService (local) + Bulk data (optional, for card lookups) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
 ---
 
 ## Prompts (workflow server)
 
-Prompts are user-invocable templates registered on the workflow server. They guide multi-step analysis workflows by generating structured instructions for the AI assistant.
+Prompts are user-invocable templates registered on the workflow server. They guide multi-step analysis workflows by generating structured instructions for the AI assistant. 17 prompts total.
 
 ### `evaluate_commander_swap`
 Evaluate swapping a card in a Commander deck.
@@ -301,6 +596,110 @@ Guide a budget upgrade session for a Commander deck.
 | Input | `commander: str`, `budget: float` |
 | Output | Multi-step prompt: use `budget_upgrade` for ranked suggestions, use `evaluate_upgrade` on top 5, evaluate by synergy/$, combo potential, inclusion rate, recommend top 3-5 |
 
+### `build_deck`
+Guide building a new Commander deck from scratch.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commander: str` |
+| Output | Multi-step prompt: commander overview, staples, combos, mana base |
+
+### `evaluate_collection`
+Evaluate a card collection for trade and deck-building value.
+
+| Field | Detail |
+|-------|--------|
+| Input | `cards: list[str]` |
+| Output | Multi-step prompt: price lookup, format legality, Commander staple potential |
+
+### `format_intro`
+Introduction to a Magic format with key cards and strategies.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str` |
+| Output | Multi-step prompt: format staples, top archetypes, entry budget |
+
+### `card_alternatives`
+Find alternatives to a card for budget or format reasons.
+
+| Field | Detail |
+|-------|--------|
+| Input | `card: str`, `reason: str` |
+| Output | Multi-step prompt: card analysis, similar card search, comparison |
+
+### `rules_question`
+Ask a rules question with full Comprehensive Rules citations.
+
+| Field | Detail |
+|-------|--------|
+| Input | `question: str` |
+| Output | Multi-step prompt: rules lookup, keyword explanation, scenario resolution |
+
+### `build_around_deck`
+Build a deck around specific cards or a win condition in any format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `cards: str`, `format: str`, `budget: float | None = None` |
+| Output | Multi-step prompt: theme/synergy search → build_around → rotation_check (if Standard) → complete_deck → deck_validate |
+
+### `build_tribal_deck`
+Build a tribal Commander deck around a creature type.
+
+| Field | Detail |
+|-------|--------|
+| Input | `tribe: str`, `commander: str` |
+| Output | Multi-step prompt: tribal_staples → commander_overview → complete_deck |
+
+### `build_theme_deck`
+Build a theme-based Commander deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `theme: str`, `commander: str` |
+| Output | Multi-step prompt: theme_search → build_around → complete_deck |
+
+### `upgrade_precon`
+Upgrade a precon Commander deck with a budget.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commander: str`, `budget: float` |
+| Output | Multi-step prompt: precon_upgrade → budget_upgrade → suggest_mana_base |
+
+### `sealed_session`
+Guide a sealed deck building session.
+
+| Field | Detail |
+|-------|--------|
+| Input | `set_code: str` |
+| Output | Multi-step prompt: sealed_pool_build → suggest_mana_base → deck_validate |
+
+### `draft_review`
+Review a completed draft with analysis and grade.
+
+| Field | Detail |
+|-------|--------|
+| Input | `set_code: str` |
+| Output | Multi-step prompt: draft_log_review → draft_signal_read analysis |
+
+### `compare_commanders`
+Compare commanders to choose between them.
+
+| Field | Detail |
+|-------|--------|
+| Input | `commanders: str` |
+| Output | Multi-step prompt: commander_comparison → combo analysis → staples comparison |
+
+### `rotation_plan`
+Plan for Standard rotation — identify rotating cards and replacements.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str` |
+| Output | Multi-step prompt: rotation_check → card_alternatives for rotating staples |
+
 ---
 
 ## Resources (mtg:// URIs)
@@ -313,6 +712,7 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 |-----|-------------|
 | `mtg://card/{name}` | Card data as JSON by exact name |
 | `mtg://card/{name}/rulings` | Card rulings as JSON by card name |
+| `mtg://scryfall/set/{code}` | Set metadata as JSON by set code |
 
 ### Spellbook Resources
 
@@ -337,3 +737,23 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 | URI | Description |
 |-----|-------------|
 | `mtg://card-data/{name}` | Card data from Scryfall bulk data as JSON |
+| `mtg://bulk/format/{format}/legal-cards` | Legal cards in a format |
+| `mtg://bulk/format/{format}/banned` | Banned cards in a format |
+| `mtg://bulk/card/{name}/formats` | Format legality for a card |
+
+### Rules Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://rules/{number}` | Rule text by number (e.g. "702.2") |
+| `mtg://rules/glossary/{term}` | Glossary definition for a term |
+| `mtg://rules/keywords` | List of all keywords with rule references |
+| `mtg://rules/sections` | List of all rule sections |
+
+### Format Workflow Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://theme/{theme}` | Cards matching a theme (oracle text patterns) |
+| `mtg://tribe/{tribe}/staples` | Staple cards for a creature type |
+| `mtg://draft/{set_code}/signals` | Draft color openness signals for a set |
