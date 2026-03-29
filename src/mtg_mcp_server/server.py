@@ -61,6 +61,12 @@ mcp = FastMCP(
         "- deck_validate: Validate a decklist against format rules\n"
         "- suggest_mana_base: Suggest lands for a decklist\n"
         "- price_comparison: Compare card prices side-by-side\n\n"
+        "Rules tools (no prefix):\n"
+        "- rules_lookup: Look up rules by number or keyword\n"
+        "- keyword_explain: Explain a keyword with rules, interactions, and examples\n"
+        "- rules_interaction: How two mechanics interact under the rules\n"
+        "- rules_scenario: Resolve a game scenario with rule citations\n"
+        "- combat_calculator: Step-by-step combat with keyword interactions\n\n"
         "Resources (mtg:// URIs) provide cached card, combo, and rating data.\n"
         "Prompts guide multi-step analysis workflows.\n\n"
         "mtg-mcp-server is unofficial Fan Content permitted under the Fan Content Policy. "
@@ -102,6 +108,20 @@ mcp.mount(workflow_mcp)
 # Limit response sizes to 500KB to prevent edge-case payloads from overwhelming
 # LLM context windows. Most tool outputs are well under 10KB.
 mcp.add_middleware(ResponseLimitingMiddleware(max_size=500_000))
+
+# CodeMode: experimental transform that replaces individual tools with meta-tools
+# for discovery and code execution. Useful at 40+ tools to reduce LLM context.
+if _settings.enable_code_mode:
+    try:
+        from fastmcp.experimental.transforms.code_mode import CodeMode
+
+        mcp.add_transform(CodeMode())
+        structlog.get_logger(service="startup").info("code_mode.enabled")
+    except ImportError:
+        structlog.get_logger(service="startup").error(
+            "code_mode.unavailable",
+            hint='Install with: pip install "mtg-mcp-server[code-mode]"',
+        )
 
 
 # Ping is a local health check — no network access, so openWorldHint=False.

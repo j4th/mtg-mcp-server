@@ -13,12 +13,13 @@ so tool names stay clean (e.g. ``commander_overview``, not
 from __future__ import annotations
 
 from contextlib import AsyncExitStack
-from typing import Annotated
+from typing import Annotated, Literal
 
 import structlog
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from mtg_mcp_server.config import Settings
@@ -27,11 +28,13 @@ from mtg_mcp_server.providers import (
     TAGS_COMMANDER,
     TAGS_DRAFT,
     TAGS_PRICING,
+    TAGS_RULES,
     TAGS_VALIDATE,
     TOOL_ANNOTATIONS,
 )
 from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient
+from mtg_mcp_server.services.rules import RulesService
 from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
@@ -45,6 +48,7 @@ _spellbook: SpellbookClient | None = None
 _seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
 _bulk: ScryfallBulkClient | None = None
+_rules: RulesService | None = None
 
 
 @lifespan
@@ -56,7 +60,7 @@ async def workflow_lifespan(server: FastMCP):
     when their corresponding ``Settings`` flag is enabled. All clients are torn down
     when the server shuts down.
     """
-    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk
+    global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk, _rules
     settings = Settings()
     async with AsyncExitStack() as stack:
         _scryfall = await stack.enter_async_context(
@@ -80,12 +84,26 @@ async def workflow_lifespan(server: FastMCP):
             )
             _bulk = await stack.enter_async_context(client)
             _bulk.start_background_refresh()
+        if settings.enable_rules:
+            _rules = RulesService(
+                rules_url=settings.rules_url,
+                refresh_hours=settings.rules_refresh_hours,
+            )
+            try:
+                await _rules.ensure_loaded()
+            except Exception:
+                _log.warning(
+                    "rules.startup_load_failed",
+                    exc_info=True,
+                    hint="Rules tools will attempt to load on first use",
+                )
         yield {}
     _scryfall = None
     _spellbook = None
     _seventeen_lands = None
     _edhrec = None
     _bulk = None
+    _rules = None
 
 
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan, mask_error_details=True)
@@ -126,6 +144,13 @@ def _require_bulk() -> ScryfallBulkClient:
     return _bulk
 
 
+def _require_rules() -> RulesService:
+    """Return rules service or raise ToolError if the feature flag is off."""
+    if _rules is None:
+        raise ToolError("Rules engine is not enabled. Set MTG_MCP_ENABLE_RULES=true.")
+    return _rules
+
+
 _log = structlog.get_logger(service="workflows")
 
 
@@ -142,7 +167,11 @@ async def commander_overview(
     commander_name: Annotated[
         str, Field(description="Commander card name (e.g. 'Muldrotha, the Gravetide')")
     ],
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Comprehensive commander profile combining data from all available sources.
 
     Returns card details, top combos, EDHREC staples, and synergy scores.
@@ -154,12 +183,14 @@ async def commander_overview(
         raise ToolError("Commander name cannot be empty.")
 
     try:
-        return await impl(
+        result = await impl(
             commander_name,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except CardNotFoundError as exc:
         raise ToolError(
             f"Commander not found: '{commander_name}'. Check spelling or try a different name."
@@ -174,7 +205,11 @@ async def evaluate_upgrade(
         str, Field(description="Card to evaluate for the deck (e.g. 'Spore Frog')")
     ],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Assess whether a card is worth adding to a specific commander deck.
 
     Returns card details, price, synergy score, and combos enabled for the caller to assess.
@@ -188,13 +223,15 @@ async def evaluate_upgrade(
         raise ToolError("Commander name cannot be empty.")
 
     try:
-        return await impl(
+        result = await impl(
             card_name,
             commander_name,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except CardNotFoundError as exc:
         raise ToolError(
             f"Card not found: '{card_name}'. Check spelling or try a different name."
@@ -213,7 +250,11 @@ async def draft_pack_pick(
         list[str] | None,
         Field(description="Cards already drafted — enables color fit analysis when provided"),
     ] = None,
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Rank cards in a draft pack using 17Lands win rate data.
 
     Provides GIH WR, ALSA, IWD stats, and color fit analysis based on current picks.
@@ -222,12 +263,14 @@ async def draft_pack_pick(
     from mtg_mcp_server.workflows.draft import draft_pack_pick as impl
 
     try:
-        return await impl(
+        result = await impl(
             pack,
             set_code,
             seventeen_lands=_require_seventeen_lands(),
             current_picks=current_picks,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"17Lands error: {exc}") from exc
 
@@ -237,7 +280,11 @@ async def suggest_cuts(
     decklist: Annotated[list[str], Field(description="List of card names in the deck")],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     num_cuts: Annotated[int, Field(description="Number of cut candidates to suggest")] = 5,
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Identify the weakest cards to cut from a commander decklist.
 
     Scores cards by synergy, inclusion rate, and combo membership.
@@ -249,13 +296,15 @@ async def suggest_cuts(
         raise ToolError("Commander name cannot be empty.")
 
     try:
-        return await impl(
+        result = await impl(
             decklist,
             commander_name,
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             num_cuts=num_cuts,
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"suggest_cuts failed: {exc}") from exc
 
@@ -265,7 +314,11 @@ async def card_comparison(
     cards: Annotated[list[str], Field(description="2-5 card names to compare side-by-side")],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     ctx: Context,
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Compare 2-5 cards side-by-side for a specific commander deck.
 
     Shows mana cost, type, synergy, inclusion rate, combo count, and price for each card.
@@ -284,14 +337,16 @@ async def card_comparison(
         raise ToolError("Maximum 5 cards can be compared at once.")
 
     try:
-        return await impl(
+        result = await impl(
             cards,
             commander_name,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except CardNotFoundError as exc:
         raise ToolError(f"{exc}. Check spelling.") from exc
     except ServiceError as exc:
@@ -307,9 +362,13 @@ async def budget_upgrade(
     num_suggestions: Annotated[
         int, Field(description="Number of upgrade suggestions to return")
     ] = 10,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
     *,
     ctx: Context,
-) -> str:
+) -> ToolResult:
     """Suggest budget-friendly upgrades for a commander deck.
 
     Ranks EDHREC staples by synergy-per-dollar within the given budget ceiling.
@@ -323,14 +382,16 @@ async def budget_upgrade(
         raise ToolError("Budget must be a positive number.")
 
     try:
-        return await impl(
+        result = await impl(
             commander_name,
             budget=budget,
             num_suggestions=num_suggestions,
             scryfall=_require_scryfall(),
             edhrec=_require_edhrec(),
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except CommanderNotFoundError as exc:
         raise ToolError(f"Commander not found: '{commander_name}'.") from exc
     except ServiceError as exc:
@@ -344,7 +405,11 @@ async def deck_analysis(
     ],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     ctx: Context,
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Full decklist health check — mana curve, colors, combos, bracket, budget, synergy.
 
     Uses all available backends: Scryfall bulk data for rate-limit-free card resolution,
@@ -357,7 +422,7 @@ async def deck_analysis(
         raise ToolError("Provide at least one card in the decklist.")
 
     try:
-        return await impl(
+        result = await impl(
             decklist,
             commander_name,
             bulk=_bulk,
@@ -365,7 +430,9 @@ async def deck_analysis(
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"deck_analysis failed: {exc}") from exc
 
@@ -378,9 +445,13 @@ async def set_overview(
     event_type: Annotated[
         str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
     ] = "PremierDraft",
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
     *,
     ctx: Context,
-) -> str:
+) -> ToolResult:
     """Draft format overview — top commons/uncommons and trap rares.
 
     Uses 17Lands card ratings to provide a data-driven format breakdown.
@@ -389,12 +460,14 @@ async def set_overview(
     from mtg_mcp_server.workflows.draft import set_overview as impl
 
     try:
-        return await impl(
+        result = await impl(
             set_code,
             event_type=event_type,
             seventeen_lands=_require_seventeen_lands(),
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"17Lands error: {exc}") from exc
 
@@ -533,7 +606,11 @@ async def deck_validate(
     sideboard: Annotated[
         list[str] | None, Field(description="Sideboard card names, same format as decklist")
     ] = None,
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Validate a decklist against a format's construction rules.
 
     Checks legality, deck size, copy limits, color identity (Commander), singleton
@@ -545,13 +622,15 @@ async def deck_validate(
         raise ToolError("Provide at least one card in the decklist.")
 
     try:
-        return await impl(
+        result = await impl(
             decklist,
             format,
             commander=commander,
             sideboard=sideboard,
             bulk=_require_bulk(),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
     except ServiceError as exc:
@@ -568,7 +647,11 @@ async def suggest_mana_base(
         int | None,
         Field(description="Override total land count (default: auto-calculated from avg CMC)"),
     ] = None,
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Suggest a mana base for a decklist based on color pip distribution.
 
     Analyzes color requirements, recommends land count, and suggests format-legal
@@ -580,12 +663,14 @@ async def suggest_mana_base(
         raise ToolError("Provide at least one card in the decklist.")
 
     try:
-        return await impl(
+        result = await impl(
             decklist,
             format,
             total_lands=total_lands,
             bulk=_require_bulk(),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
     except ServiceError as exc:
@@ -595,7 +680,11 @@ async def suggest_mana_base(
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_PRICING)
 async def price_comparison(
     cards: Annotated[list[str], Field(description="2-20 card names to compare prices")],
-) -> str:
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
     """Compare prices across multiple cards using Scryfall bulk data.
 
     Returns a markdown table with USD, USD foil, and EUR prices sorted by USD descending.
@@ -610,10 +699,12 @@ async def price_comparison(
         raise ToolError("Maximum 20 cards for price comparison.")
 
     try:
-        return await impl(
+        result = await impl(
             cards,
             bulk=_require_bulk(),
+            response_format=response_format,
         )
+        return ToolResult(content=result.markdown, structured_content=result.data)
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
     except ServiceError as exc:
@@ -728,3 +819,225 @@ Step 4: Evaluate each alternative:
   - Format legality confirmed?
 
 Rank the top 3-5 alternatives with reasoning and price."""
+
+
+# ---------------------------------------------------------------------------
+# Rules Engine Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def rules_lookup(
+    query: Annotated[
+        str, Field(description="Rule number (e.g. '704.5k') or keyword to search for")
+    ],
+    section: Annotated[
+        str | None,
+        Field(
+            description="Narrow search to a section (e.g. 'combat', 'stack', 'lands', 'state-based')"
+        ),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Look up MTG Comprehensive Rules by number or keyword search.
+
+    Returns matching rules with full text, parent context, and subrules.
+    """
+    from mtg_mcp_server.workflows.rules import rules_lookup as impl
+
+    try:
+        result = await impl(
+            query,
+            section=section,
+            rules=_require_rules(),
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"rules_lookup failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def keyword_explain(
+    keyword: Annotated[
+        str, Field(description="MTG keyword to explain (e.g. 'trample', 'deathtouch')")
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Explain an MTG keyword with rules text, examples, and interactions.
+
+    Returns the rules definition, reminder text, and up to 5 example cards from bulk data.
+    """
+    from mtg_mcp_server.workflows.rules import keyword_explain as impl
+
+    try:
+        result = await impl(
+            keyword,
+            rules=_require_rules(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"keyword_explain failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def rules_interaction(
+    mechanic_a: Annotated[str, Field(description="First mechanic or card name")],
+    mechanic_b: Annotated[str, Field(description="Second mechanic or card name")],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Explain how two mechanics or cards interact under MTG rules.
+
+    Returns relevant rules, step-by-step resolution, and common misconceptions.
+    """
+    from mtg_mcp_server.workflows.rules import rules_interaction as impl
+
+    try:
+        result = await impl(
+            mechanic_a,
+            mechanic_b,
+            rules=_require_rules(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"rules_interaction failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def rules_scenario(
+    scenario: Annotated[
+        str, Field(description="Game scenario to resolve (describe the board state and action)")
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Resolve a game scenario step-by-step using MTG rules.
+
+    Covers priority, stack resolution, state-based actions, and triggers with rule citations.
+    """
+    from mtg_mcp_server.workflows.rules import rules_scenario as impl
+
+    try:
+        result = await impl(
+            scenario,
+            rules=_require_rules(),
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"rules_scenario failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_RULES)
+async def combat_calculator(
+    attackers: Annotated[list[str], Field(description="Attacking creature names or descriptions")],
+    blockers: Annotated[list[str], Field(description="Blocking creature names or descriptions")],
+    keywords: Annotated[
+        list[str] | None,
+        Field(
+            description="Additional keyword abilities to consider (e.g. 'deathtouch', 'trample')"
+        ),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Calculate combat step-by-step with keyword interactions.
+
+    Resolves declare attackers → declare blockers → damage steps → state-based actions.
+    Looks up card keywords from bulk data if card names are provided.
+    """
+    from mtg_mcp_server.workflows.rules import combat_calculator as impl
+
+    try:
+        result = await impl(
+            attackers,
+            blockers,
+            keywords=keywords,
+            rules=_require_rules(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"combat_calculator failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Rules Resources
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.resource("mtg://rules/{number}")
+async def get_rule(number: str) -> dict[str, object]:
+    """Rule text by number (e.g. mtg://rules/704.5k)."""
+    rules = _require_rules()
+    rule = await rules.lookup_by_number(number)
+    return rule.model_dump(mode="json") if rule else {"error": f"Rule {number} not found"}
+
+
+@workflow_mcp.resource("mtg://rules/glossary/{term}")
+async def get_glossary_term(term: str) -> dict[str, object]:
+    """Glossary definition by term."""
+    rules = _require_rules()
+    entry = await rules.glossary_lookup(term)
+    return entry.model_dump(mode="json") if entry else {"error": f"Term '{term}' not found"}
+
+
+@workflow_mcp.resource("mtg://rules/keywords")
+async def list_keywords() -> list[dict[str, str]]:
+    """All keywords with brief definitions."""
+    rules = _require_rules()
+    return await rules.list_keywords()
+
+
+@workflow_mcp.resource("mtg://rules/sections")
+async def list_sections() -> list[dict[str, str]]:
+    """Section index for the Comprehensive Rules."""
+    rules = _require_rules()
+    return await rules.list_sections()
+
+
+# ---------------------------------------------------------------------------
+# Rules Prompt
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.prompt()
+def rules_question(
+    question: Annotated[str, Field(description="The rules question to answer")],
+) -> str:
+    """Guide for answering an MTG rules question with citations."""
+    return f"""Answer this MTG rules question: {question}
+
+Step 1: Use rules_lookup to find the relevant rules. Try rule numbers if specific,
+or keyword search for the mechanic/concept in question.
+
+Step 2: If the question mentions specific cards, use scryfall_card_details or
+bulk_card_lookup to get their oracle text and keywords.
+
+Step 3: If the question involves keyword interactions, use keyword_explain
+for each keyword involved, then rules_interaction for the combination.
+
+Step 4: Explain the answer in plain language, citing specific rule numbers.
+Include the exact rule text for the most important rules.
+
+Important: MTG rules can be counterintuitive. Always cite the specific rule —
+never guess or assume based on "how it should work."
+"""

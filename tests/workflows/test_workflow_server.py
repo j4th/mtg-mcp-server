@@ -395,6 +395,8 @@ class TestDeckAnalysisToolError:
         mock_scryfall = AsyncMock()
         mock_scryfall.get_card_by_name = AsyncMock(side_effect=ServiceError("timeout"))
         mock_spellbook = AsyncMock()
+        mock_spellbook.estimate_bracket = AsyncMock(side_effect=ServiceError("unavailable"))
+        mock_spellbook.find_decklist_combos = AsyncMock(side_effect=ServiceError("unavailable"))
 
         with (
             patch("mtg_mcp_server.workflows.server._scryfall", mock_scryfall),
@@ -462,6 +464,80 @@ class TestSetOverviewToolError:
             )
         assert result.is_error
         assert "17lands" in result.content[0].text.lower()
+
+
+# ---------------------------------------------------------------------------
+# ToolError conversion — rules tools
+# ---------------------------------------------------------------------------
+
+
+class TestRulesLookupToolError:
+    """Verify rules tools convert exceptions to ToolError."""
+
+    async def test_rules_disabled_becomes_tool_error(self, mcp_client: Client):
+        """Rules not enabled → ToolError mentioning the feature flag."""
+        with patch("mtg_mcp_server.workflows.server._rules", None):
+            result = await mcp_client.call_tool(
+                "rules_lookup",
+                {"query": "deathtouch"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+        assert "enable_rules" in result.content[0].text.lower()
+
+    async def test_keyword_explain_disabled(self, mcp_client: Client):
+        """keyword_explain with rules disabled → ToolError."""
+        with patch("mtg_mcp_server.workflows.server._rules", None):
+            result = await mcp_client.call_tool(
+                "keyword_explain",
+                {"keyword": "flying"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+
+    async def test_rules_interaction_disabled(self, mcp_client: Client):
+        """rules_interaction with rules disabled → ToolError."""
+        with patch("mtg_mcp_server.workflows.server._rules", None):
+            result = await mcp_client.call_tool(
+                "rules_interaction",
+                {"mechanic_a": "deathtouch", "mechanic_b": "trample"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+
+    async def test_rules_scenario_disabled(self, mcp_client: Client):
+        """rules_scenario with rules disabled → ToolError."""
+        with patch("mtg_mcp_server.workflows.server._rules", None):
+            result = await mcp_client.call_tool(
+                "rules_scenario",
+                {"scenario": "Can I cast Lightning Bolt?"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+
+    async def test_combat_calculator_disabled(self, mcp_client: Client):
+        """combat_calculator with rules disabled → ToolError."""
+        with patch("mtg_mcp_server.workflows.server._rules", None):
+            result = await mcp_client.call_tool(
+                "combat_calculator",
+                {"attackers": ["Grizzly Bears"], "blockers": ["Llanowar Elves"]},
+                raise_on_error=False,
+            )
+        assert result.is_error
+
+    async def test_service_error_becomes_tool_error(self, mcp_client: Client):
+        """Generic ServiceError from _require_rules → ToolError."""
+        with patch(
+            "mtg_mcp_server.workflows.server._require_rules",
+            side_effect=ServiceError("rules engine broken"),
+        ):
+            result = await mcp_client.call_tool(
+                "rules_lookup",
+                {"query": "100.1"},
+                raise_on_error=False,
+            )
+        assert result.is_error
+        assert "rules_lookup failed" in result.content[0].text.lower()
 
 
 # ---------------------------------------------------------------------------

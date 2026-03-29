@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
+
+from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from mtg_mcp_server.services.edhrec import EDHRECClient
@@ -46,17 +48,24 @@ async def suggest_cuts(
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
     num_cuts: int = 5,
-) -> str:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> WorkflowResult:
     """Identify the weakest cards in a Commander decklist.
 
     Uses EDHREC synergy/inclusion data and Spellbook combo analysis to rank
     cards by cuttability. Combo pieces are protected.
     """
     if not decklist:
-        return f"# Suggested Cuts for {commander_name}\n\nNo cards in decklist to evaluate."
+        return WorkflowResult(
+            markdown=f"# Suggested Cuts for {commander_name}\n\nNo cards in decklist to evaluate.",
+            data={"commander_name": commander_name, "cuts": []},
+        )
 
     if num_cuts <= 0:
-        return f"# Suggested Cuts for {commander_name}\n\nNo cuts requested."
+        return WorkflowResult(
+            markdown=f"# Suggested Cuts for {commander_name}\n\nNo cuts requested.",
+            data={"commander_name": commander_name, "cuts": []},
+        )
 
     sources = _DataSources(edhrec_available=edhrec is not None)
 
@@ -80,7 +89,27 @@ async def suggest_cuts(
     top_cuts = scored[:cut_count]
 
     # -- 6. Format output ------------------------------------------------------
-    return _format_output(commander_name, top_cuts, sources)
+    markdown = _format_output(commander_name, top_cuts, sources, response_format=response_format)
+    data = {
+        "commander_name": commander_name,
+        "cuts": [
+            {
+                "name": cs.name,
+                "cuttability": cs.cuttability,
+                "synergy_score": cs.synergy_score,
+                "inclusion_rate": cs.inclusion_rate,
+                "is_combo_piece": cs.is_combo_piece,
+                "has_edhrec_data": cs.has_edhrec_data,
+                "has_data": cs.has_data,
+            }
+            for cs in top_cuts
+        ],
+        "sources": {
+            "spellbook": sources.spellbook_ok,
+            "edhrec": sources.edhrec_ok,
+        },
+    }
+    return WorkflowResult(markdown=markdown, data=data)
 
 
 async def _fetch_spellbook(
@@ -231,29 +260,33 @@ def _format_output(
     commander_name: str,
     top_cuts: list[_CardScore],
     sources: _DataSources,
+    *,
+    response_format: Literal["detailed", "concise"] = "detailed",
 ) -> str:
     """Build the markdown output for suggested cuts."""
     lines: list[str] = []
     lines.append(f"# Suggested Cuts for {commander_name}")
     lines.append("")
 
-    # Data sources status
-    lines.append("## Data Sources")
-    lines.append(
-        f"- [Commander Spellbook](https://commanderspellbook.com): "
-        f"{'OK' if sources.spellbook_ok else 'Failed'}"
-    )
+    if response_format != "concise":
+        # Data sources status
+        lines.append("## Data Sources")
+        lines.append(
+            f"- [Commander Spellbook](https://commanderspellbook.com): "
+            f"{'OK' if sources.spellbook_ok else 'Failed'}"
+        )
 
-    if not sources.edhrec_available:
-        lines.append("- [EDHREC](https://edhrec.com): Disabled")
-    elif sources.edhrec_ok:
-        lines.append("- [EDHREC](https://edhrec.com): OK")
-    else:
-        lines.append("- [EDHREC](https://edhrec.com): Failed")
-    lines.append("")
+        if not sources.edhrec_available:
+            lines.append("- [EDHREC](https://edhrec.com): Disabled")
+        elif sources.edhrec_ok:
+            lines.append("- [EDHREC](https://edhrec.com): OK")
+        else:
+            lines.append("- [EDHREC](https://edhrec.com): Failed")
+        lines.append("")
 
     # Ranked list
-    lines.append("## Suggested Cuts")
+    if response_format != "concise":
+        lines.append("## Suggested Cuts")
     for i, cs in enumerate(top_cuts, start=1):
         reasoning_parts: list[str] = []
 
@@ -271,8 +304,8 @@ def _format_output(
         reasoning = " | ".join(reasoning_parts) if reasoning_parts else "No additional data"
         lines.append(f"{i}. **{cs.name}** \u2014 {reasoning}")
 
-    # Notes section if any sources failed
-    if sources.failures:
+    # Notes section if any sources failed (detailed only)
+    if response_format != "concise" and sources.failures:
         lines.append("")
         lines.append("## Notes")
         for failure in sources.failures:

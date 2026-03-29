@@ -9,6 +9,7 @@ import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from mtg_mcp_server.config import Settings
@@ -79,7 +80,7 @@ async def find_combos(
         ),
     ] = None,
     limit: Annotated[int, Field(description="Maximum number of combos to return")] = 10,
-) -> str:
+) -> ToolResult:
     """Search for known combos involving a specific card.
 
     Optionally filter by color identity (e.g. "sultai", "BUG", "wubrg").
@@ -92,7 +93,14 @@ async def find_combos(
         raise ToolError(f"Spellbook API error: {exc}") from exc
 
     if not combos:
-        return f"No combos found involving '{card_name}'." + ATTRIBUTION_SPELLBOOK
+        return ToolResult(
+            content=f"No combos found involving '{card_name}'." + ATTRIBUTION_SPELLBOOK,
+            structured_content={
+                "card_name": card_name,
+                "total_combos": 0,
+                "combos": [],
+            },
+        )
 
     lines = [f"Found {len(combos)} combo(s) involving {card_name}:"]
     for combo in combos:
@@ -101,7 +109,14 @@ async def find_combos(
         if combo.bracket_tag:
             lines.append(f"    Bracket: {combo.bracket_tag}")
         lines.append(f"    Popularity: {combo.popularity}")
-    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SPELLBOOK,
+        structured_content={
+            "card_name": card_name,
+            "total_combos": len(combos),
+            "combos": [combo.model_dump(mode="json") for combo in combos],
+        },
+    )
 
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP | TAGS_COMBO)
@@ -112,7 +127,7 @@ async def combo_details(
             description="Spellbook combo ID from find_combos results (e.g. '1414-2730-5131-5256')"
         ),
     ],
-) -> str:
+) -> ToolResult:
     """Get detailed steps for a specific combo by its Spellbook ID.
 
     Use an ID from find_combos results (e.g. "1414-2730-5131-5256").
@@ -147,7 +162,10 @@ async def combo_details(
         lines.append(f"Bracket: {combo.bracket_tag}")
     lines.append(f"Popularity: {combo.popularity}")
 
-    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SPELLBOOK,
+        structured_content=combo.model_dump(mode="json"),
+    )
 
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
@@ -156,7 +174,7 @@ async def find_decklist_combos(
         list[str], Field(description="Commander card name(s) (e.g. ['Muldrotha, the Gravetide'])")
     ],
     decklist: Annotated[list[str], Field(description="List of card names in the main deck")],
-) -> str:
+) -> ToolResult:
     """Find combos present in (or nearly present in) a Commander decklist.
 
     Provide commander name(s) and a list of card names in the main deck.
@@ -182,7 +200,10 @@ async def find_decklist_combos(
         for combo in result.almost_included:
             lines.extend(_format_combo_summary(combo))
 
-    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SPELLBOOK,
+        structured_content=result.model_dump(mode="json"),
+    )
 
 
 @spellbook_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_COMBO)
@@ -191,7 +212,7 @@ async def estimate_bracket(
         list[str], Field(description="Commander card name(s) (e.g. ['Muldrotha, the Gravetide'])")
     ],
     decklist: Annotated[list[str], Field(description="List of card names in the main deck")],
-) -> str:
+) -> ToolResult:
     """Estimate the Commander bracket (power level) for a decklist.
 
     Provide commander name(s) and a list of card names in the main deck.
@@ -224,7 +245,10 @@ async def estimate_bracket(
     ):
         lines.append("No bracket-relevant concerns found.")
 
-    return "\n".join(lines) + ATTRIBUTION_SPELLBOOK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SPELLBOOK,
+        structured_content=result.model_dump(mode="json"),
+    )
 
 
 def _zone_name(code: str) -> str:

@@ -169,6 +169,10 @@ class TestCardLookup:
         assert "Artifact" in text
         assert "{T}: Add {C}{C}." in text
         assert "Data: Scryfall bulk data" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+        assert sc["type_line"] == "Artifact"
 
     async def test_card_with_prices_and_legalities(self, client_with_data: Client):
         """card_lookup shows prices, legalities, and EDHREC rank."""
@@ -177,6 +181,10 @@ class TestCardLookup:
         assert "$0.50" in text
         assert "EDHREC Rank" in text
         assert "commander" in text.lower()
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+        assert sc["mana_cost"] == "{1}"
 
     async def test_legendary_creature(self, client_with_data: Client):
         """card_lookup returns power/toughness for creatures."""
@@ -187,12 +195,19 @@ class TestCardLookup:
         assert "Muldrotha, the Gravetide" in text
         assert "6/6" in text
         assert "Legendary Creature" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert sc["power"] == "6"
 
     async def test_case_insensitive(self, client_with_data: Client):
         """card_lookup matches card names case-insensitively."""
         result = await client_with_data.call_tool("card_lookup", {"name": "sol ring"})
         text = result.content[0].text
         assert "Sol Ring" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
 
     async def test_not_found_returns_error(self, client_with_data: Client):
         """card_lookup returns an error response for nonexistent cards."""
@@ -227,6 +242,10 @@ class TestCardSearch:
         text = result.content[0].text
         assert "Sol Ring" in text
         assert "Found" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["query"] == "Sol"
+        assert isinstance(sc["cards"], list)
 
     async def test_search_by_type(self, client_with_data: Client):
         """card_search finds cards by type line when search_field is 'type'."""
@@ -235,6 +254,10 @@ class TestCardSearch:
         )
         text = result.content[0].text
         assert "Muldrotha" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["search_field"] == "type"
+        assert isinstance(sc["cards"], list)
 
     async def test_search_by_text(self, client_with_data: Client):
         """card_search finds cards by oracle text when search_field is 'text'."""
@@ -243,6 +266,10 @@ class TestCardSearch:
         )
         text = result.content[0].text
         assert "Muldrotha" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["search_field"] == "text"
+        assert sc["total_results"] >= 1
 
     async def test_search_no_results(self, client_with_data: Client):
         """card_search returns an error response when no cards match the query."""
@@ -260,6 +287,10 @@ class TestCardSearch:
         )
         text = result.content[0].text
         assert "Found 1" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_results"] == 1
+        assert len(sc["cards"]) == 1
 
     async def test_invalid_search_field(self, client_with_data: Client):
         """card_search returns a validation error for unsupported search_field values."""
@@ -278,6 +309,10 @@ class TestCardSearch:
         result = await client_with_data.call_tool("card_search", {"query": "Sol"})
         text = result.content[0].text
         assert "Data: Scryfall bulk data" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["query"] == "Sol"
+        assert isinstance(sc["cards"], list)
 
 
 class TestResourceErrors:
@@ -316,6 +351,9 @@ class TestLegalitiesFormatting:
                 result = await c.call_tool("card_lookup", {"name": "Sol Ring"})
                 text = result.content[0].text
                 assert "Not legal in any format" in text
+                sc = result.structured_content
+                assert isinstance(sc, dict)
+                assert sc["name"] == "Sol Ring"
 
 
 # ---------------------------------------------------------------------------
@@ -489,6 +527,11 @@ class TestFormatLegality:
         assert "Sol Ring" in text
         assert "Lightning Bolt" in text
         assert "Legal" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
+        assert sc["total_cards"] == 2
 
     async def test_banned_card(self):
         """format_legality shows Banned status for banned cards."""
@@ -501,6 +544,10 @@ class TestFormatLegality:
                 )
         text = result.content[0].text
         assert "Banned" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "modern"
+        assert isinstance(sc["cards"], list)
 
     async def test_not_found_card(self):
         """format_legality shows Not Found for unknown cards."""
@@ -513,6 +560,10 @@ class TestFormatLegality:
                 )
         text = result.content[0].text
         assert "Not Found" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
 
     async def test_format_alias(self):
         """format_legality normalizes format aliases (e.g. 'edh' -> 'commander')."""
@@ -526,6 +577,10 @@ class TestFormatLegality:
         text = result.content[0].text
         assert "Commander" in text  # header
         assert "Legal" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -547,6 +602,10 @@ class TestFormatSearch:
                 )
         text = result.content[0].text
         assert "Lightning Bolt" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert sc["query"] == "Lightning"
 
     async def test_search_by_type(self):
         """format_search matches type line text."""
@@ -560,6 +619,10 @@ class TestFormatSearch:
         text = result.content[0].text
         # Should find all instants (Lightning Bolt, Counterspell, Swords)
         assert "Lightning Bolt" in text or "Counterspell" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert sc["total_results"] >= 1
 
     async def test_search_with_color_identity(self):
         """format_search filters by color identity."""
@@ -574,6 +637,10 @@ class TestFormatSearch:
         assert "Counterspell" in text
         # Swords is white, should be excluded
         assert "Swords to Plowshares" not in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
 
     async def test_search_no_results(self):
         """format_search returns error when nothing matches."""
@@ -599,6 +666,10 @@ class TestFormatSearch:
         text = result.content[0].text
         # Lightning Bolt costs $0.50, should be included
         assert "Lightning Bolt" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert sc["total_results"] >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -621,6 +692,10 @@ class TestFormatStaples:
         text = result.content[0].text
         assert "Sol Ring" in text
         assert "#1" in text  # Sol Ring should be rank 1
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
 
     async def test_staples_with_type_filter(self):
         """format_staples filters by card type."""
@@ -634,6 +709,10 @@ class TestFormatStaples:
         text = result.content[0].text
         assert "Swords to Plowshares" in text or "Counterspell" in text
         assert "Sol Ring" not in text  # Artifact, not instant
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert sc["card_type"] == "instant"
 
     async def test_staples_with_color(self):
         """format_staples filters by color identity."""
@@ -648,6 +727,10 @@ class TestFormatStaples:
         assert "Birds of Paradise" in text
         # Colorless cards (Sol Ring) should also be included (subset of green identity)
         assert "Sol Ring" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
 
     async def test_staples_no_results(self):
         """format_staples returns error when no cards match."""
@@ -682,6 +765,10 @@ class TestSimilarCards:
         text = result.content[0].text
         assert "Similar to Lightning Bolt" in text
         assert "score:" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["source_card"] == "Lightning Bolt"
+        assert isinstance(sc["similar"], list)
 
     async def test_similar_not_found(self):
         """similar_cards returns error for unknown source card."""
@@ -711,6 +798,10 @@ class TestSimilarCards:
         result_lines = [ln for ln in lines if "score:" in ln]
         for line in result_lines:
             assert "Lightning Bolt" not in line
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["source_card"] == "Lightning Bolt"
+        assert isinstance(sc["similar"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -732,6 +823,10 @@ class TestRandomCard:
         pool_names = [c.name for c in _make_test_pool()]
         assert any(name in text for name in pool_names)
         assert "Data: Scryfall bulk data" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] in pool_names
+        assert "type_line" in sc
 
     async def test_random_with_format(self):
         """random_card filters by format legality."""
@@ -757,6 +852,9 @@ class TestRandomCard:
                 )
         text = result.content[0].text
         assert "Standard Card" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Standard Card"
 
     async def test_random_no_matches(self):
         """random_card returns error when no cards match filters."""
@@ -791,6 +889,10 @@ class TestBanList:
         text = result.content[0].text
         assert "Banned" in text
         assert "Sol Ring" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "modern"
+        assert isinstance(sc["banned"], list)
 
     async def test_has_restricted_cards(self):
         """ban_list shows restricted cards for vintage."""
@@ -804,6 +906,10 @@ class TestBanList:
         text = result.content[0].text
         assert "Restricted" in text
         assert "Sol Ring" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "vintage"
+        assert isinstance(sc["restricted"], list)
 
     async def test_no_bans(self):
         """ban_list shows message when format has no bans."""
@@ -822,6 +928,10 @@ class TestBanList:
                 )
         text = result.content[0].text
         assert "no banned" in text.lower() or "No banned" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "legacy"
+        assert isinstance(sc["banned"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -846,6 +956,10 @@ class TestCardInFormats:
         assert "Commander" in text
         assert "Modern" in text
         assert "Vintage" in text
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+        assert isinstance(sc["legalities"], dict)
 
     async def test_card_not_found(self):
         """card_in_formats returns error for unknown card."""
@@ -873,6 +987,10 @@ class TestCardInFormats:
         # Commander and Modern should appear before less common formats
         assert "Commander" in text
         assert "Format" in text  # table header
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+        assert isinstance(sc["legalities"], dict)
 
 
 # ---------------------------------------------------------------------------
@@ -970,3 +1088,139 @@ class TestNewToolRegistration:
             "card_in_formats",
         }
         assert expected == tool_names
+
+
+# ---------------------------------------------------------------------------
+# Concise response_format tests
+# ---------------------------------------------------------------------------
+
+
+class TestCardLookupConcise:
+    """card_lookup concise mode returns shorter output."""
+
+    async def test_concise_is_shorter(self):
+        """Concise output omits oracle text, colors, keywords, legalities."""
+        mock = _make_pool_client()
+        with patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock):
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result_detailed = await client.call_tool(
+                    "card_lookup", {"name": "Sol Ring", "response_format": "detailed"}
+                )
+                result_concise = await client.call_tool(
+                    "card_lookup", {"name": "Sol Ring", "response_format": "concise"}
+                )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        assert "Sol Ring" in concise_text
+        # Concise should NOT include legalities
+        assert "Legalities:" not in concise_text
+        sc = result_detailed.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+
+
+class TestCardSearchConcise:
+    """card_search concise mode returns shorter output."""
+
+    async def test_concise_is_shorter(self):
+        """Concise output omits type line per card."""
+        mock = _make_pool_client()
+        with patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock):
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result_detailed = await client.call_tool(
+                    "card_search", {"query": "Sol", "response_format": "detailed"}
+                )
+                result_concise = await client.call_tool(
+                    "card_search", {"query": "Sol", "response_format": "concise"}
+                )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        assert "Sol Ring" in concise_text
+        sc = result_detailed.structured_content
+        assert isinstance(sc, dict)
+        assert sc["query"] == "Sol"
+        assert isinstance(sc["cards"], list)
+
+
+class TestFormatSearchConcise:
+    """format_search concise mode returns shorter output."""
+
+    async def test_concise_is_shorter(self):
+        """Concise output omits type and price per card."""
+        mock = _make_pool_client()
+        with patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock):
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result_detailed = await client.call_tool(
+                    "format_search",
+                    {"format": "commander", "query": "Lightning", "response_format": "detailed"},
+                )
+                result_concise = await client.call_tool(
+                    "format_search",
+                    {"format": "commander", "query": "Lightning", "response_format": "concise"},
+                )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        assert "Lightning Bolt" in concise_text
+        sc = result_detailed.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert sc["total_results"] >= 1
+
+
+class TestFormatStaplesConcise:
+    """format_staples concise mode returns shorter output."""
+
+    async def test_concise_is_shorter(self):
+        """Concise output uses plain list instead of markdown table."""
+        mock = _make_pool_client()
+        with patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock):
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result_detailed = await client.call_tool(
+                    "format_staples",
+                    {"format": "commander", "response_format": "detailed"},
+                )
+                result_concise = await client.call_tool(
+                    "format_staples",
+                    {"format": "commander", "response_format": "concise"},
+                )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        assert "Sol Ring" in concise_text
+        # Concise uses "rank:" format instead of table
+        assert "(rank:" in concise_text
+        sc = result_detailed.structured_content
+        assert isinstance(sc, dict)
+        assert sc["format"] == "commander"
+        assert isinstance(sc["cards"], list)
+
+
+class TestSimilarCardsConcise:
+    """similar_cards concise mode returns shorter output."""
+
+    async def test_concise_is_shorter(self):
+        """Concise output uses 'score: N%' format without type/price."""
+        mock = _make_pool_client()
+        with patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock):
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result_detailed = await client.call_tool(
+                    "similar_cards",
+                    {"card_name": "Lightning Bolt", "response_format": "detailed"},
+                )
+                result_concise = await client.call_tool(
+                    "similar_cards",
+                    {"card_name": "Lightning Bolt", "response_format": "concise"},
+                )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        assert "Similar to Lightning Bolt" in concise_text
+        # Concise uses "score: N%" instead of "[score: N.N]"
+        assert "(score:" in concise_text
+        sc = result_detailed.structured_content
+        assert isinstance(sc, dict)
+        assert sc["source_card"] == "Lightning Bolt"
+        assert isinstance(sc["similar"], list)

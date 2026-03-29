@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 
 from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.utils.mana import count_pips
+from mtg_mcp_server.workflows import WorkflowResult
 from mtg_mcp_server.workflows.deck import build_synergy_lookup
 
 if TYPE_CHECKING:
@@ -133,7 +134,8 @@ async def deck_analysis(
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
-) -> str:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> WorkflowResult:
     """Full decklist health check using all available backends.
 
     Args:
@@ -146,7 +148,7 @@ async def deck_analysis(
         on_progress: Optional progress callback (step, total).
 
     Returns:
-        Formatted markdown string with deck analysis.
+        WorkflowResult with markdown and structured data.
     """
     log.info("deck_analysis.start", commander=commander_name, deck_size=len(decklist))
 
@@ -156,7 +158,10 @@ async def deck_analysis(
     )
 
     if not decklist:
-        return f"# Deck Analysis \u2014 {commander_name}\n\nNo cards in decklist to analyze."
+        return WorkflowResult(
+            markdown=f"# Deck Analysis \u2014 {commander_name}\n\nNo cards in decklist to analyze.",
+            data={"commander_name": commander_name, "deck_size": 0},
+        )
 
     # Step 1/3: Resolve cards
     if on_progress is not None:
@@ -190,7 +195,7 @@ async def deck_analysis(
     total_price, avg_price, priced_count = _compute_budget(resolved_cards)
 
     # Format output
-    return _format_output(
+    markdown = _format_output(
         commander_name=commander_name,
         deck_size=len(decklist),
         mana_curve=mana_curve,
@@ -203,7 +208,30 @@ async def deck_analysis(
         low_synergy=low_synergy,
         failures=failures,
         sources=sources,
+        response_format=response_format,
     )
+    data: dict[str, object] = {
+        "commander_name": commander_name,
+        "deck_size": len(decklist),
+        "mana_curve": dict(mana_curve.buckets),
+        "total_mana_value": mana_curve.total_mana_value,
+        "color_pips": dict(color_pips.pips),
+        "bracket": bracket.model_dump(mode="json") if bracket is not None else None,
+        "combos_included": len(deck_combos.included) if deck_combos else None,
+        "combos_almost_included": len(deck_combos.almost_included) if deck_combos else None,
+        "total_price": total_price,
+        "avg_price": avg_price,
+        "priced_count": priced_count,
+        "low_synergy": [{"name": n, "synergy": s} for n, s in low_synergy],
+        "unresolved": failures,
+        "sources": {
+            "scryfall": sources.scryfall_ok,
+            "spellbook": sources.spellbook_ok,
+            "edhrec": sources.edhrec_ok,
+            "bulk_data": sources.bulk_data_available,
+        },
+    }
+    return WorkflowResult(markdown=markdown, data=data)
 
 
 # ---------------------------------------------------------------------------
@@ -384,13 +412,14 @@ def _format_output(
     low_synergy: list[tuple[str, float]],
     failures: list[str],
     sources: _DataSources,
+    response_format: Literal["detailed", "concise"] = "detailed",
 ) -> str:
     """Build the markdown output for deck analysis."""
     lines: list[str] = []
     lines.append(f"# Deck Analysis \u2014 {commander_name}")
     lines.append("")
 
-    # Mana Curve
+    # Mana Curve (always included)
     lines.append("## Mana Curve")
     lines.append("")
     lines.append("| CMC | " + " | ".join(_CMC_HEADER) + " |")
@@ -403,21 +432,22 @@ def _format_output(
         lines.append(f"**Average mana value:** {mana_curve.total_mana_value / deck_size:.1f}")
     lines.append("")
 
-    # Color Requirements
-    lines.append("## Color Requirements")
-    lines.append("")
-    pip_parts = [
-        f"{c}: {int(count) if count == int(count) else count}"
-        for c, count in color_pips.pips.items()
-        if count > 0
-    ]
-    if pip_parts:
-        lines.append(", ".join(pip_parts))
-    else:
-        lines.append("No colored mana pips found.")
-    lines.append("")
+    if response_format != "concise":
+        # Color Requirements (detailed only)
+        lines.append("## Color Requirements")
+        lines.append("")
+        pip_parts = [
+            f"{c}: {int(count) if count == int(count) else count}"
+            for c, count in color_pips.pips.items()
+            if count > 0
+        ]
+        if pip_parts:
+            lines.append(", ".join(pip_parts))
+        else:
+            lines.append("No colored mana pips found.")
+        lines.append("")
 
-    # Combos & Bracket
+    # Combos & Bracket (always included)
     lines.append("## Combos & Bracket")
     lines.append("")
     if bracket is not None:
@@ -433,71 +463,76 @@ def _format_output(
         lines.append("**Almost included:** Unknown (Spellbook unavailable)")
     lines.append("")
 
-    # Budget
-    lines.append("## Budget")
-    lines.append("")
-    if priced_count > 0:
-        lines.append(f"**Total:** ${total_price:.2f}")
-        lines.append(f"**Average card:** ${avg_price:.2f}")
-        if priced_count < deck_size:
-            lines.append(f"*({priced_count}/{deck_size} cards priced)*")
-    else:
-        lines.append("No price data available.")
-    lines.append("")
-
-    # Lowest Synergy Cards
-    lines.append("## Lowest Synergy Cards")
-    lines.append("")
-    if low_synergy:
-        for i, (name, synergy) in enumerate(low_synergy, 1):
-            sign = "+" if synergy >= 0 else ""
-            lines.append(f"{i}. **{name}** \u2014 synergy: {sign}{synergy:.0%}")
-    else:
-        if sources.edhrec_available:
-            if sources.edhrec_ok:
-                lines.append("No synergy data found for cards in this decklist.")
-            else:
-                lines.append(f"EDHREC unavailable: {sources.edhrec_error}")
+    if response_format != "concise":
+        # Budget (detailed only)
+        lines.append("## Budget")
+        lines.append("")
+        if priced_count > 0:
+            lines.append(f"**Total:** ${total_price:.2f}")
+            lines.append(f"**Average card:** ${avg_price:.2f}")
+            if priced_count < deck_size:
+                lines.append(f"*({priced_count}/{deck_size} cards priced)*")
         else:
-            lines.append("EDHREC not enabled \u2014 synergy data not available.")
-    lines.append("")
-
-    # Card resolution failures
-    if failures:
-        lines.append("## Unresolved Cards")
-        lines.append("")
-        for name in failures:
-            lines.append(f"- {name}")
+            lines.append("No price data available.")
         lines.append("")
 
-    # Data Sources footer
-    lines.append("---")
-    lines.append("**Data Sources:**")
-    lines.append(f"- [Scryfall](https://scryfall.com): {'OK' if sources.scryfall_ok else 'Failed'}")
+        # Lowest Synergy Cards (detailed only)
+        lines.append("## Lowest Synergy Cards")
+        lines.append("")
+        if low_synergy:
+            for i, (name, synergy) in enumerate(low_synergy, 1):
+                sign = "+" if synergy >= 0 else ""
+                lines.append(f"{i}. **{name}** \u2014 synergy: {sign}{synergy:.0%}")
+        else:
+            if sources.edhrec_available:
+                if sources.edhrec_ok:
+                    lines.append("No synergy data found for cards in this decklist.")
+                else:
+                    lines.append(f"EDHREC unavailable: {sources.edhrec_error}")
+            else:
+                lines.append("EDHREC not enabled \u2014 synergy data not available.")
+        lines.append("")
 
-    if sources.spellbook_ok:
-        lines.append("- [Commander Spellbook](https://commanderspellbook.com): OK")
-    elif sources.spellbook_error is not None:
+        # Card resolution failures (detailed only)
+        if failures:
+            lines.append("## Unresolved Cards")
+            lines.append("")
+            for name in failures:
+                lines.append(f"- {name}")
+            lines.append("")
+
+        # Data Sources footer (detailed only)
+        lines.append("---")
+        lines.append("**Data Sources:**")
         lines.append(
-            f"- [Commander Spellbook](https://commanderspellbook.com): "
-            f"Failed ({sources.spellbook_error})"
+            f"- [Scryfall](https://scryfall.com): {'OK' if sources.scryfall_ok else 'Failed'}"
         )
-    else:
-        lines.append("- [Commander Spellbook](https://commanderspellbook.com): Failed")
 
-    if not sources.edhrec_available:
-        lines.append("- [EDHREC](https://edhrec.com): Disabled")
-    elif sources.edhrec_ok:
-        lines.append("- [EDHREC](https://edhrec.com): OK")
-    elif sources.edhrec_error is not None:
-        lines.append(f"- [EDHREC](https://edhrec.com): Failed ({sources.edhrec_error})")
-    else:
-        lines.append("- [EDHREC](https://edhrec.com): Failed")
+        if sources.spellbook_ok:
+            lines.append("- [Commander Spellbook](https://commanderspellbook.com): OK")
+        elif sources.spellbook_error is not None:
+            lines.append(
+                f"- [Commander Spellbook](https://commanderspellbook.com): "
+                f"Failed ({sources.spellbook_error})"
+            )
+        else:
+            lines.append("- [Commander Spellbook](https://commanderspellbook.com): Failed")
 
-    if sources.bulk_data_available:
-        lines.append("- [Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): OK")
-    else:
-        lines.append("- [Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): Disabled")
+        if not sources.edhrec_available:
+            lines.append("- [EDHREC](https://edhrec.com): Disabled")
+        elif sources.edhrec_ok:
+            lines.append("- [EDHREC](https://edhrec.com): OK")
+        elif sources.edhrec_error is not None:
+            lines.append(f"- [EDHREC](https://edhrec.com): Failed ({sources.edhrec_error})")
+        else:
+            lines.append("- [EDHREC](https://edhrec.com): Failed")
+
+        if sources.bulk_data_available:
+            lines.append("- [Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): OK")
+        else:
+            lines.append(
+                "- [Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): Disabled"
+            )
 
     log.info("deck_analysis.complete", commander=commander_name, deck_size=deck_size)
     return "\n".join(lines)

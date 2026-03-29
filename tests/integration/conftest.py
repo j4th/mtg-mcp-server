@@ -24,10 +24,13 @@ SEVENTEEN_LANDS_FIXTURES = FIXTURES / "seventeen_lands"
 EDHREC_FIXTURES = FIXTURES / "edhrec"
 SCRYFALL_BULK_FIXTURES = FIXTURES / "scryfall_bulk"
 
+RULES_FIXTURES = FIXTURES / "rules"
+
 SCRYFALL_BASE = "https://api.scryfall.com"
 SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
 EDHREC_BASE = "https://json.edhrec.com"
+RULES_URL = "https://media.wizards.com/2025/downloads/MagicCompRules%2020250404.txt"
 
 
 def _load_json(path: Path) -> dict | list:
@@ -144,6 +147,13 @@ async def mcp_client():
         respx.get(_bulk_download_url()).mock(
             return_value=httpx.Response(
                 200, content=_load_oracle_cards_bytes(), headers={"ETag": '"integration-test"'}
+            )
+        )
+
+        # --- Rules routes ---
+        respx.get(RULES_URL).mock(
+            return_value=httpx.Response(
+                200, content=(RULES_FIXTURES / "comprehensive_rules.txt").read_bytes()
             )
         )
 

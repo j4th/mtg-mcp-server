@@ -1,0 +1,104 @@
+﻿Magic: The Gathering Comprehensive Rules
+
+These rules are effective as of April 4, 2025.
+
+Introduction
+
+This document is the ultimate authority for Magic: The Gathering competitive game play. It consists of a series of numbered rules followed by a glossary.
+
+Contents
+
+1. Game Concepts
+2. Parts of a Card
+7. Additional Rules
+
+1. Game Concepts
+
+100. General
+
+100.1. These Magic rules apply to any Magic game with two or more players, including two-player games and multiplayer games.
+
+100.2. To play, each player needs their own deck of traditional Magic cards, small items to represent any tokens and counters, and some way to clearly track life totals.
+
+100.2a. In constructed play (a way of playing in which each player creates their own deck ahead of time), each deck has a minimum deck size of 60 cards. A constructed deck may contain any number of basic land cards and no more than four of any card with a particular English name other than basic land cards.
+
+100.2b. In limited play (a way of playing in which each player gets the same quantity of unopened Magic product and makes their own deck using only that product and basic land cards), each deck has a minimum deck size of 40 cards. A limited deck may contain as many duplicates of a card as are included with the product.
+
+100.3. Some cards require coins or traditional dice. Some casual variants require additional items, such as specially designated cards, nontraditional Magic cards, or items to track certain game states.
+
+100.6. Most Magic tournaments (organized play activities where players compete against other players to win prizes) have additional rules covered in the Magic: The Gathering Tournament Rules (found at WPN.Wizards.com/en/resources/rules-documents). These rules may limit the use of some cards, including barring all cards from some older sets.
+
+7. Additional Rules
+
+700. General
+
+700.1. Anything that happens in a game is an event. Multiple events may take place during the resolution of a spell or ability. The text of triggered abilities and replacement effects defines the event they're looking for.
+
+702. Keyword Abilities
+
+702.1. Most abilities describe exactly what they do in the card's rules text. Some, though, are very common or would require too much space to define on the card. In these cases, the object lists only the name of the ability as a "keyword"; sometimes reminder text summarizes the game rule.
+
+702.2. Deathtouch
+
+702.2a. Deathtouch is a static ability.
+
+702.2b. A creature with toughness greater than 0 that's been dealt damage by a source with deathtouch since the last time state-based actions were checked is destroyed as a state-based action. See rule 704.
+
+702.2c. If an object changes zones before an effect causes it to deal damage, its last known information is used to determine whether it had deathtouch.
+
+702.2d. The deathtouch rules function no matter what zone an object with deathtouch deals damage from.
+
+702.9. Flying
+
+702.9a. Flying is an evasion ability.
+
+702.9b. A creature with flying can't be blocked except by creatures with flying and/or reach. See rule 509, "Declare Blockers Step."
+
+702.19. Trample
+
+702.19a. Trample is a static ability that modifies the rules for assigning an attacking creature's combat damage. The ability has no effect when a creature with trample is blocking or is dealing noncombat damage. (See rule 510, "Combat Damage Step.")
+
+702.19b. The controller of an attacking creature with trample first assigns damage to the creature(s) blocking it. Once all those blocking creatures are assigned lethal damage, any excess damage is assigned as its controller chooses among those blocking creatures and the player or planeswalker the creature is attacking.
+
+704. State-Based Actions
+
+704.1. State-based actions are game actions that happen automatically whenever certain conditions (listed below) are met. State-based actions don't use the stack.
+
+704.5. The state-based actions are as follows:
+
+704.5a. If a player has 0 or less life, that player loses the game.
+
+704.5b. If a player attempted to draw a card from a library with no cards in it since the last time state-based actions were checked, that player loses the game.
+
+704.5c. If a player has ten or more poison counters, that player loses the game.
+
+704.5j. If a player controls two or more legendary permanents with the same name, that player chooses one of them, and the rest are put into their owners' graveyards. This is called the "legend rule."
+
+704.5k. If two or more permanents have the supertype world, all except the one that has had the supertype world for the shortest amount of time are put into their owners' graveyards. In the event of a tie, all are put into their owners' graveyards. This is called the "world rule."
+
+Glossary
+
+Deathtouch
+An ability that causes damage dealt by an object to be especially effective. See rule 702.2, "Deathtouch."
+
+Flying
+An evasion ability that makes a creature unblockable except by other creatures with flying or reach. See rule 702.9, "Flying."
+
+Legend Rule
+A state-based action that puts all but one legendary permanent with the same name into the graveyard. See rule 704.5j.
+
+Mulligan
+A procedure players use at the beginning of the game to get a new hand of cards. See rule 103.5.
+
+State-Based Actions
+Game actions that happen automatically whenever certain conditions are met. See rule 704.
+
+Trample
+An ability that allows an attacking creature to deal excess combat damage to the defending player or planeswalker. See rule 702.19, "Trample."
+
+World Rule
+A state-based action that puts all but the newest world permanent into the graveyard. See rule 704.5k.
+
+Credits
+
+Magic: The Gathering Original Game Design: Richard Garfield

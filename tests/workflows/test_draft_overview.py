@@ -80,35 +80,36 @@ class TestSetOverviewHappyPath:
         """Output header includes Set Overview title, set code, and 17Lands attribution."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
-        assert "Set Overview" in result
-        assert "LRW" in result
-        assert "Data provided by [17Lands]" in result
+        assert isinstance(result.data, dict)
+        assert "Set Overview" in result.markdown
+        assert "LRW" in result.markdown
+        assert "Data provided by [17Lands]" in result.markdown
 
     async def test_top_commons_section_present(self) -> None:
         """Top Commons section present in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
-        assert "## Top Commons" in result
+        assert "## Top Commons" in result.markdown
 
     async def test_top_uncommons_section_present(self) -> None:
         """Top Uncommons section present in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
-        assert "## Top Uncommons" in result
+        assert "## Top Uncommons" in result.markdown
 
     async def test_trap_rares_section_present(self) -> None:
         """Trap Rares/Mythics section present in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
-        assert "## Trap Rares/Mythics" in result
+        assert "## Trap Rares/Mythics" in result.markdown
 
     async def test_commons_sorted_by_gih_wr(self) -> None:
         """Commons sorted by GIH WR descending in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         # Top Common A (62.0%) should appear before Top Common B (59.5%)
-        pos_a = result.index("Top Common A")
-        pos_b = result.index("Top Common B")
+        pos_a = result.markdown.index("Top Common A")
+        pos_b = result.markdown.index("Top Common B")
         assert pos_a < pos_b
 
     async def test_uncommons_sorted_by_gih_wr(self) -> None:
@@ -116,8 +117,8 @@ class TestSetOverviewHappyPath:
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         # Top Uncommon X (61.0%) should appear before Top Uncommon Y (58.0%)
-        pos_x = result.index("Top Uncommon X")
-        pos_y = result.index("Top Uncommon Y")
+        pos_x = result.markdown.index("Top Uncommon X")
+        pos_y = result.markdown.index("Top Uncommon Y")
         assert pos_x < pos_y
 
     async def test_trap_rares_below_median(self) -> None:
@@ -126,16 +127,16 @@ class TestSetOverviewHappyPath:
         result = await set_overview("LRW", seventeen_lands=client)
         # Trap Rare (48.0%) and Bad Rare (46.0%) and Trap Mythic (49.0%)
         # should all be in the trap section
-        assert "Trap Rare" in result
-        assert "Bad Rare" in result
-        assert "Trap Mythic" in result
+        assert "Trap Rare" in result.markdown
+        assert "Bad Rare" in result.markdown
+        assert "Trap Mythic" in result.markdown
 
     async def test_good_rares_not_in_trap_section(self) -> None:
         """Rares above median GIH WR excluded from trap section."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
         # Good Rare (63.0%) and Bomb Mythic (65.0%) should NOT be traps
-        trap_section = result.split("## Trap Rares/Mythics")[1]
+        trap_section = result.markdown.split("## Trap Rares/Mythics")[1]
         assert "Good Rare" not in trap_section
         assert "Bomb Mythic" not in trap_section
 
@@ -143,19 +144,19 @@ class TestSetOverviewHappyPath:
         """GIH WR displayed as a percentage (e.g., 62.0%)."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
-        assert "62.0%" in result  # Top Common A
+        assert "62.0%" in result.markdown  # Top Common A
 
     async def test_median_gih_displayed(self) -> None:
         """Median GIH WR value displayed in output."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client)
-        assert "Median GIH WR" in result
+        assert "Median GIH WR" in result.markdown
 
     async def test_event_type_shown(self) -> None:
         """Custom event type displayed in output header."""
         client = _make_mock_client()
         result = await set_overview("LRW", event_type="TradDraft", seventeen_lands=client)
-        assert "TradDraft" in result
+        assert "TradDraft" in result.markdown
 
     async def test_calls_card_ratings_with_params(self) -> None:
         """17Lands card_ratings called with set code and event type."""
@@ -171,8 +172,8 @@ class TestSetOverviewEmptyRatings:
         """Empty ratings produce a 'No card data available' message."""
         client = _make_mock_client(ratings=[])
         result = await set_overview("XYZ", seventeen_lands=client)
-        assert "No card data available" in result
-        assert "XYZ" in result
+        assert "No card data available" in result.markdown
+        assert "XYZ" in result.markdown
 
 
 class TestSetOverviewAllNoneGihWr:
@@ -187,7 +188,7 @@ class TestSetOverviewAllNoneGihWr:
         ]
         client = _make_mock_client(ratings)
         result = await set_overview("XYZ", seventeen_lands=client)
-        assert "No card data available" in result
+        assert "No card data available" in result.markdown
 
 
 class TestSetOverviewNoTrapRares:
@@ -204,7 +205,7 @@ class TestSetOverviewNoTrapRares:
         ]
         client = _make_mock_client(ratings)
         result = await set_overview("LRW", seventeen_lands=client)
-        assert "No trap rares found" in result
+        assert "No trap rares found" in result.markdown
 
 
 class TestSetOverviewProgressCallback:
@@ -223,7 +224,7 @@ class TestSetOverviewProgressCallback:
         """No crash when on_progress is None."""
         client = _make_mock_client()
         result = await set_overview("LRW", seventeen_lands=client, on_progress=None)
-        assert "Set Overview" in result
+        assert "Set Overview" in result.markdown
 
 
 class TestSetOverviewTopNLimit:
@@ -239,7 +240,7 @@ class TestSetOverviewTopNLimit:
         client = _make_mock_client(ratings)
         result = await set_overview("LRW", seventeen_lands=client)
         # Count ranked rows in the commons section
-        commons_section = result.split("## Top Commons")[1].split("## Top Uncommons")[0]
+        commons_section = result.markdown.split("## Top Commons")[1].split("## Top Uncommons")[0]
         ranked_rows = [
             line
             for line in commons_section.split("\n")
@@ -256,10 +257,31 @@ class TestSetOverviewTopNLimit:
         ]
         client = _make_mock_client(ratings)
         result = await set_overview("LRW", seventeen_lands=client)
-        uncommons_section = result.split("## Top Uncommons")[1].split("## Trap Rares")[0]
+        uncommons_section = result.markdown.split("## Top Uncommons")[1].split("## Trap Rares")[0]
         ranked_rows = [
             line
             for line in uncommons_section.split("\n")
             if line.strip().startswith("|") and "." in line
         ]
         assert len(ranked_rows) <= 10
+
+
+# ---------------------------------------------------------------------------
+# response_format tests
+# ---------------------------------------------------------------------------
+
+
+class TestSetOverviewResponseFormat:
+    """Concise output is shorter than detailed."""
+
+    async def test_concise_shorter_than_detailed(self) -> None:
+        client = _make_mock_client()
+
+        detailed = await set_overview("LRW", seventeen_lands=client, response_format="detailed")
+        concise = await set_overview("LRW", seventeen_lands=client, response_format="concise")
+
+        assert len(concise.markdown) < len(detailed.markdown)
+        assert "LRW" in concise.markdown
+        # Concise omits Trap Rares section
+        assert "Trap Rares" not in concise.markdown
+        assert "Trap Rares" in detailed.markdown

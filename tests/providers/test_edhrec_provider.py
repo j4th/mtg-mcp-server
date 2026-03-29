@@ -49,6 +49,14 @@ class TestCommanderStaples:
         assert "+53%" in text
         assert "Data provided by [EDHREC]" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["commander_name"] == "Muldrotha, the Gravetide"
+        assert sc["total_decks"] == 22329
+        assert isinstance(sc["cardlists"], list)
+        assert len(sc["cardlists"]) > 0
+
     @respx.mock
     async def test_category_filter(self, client: Client):
         """commander_staples filters results to a single card category when specified."""
@@ -66,6 +74,12 @@ class TestCommanderStaples:
         assert "Spore Frog" in text
         # Should not contain other categories
         assert "Enchantments" not in text
+
+        # Structured output respects filter
+        sc = result.structured_content
+        assert sc is not None
+        assert len(sc["cardlists"]) == 1
+        assert sc["cardlists"][0]["header"] == "Creatures"
 
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
@@ -102,6 +116,16 @@ class TestCardSynergy:
         assert "+53%" in text
         assert "high-synergy" in text
 
+        # Structured output
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["card_name"] == "Spore Frog"
+        assert sc["commander_name"] == "Muldrotha, the Gravetide"
+        assert sc["found"] is True
+        assert isinstance(sc["synergy"], float)
+        assert sc["synergy"] > 0.3
+        assert isinstance(sc["num_decks"], int)
+
     @respx.mock
     async def test_card_not_found_returns_message(self, client: Client):
         """card_synergy returns a 'not found' message when the card is not in the commander's data."""
@@ -119,6 +143,12 @@ class TestCardSynergy:
         )
         text = result.content[0].text
         assert "not found" in text.lower()
+
+        # Structured output for not-found case
+        sc = result.structured_content
+        assert sc is not None
+        assert sc["found"] is False
+        assert sc["card_name"] == "Totally Nonexistent Card"
 
 
 class TestToolRegistration:

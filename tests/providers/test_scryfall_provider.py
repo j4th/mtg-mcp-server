@@ -48,6 +48,51 @@ class TestSearchCards:
         assert fixture["data"][0]["name"] in text
         assert "Data provided by [Scryfall]" in text
 
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["query"] == "f:commander id:sultai t:creature"
+        assert sc["total_cards"] == 9273
+        assert isinstance(sc["cards"], list)
+
+
+class TestSearchCardsConcise:
+    """Scryfall search_cards tool concise mode."""
+
+    @respx.mock
+    async def test_concise_is_shorter(self, client: Client):
+        """Concise output omits type and price, producing shorter text."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(
+            f"{BASE_URL}/cards/search",
+            params={"q": "f:commander id:sultai t:creature", "page": "1"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result_detailed = await client.call_tool(
+            "search_cards",
+            {"query": "f:commander id:sultai t:creature", "response_format": "detailed"},
+        )
+        # Re-mock for second call
+        respx.get(
+            f"{BASE_URL}/cards/search",
+            params={"q": "f:commander id:sultai t:creature", "page": "1"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result_concise = await client.call_tool(
+            "search_cards",
+            {"query": "f:commander id:sultai t:creature", "response_format": "concise"},
+        )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        # Card name still present
+        assert fixture["data"][0]["name"] in concise_text
+        assert "Data provided by [Scryfall]" in concise_text
+
+        sc = result_concise.structured_content
+        assert isinstance(sc, dict)
+        assert sc["query"] == "f:commander id:sultai t:creature"
+        assert isinstance(sc["cards"], list)
+
 
 class TestCardDetails:
     """Scryfall card_details tool behavior."""
@@ -66,6 +111,11 @@ class TestCardDetails:
         assert "{3}{B}{G}{U}" in text
         assert "6/6" in text
 
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert "type_line" in sc
+
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
         """card_details returns an error response for nonexistent cards."""
@@ -76,6 +126,43 @@ class TestCardDetails:
 
         result = await client.call_tool("card_details", {"name": "Xyzzy"}, raise_on_error=False)
         assert result.is_error
+
+
+class TestCardDetailsConcise:
+    """Scryfall card_details tool concise mode."""
+
+    @respx.mock
+    async def test_concise_is_shorter(self, client: Client):
+        """Concise output returns only name, type, and price -- no oracle text or legalities."""
+        fixture = _load_fixture("card_muldrotha.json")
+        respx.get(f"{BASE_URL}/cards/named", params={"exact": "Muldrotha, the Gravetide"}).mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result_detailed = await client.call_tool(
+            "card_details",
+            {"name": "Muldrotha, the Gravetide", "response_format": "detailed"},
+        )
+        respx.get(f"{BASE_URL}/cards/named", params={"exact": "Muldrotha, the Gravetide"}).mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result_concise = await client.call_tool(
+            "card_details",
+            {"name": "Muldrotha, the Gravetide", "response_format": "concise"},
+        )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        assert "Muldrotha, the Gravetide" in concise_text
+        # Concise should NOT include legalities or scryfall URI
+        assert "Legalities:" not in concise_text
+        assert "Scryfall:" not in concise_text
+
+        sc = result_concise.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert "type_line" in sc
 
 
 class TestCardPrice:
@@ -93,6 +180,11 @@ class TestCardPrice:
         text = result.content[0].text
         assert "Sol Ring" in text
         assert "$" in text
+
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+        assert "prices" in sc
 
 
 class TestCardRulings:
@@ -117,6 +209,12 @@ class TestCardRulings:
         assert "Muldrotha" in text
         assert "8 ruling" in text.lower()
 
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert sc["total_rulings"] == 8
+        assert isinstance(sc["rulings"], list)
+
 
 class TestSetInfo:
     """Scryfall set_info tool behavior."""
@@ -135,6 +233,11 @@ class TestSetInfo:
         assert "2018-04-27" in text
         assert "280" in text
         assert "Data provided by [Scryfall]" in text
+
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Dominaria"
+        assert sc["code"] == "dom"
 
     @respx.mock
     async def test_set_not_found(self, client: Client):
@@ -165,6 +268,11 @@ class TestWhatsNew:
         assert "card" in text.lower()
         assert "Data provided by [Scryfall]" in text
 
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_cards"] == 9273
+        assert isinstance(sc["cards"], list)
+
     @respx.mock
     async def test_with_set_and_format_filters(self, client: Client):
         """whats_new accepts optional set_code and format filters."""
@@ -176,6 +284,11 @@ class TestWhatsNew:
         )
         text = result.content[0].text
         assert "Found" in text
+
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["days"] == 7
+        assert sc["set_code"] == "dom"
 
     async def test_invalid_days_zero(self, client: Client):
         """whats_new rejects days < 1."""
@@ -195,6 +308,34 @@ class TestWhatsNew:
         result = await client.call_tool("whats_new", {"days": 1}, raise_on_error=False)
         assert result.is_error
         assert "no new cards found" in result.content[0].text.lower()
+
+
+class TestWhatsNewConcise:
+    """Scryfall whats_new tool concise mode."""
+
+    @respx.mock
+    async def test_concise_is_shorter(self, client: Client):
+        """Concise output omits type line, producing shorter text."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result_detailed = await client.call_tool(
+            "whats_new", {"days": 30, "response_format": "detailed"}
+        )
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result_concise = await client.call_tool(
+            "whats_new", {"days": 30, "response_format": "concise"}
+        )
+        detailed_text = result_detailed.content[0].text
+        concise_text = result_concise.content[0].text
+        assert len(concise_text) < len(detailed_text)
+        assert "Found" in concise_text
+
+        sc = result_concise.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_cards"] == 9273
+        assert isinstance(sc["cards"], list)
 
 
 class TestToolRegistration:

@@ -7,13 +7,14 @@ keyword argument and returns a formatted markdown string. The workflow server
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 
 from mtg_mcp_server.utils.decklist import parse_decklist
 from mtg_mcp_server.utils.format_rules import normalize_format
 from mtg_mcp_server.utils.mana import count_pips, suggest_land_count
+from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
@@ -44,7 +45,8 @@ async def suggest_mana_base(
     *,
     total_lands: int | None = None,
     bulk: ScryfallBulkClient,
-) -> str:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> WorkflowResult:
     """Suggest a mana base based on color pip distribution.
 
     Analyzes the mana costs of non-land cards, counts color pips weighted
@@ -58,7 +60,7 @@ async def suggest_mana_base(
         bulk: Initialized ScryfallBulkClient.
 
     Returns:
-        Formatted markdown with mana base recommendations.
+        WorkflowResult with markdown and structured data.
     """
     log.info("suggest_mana_base.start", format=format, cards=len(decklist))
 
@@ -68,7 +70,10 @@ async def suggest_mana_base(
     # --- Parse and resolve ---
     parsed = parse_decklist(decklist)
     if not parsed:
-        return "# Mana Base Suggestion\n\nNo cards provided."
+        return WorkflowResult(
+            markdown="# Mana Base Suggestion\n\nNo cards provided.",
+            data={"format": fmt, "land_count": 0, "basic_lands": {}, "dual_lands": []},
+        )
 
     unique_names = list(dict.fromkeys(name for _, name in parsed))
     resolved = await bulk.get_cards(unique_names)
@@ -171,56 +176,76 @@ async def suggest_mana_base(
         "",
     ]
 
-    # Pip distribution table
-    if total_pips:
-        lines.append("## Color Pip Distribution")
-        lines.append("")
-        lines.append("| Color | Pips | Ratio |")
-        lines.append("|-------|------|-------|")
-        for color in ("W", "U", "B", "R", "G"):
-            if color in total_pips:
-                pips = total_pips[color]
-                ratio = pip_ratios.get(color, 0.0)
-                lines.append(f"| {_COLOR_NAMES[color]} ({color}) | {pips:.1f} | {ratio:.0%} |")
-        lines.append("")
+    if response_format == "concise":
+        # Basic land distribution only
+        for land_name, count in sorted(basic_lands.items()):
+            if count > 0:
+                lines.append(f"- {count}x {land_name}")
     else:
-        lines.append("## Color Pip Distribution")
+        # Pip distribution table
+        if total_pips:
+            lines.append("## Color Pip Distribution")
+            lines.append("")
+            lines.append("| Color | Pips | Ratio |")
+            lines.append("|-------|------|-------|")
+            for color in ("W", "U", "B", "R", "G"):
+                if color in total_pips:
+                    pips = total_pips[color]
+                    ratio = pip_ratios.get(color, 0.0)
+                    lines.append(f"| {_COLOR_NAMES[color]} ({color}) | {pips:.1f} | {ratio:.0%} |")
+            lines.append("")
+        else:
+            lines.append("## Color Pip Distribution")
+            lines.append("")
+            lines.append("Colorless deck - no colored mana requirements.")
+            lines.append("")
+
+        # Basic land distribution
+        lines.append("## Suggested Basic Lands")
         lines.append("")
-        lines.append("Colorless deck - no colored mana requirements.")
+        for land_name, count in sorted(basic_lands.items()):
+            if count > 0:
+                lines.append(f"- {count}x {land_name}")
         lines.append("")
 
-    # Basic land distribution
-    lines.append("## Suggested Basic Lands")
-    lines.append("")
-    for land_name, count in sorted(basic_lands.items()):
-        if count > 0:
-            lines.append(f"- {count}x {land_name}")
-    lines.append("")
+        # Dual land suggestions
+        if dual_lands:
+            lines.append("## Recommended Dual Lands")
+            lines.append("")
+            for card in dual_lands:
+                colors = ", ".join(card.color_identity)
+                price = f"${card.prices.usd}" if card.prices.usd is not None else "N/A"
+                lines.append(f"- **{card.name}** ({colors}) - {price}")
+            lines.append("")
 
-    # Dual land suggestions
-    if dual_lands:
-        lines.append("## Recommended Dual Lands")
-        lines.append("")
-        for card in dual_lands:
-            colors = ", ".join(card.color_identity)
-            price = f"${card.prices.usd}" if card.prices.usd is not None else "N/A"
-            lines.append(f"- **{card.name}** ({colors}) - {price}")
-        lines.append("")
+        # Warnings
+        if heavy_warnings:
+            lines.append("## Warnings")
+            lines.append("")
+            for warn in heavy_warnings:
+                lines.append(f"- {warn}")
+            lines.append("")
 
-    # Warnings
-    if heavy_warnings:
-        lines.append("## Warnings")
-        lines.append("")
-        for warn in heavy_warnings:
-            lines.append(f"- {warn}")
-        lines.append("")
-
-    # Summary
-    lines.append("---")
-    summary_parts = [f"{resolved_count} cards analyzed"]
-    if unresolved_count:
-        summary_parts.append(f"{unresolved_count} unresolved")
-    lines.append(f"*{', '.join(summary_parts)}*")
+        # Summary
+        lines.append("---")
+        summary_parts = [f"{resolved_count} cards analyzed"]
+        if unresolved_count:
+            summary_parts.append(f"{unresolved_count} unresolved")
+        lines.append(f"*{', '.join(summary_parts)}*")
 
     log.info("suggest_mana_base.complete", format=fmt, land_count=land_count)
-    return "\n".join(lines)
+    data: dict[str, object] = {
+        "format": fmt,
+        "avg_cmc": avg_cmc,
+        "land_count": land_count,
+        "pip_ratios": pip_ratios,
+        "basic_lands": basic_lands,
+        "dual_lands": [
+            {"name": c.name, "color_identity": list(c.color_identity), "price_usd": c.prices.usd}
+            for c in dual_lands
+        ],
+        "heavy_warnings": heavy_warnings,
+        "resolved_count": resolved_count,
+        "unresolved_count": unresolved_count,
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)

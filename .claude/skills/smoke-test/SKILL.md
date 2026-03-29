@@ -57,14 +57,24 @@ If bulk tools unavailable (older server), try `mtgjson_card_lookup` / `mtgjson_c
 
 `edhrec_commander_staples(commander_name="Muldrotha, the Gravetide")` — expect synergy scores. EDHREC scrapes undocumented endpoints; SKIP on error, don't fail the overall test.
 
-### 6. Workflows (parallel batch)
+### 6. Rules Engine (parallel batch)
+
+| Call | Validate |
+|------|----------|
+| `rules_lookup(query="704.5k")` | Rule number 704.5k present, "world rule" in text |
+| `keyword_explain(keyword="deathtouch")` | Glossary definition, rules section, interactions section (trample listed) |
+| `rules_interaction(mechanic_a="deathtouch", mechanic_b="trample")` | Both mechanics have rules, interaction note present |
+| `rules_scenario(scenario="A 1/1 creature with deathtouch and trample is blocked by a 5/5 creature")` | Rule citations present, scenario analysis |
+| `combat_calculator(attackers=["Typhoid Rats"], blockers=["Grizzly Bears"], keywords=["deathtouch"])` | Combat steps, damage assignment, outcome |
+
+### 7. Workflows (parallel batch)
 
 | Call | Validate |
 |------|----------|
 | `commander_overview(commander_name="Muldrotha, the Gravetide")` | Card header + combos section + data sources |
 | `evaluate_upgrade(card_name="Spore Frog", commander_name="Muldrotha, the Gravetide")` | Card details + synergy data |
 
-### 7. Cross-Tool Consistency
+### 8. Cross-Tool Consistency
 
 Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`bulk_card_lookup("Sol Ring")`):
 - Names match
@@ -85,9 +95,10 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 | Spellbook | 2 | | | |
 | Draft | 1 | | | |
 | EDHREC | 1 | | | |
+| Rules | 5 | | | |
 | Workflows | 2 | | | |
 | Consistency | 1 | | | |
-| **Total** | **15** | | | |
+| **Total** | **20** | | | |
 
 ### Failures
 [Details for each FAIL — what was expected vs actual]

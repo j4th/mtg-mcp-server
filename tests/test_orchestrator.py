@@ -328,7 +328,7 @@ class TestToolSchemaCompleteness:
         """Server exposes the expected number of tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
-        assert len(tools) == 35, f"Expected 35 tools, got {len(tools)}.\nTools: {tool_names}"
+        assert len(tools) == 40, f"Expected 40 tools, got {len(tools)}.\nTools: {tool_names}"
 
     async def test_no_context_parameter_exposed(self, mcp_client: Client):
         """No tool should expose 'ctx' (Context) as a user-visible parameter."""
@@ -363,6 +363,10 @@ class TestResourcePropagation:
             "ratings",  # 17Lands ratings
             "staples",  # EDHREC staples
             "card-data/{name}",  # Scryfall bulk card-data
+            "rules/{number}",  # Rules by number
+            "glossary/{term}",  # Rules glossary
+            # rules/keywords and rules/sections are static (no URI params)
+            # so they appear in list_resources(), not list_resource_templates()
         ]
         for fragment in expected_fragments:
             found = any(fragment in uri for uri in uri_set)
@@ -373,8 +377,8 @@ class TestResourcePropagation:
     async def test_resource_template_count(self, mcp_client: Client):
         """At least 6 resource templates are registered."""
         templates = await mcp_client.list_resource_templates()
-        assert len(templates) >= 6, (
-            f"Expected >= 6 resource templates, got {len(templates)}.\n"
+        assert len(templates) >= 8, (
+            f"Expected >= 8 resource templates, got {len(templates)}.\n"
             f"Templates: {[t.uriTemplate for t in templates]}"
         )
 
@@ -388,7 +392,7 @@ class TestPromptCompleteness:
     """Verify all prompts are registered and have complete argument metadata."""
 
     async def test_all_prompts_listed(self, mcp_client: Client):
-        """All 4 workflow prompts are registered."""
+        """All workflow prompts are registered."""
         prompts = await mcp_client.list_prompts()
         prompt_names = {p.name for p in prompts}
         expected = {
@@ -396,6 +400,11 @@ class TestPromptCompleteness:
             "deck_health_check",
             "draft_strategy",
             "find_upgrades",
+            "build_deck",
+            "evaluate_collection",
+            "format_intro",
+            "card_alternatives",
+            "rules_question",
         }
         assert expected.issubset(prompt_names), (
             f"Missing prompts: {expected - prompt_names}.\nAvailable: {prompt_names}"

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 
 from mtg_mcp_server.providers import ATTRIBUTION_17LANDS
+from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -90,7 +91,8 @@ async def draft_pack_pick(
     *,
     seventeen_lands: SeventeenLandsClient,
     current_picks: list[str] | None = None,
-) -> str:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> WorkflowResult:
     """Rank cards in a draft pack using 17Lands win rate data.
 
     Args:
@@ -100,12 +102,15 @@ async def draft_pack_pick(
         current_picks: Cards already drafted (for color fit analysis).
 
     Returns:
-        Formatted markdown string with ranked cards and stats.
+        WorkflowResult with markdown and structured data.
     """
     log.info("draft_pack_pick.start", set_code=set_code, pack_size=len(pack))
 
     if not pack:
-        return f"# Draft Pack Analysis \u2014 {set_code}\n\nNo cards in pack.{ATTRIBUTION_17LANDS}"
+        return WorkflowResult(
+            markdown=f"# Draft Pack Analysis \u2014 {set_code}\n\nNo cards in pack.{ATTRIBUTION_17LANDS}",
+            data={"set_code": set_code, "rankings": [], "no_data": []},
+        )
 
     # Fetch all card ratings for this set
     ratings = await seventeen_lands.card_ratings(set_code)
@@ -147,21 +152,37 @@ async def draft_pack_pick(
 
     # Ranked list
     if found:
-        lines.append("| Rank | Card | Color | Rarity | GIH WR | ALSA | IWD | Games |")
-        lines.append("|------|------|-------|--------|--------|------|-----|-------|")
-        for i, rating in enumerate(found, 1):
-            color_fit = ""
-            if pick_colors is not None:
-                card_colors = set(rating.color) if rating.color else set()
-                pick_color_set = set(pick_colors.keys())
-                color_fit = " [on-color]" if card_colors & pick_color_set else " [off-color]"
+        if response_format == "concise":
+            lines.append("| Rank | Card | GIH WR | ALSA |")
+            lines.append("|------|------|--------|------|")
+            for i, rating in enumerate(found, 1):
+                color_fit = ""
+                if pick_colors is not None:
+                    card_colors = set(rating.color) if rating.color else set()
+                    pick_color_set = set(pick_colors.keys())
+                    color_fit = " [on-color]" if card_colors & pick_color_set else " [off-color]"
 
-            lines.append(
-                f"| {i}. | {rating.name}{color_fit} | {rating.color} "
-                f"| {rating.rarity} | {_fmt_pct(rating.ever_drawn_win_rate)} "
-                f"| {_fmt_float(rating.avg_seen)} | {_fmt_iwd(rating.drawn_improvement_win_rate)} "
-                f"| {rating.game_count} |"
-            )
+                lines.append(
+                    f"| {i}. | {rating.name}{color_fit} "
+                    f"| {_fmt_pct(rating.ever_drawn_win_rate)} "
+                    f"| {_fmt_float(rating.avg_seen)} |"
+                )
+        else:
+            lines.append("| Rank | Card | Color | Rarity | GIH WR | ALSA | IWD | Games |")
+            lines.append("|------|------|-------|--------|--------|------|-----|-------|")
+            for i, rating in enumerate(found, 1):
+                color_fit = ""
+                if pick_colors is not None:
+                    card_colors = set(rating.color) if rating.color else set()
+                    pick_color_set = set(pick_colors.keys())
+                    color_fit = " [on-color]" if card_colors & pick_color_set else " [off-color]"
+
+                lines.append(
+                    f"| {i}. | {rating.name}{color_fit} | {rating.color} "
+                    f"| {rating.rarity} | {_fmt_pct(rating.ever_drawn_win_rate)} "
+                    f"| {_fmt_float(rating.avg_seen)} | {_fmt_iwd(rating.drawn_improvement_win_rate)} "
+                    f"| {rating.game_count} |"
+                )
 
     # No data section
     if no_data:
@@ -176,7 +197,24 @@ async def draft_pack_pick(
     lines.append(ATTRIBUTION_17LANDS)
 
     log.info("draft_pack_pick.complete", set_code=set_code, found=len(found), no_data=len(no_data))
-    return "\n".join(lines)
+    data = {
+        "set_code": set_code,
+        "rankings": [
+            {
+                "rank": i,
+                "name": r.name,
+                "color": r.color,
+                "rarity": r.rarity,
+                "gih_wr": r.ever_drawn_win_rate,
+                "alsa": r.avg_seen,
+                "iwd": r.drawn_improvement_win_rate,
+                "game_count": r.game_count,
+            }
+            for i, r in enumerate(found, 1)
+        ],
+        "no_data": no_data,
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +231,8 @@ async def set_overview(
     event_type: str = "PremierDraft",
     seventeen_lands: SeventeenLandsClient,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
-) -> str:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> WorkflowResult:
     """Draft format overview with top commons, top uncommons, and trap rares.
 
     Args:
@@ -203,7 +242,7 @@ async def set_overview(
         on_progress: Optional progress callback (step, total).
 
     Returns:
-        Formatted markdown string with format overview.
+        WorkflowResult with markdown and structured data.
     """
     log.info("set_overview.start", set_code=set_code, event_type=event_type)
 
@@ -220,11 +259,21 @@ async def set_overview(
         await on_progress(2, 2)
 
     if not rated:
-        return (
-            f"# Set Overview \u2014 {set_code}\n\n"
-            f"No card data available for this set. "
-            f"Check the set code is correct and that 17Lands has data for {event_type}."
-            f"{ATTRIBUTION_17LANDS}"
+        return WorkflowResult(
+            markdown=(
+                f"# Set Overview \u2014 {set_code}\n\n"
+                f"No card data available for this set. "
+                f"Check the set code is correct and that 17Lands has data for {event_type}."
+                f"{ATTRIBUTION_17LANDS}"
+            ),
+            data={
+                "set_code": set_code,
+                "event_type": event_type,
+                "median_gih_wr": None,
+                "top_commons": [],
+                "top_uncommons": [],
+                "trap_rares": [],
+            },
         )
 
     # Single-pass: group by rarity and collect GIH WR values
@@ -244,11 +293,12 @@ async def set_overview(
 
     median_gih = statistics.median(all_gih) if all_gih else 0.5
 
-    # Sort commons/uncommons by GIH WR descending, take top 10
+    # Sort commons/uncommons by GIH WR descending, take top N
     by_rarity["common"].sort(key=_sort_key)
     by_rarity["uncommon"].sort(key=_sort_key)
-    top_commons = by_rarity["common"][:_TOP_N]
-    top_uncommons = by_rarity["uncommon"][:_TOP_N]
+    top_n = 5 if response_format == "concise" else _TOP_N
+    top_commons = by_rarity["common"][:top_n]
+    top_uncommons = by_rarity["uncommon"][:top_n]
 
     # "Trap" rares/mythics: high-rarity cards that underperform the set median.
     # Drafters often over-pick rares; flagging underperformers helps avoid that.
@@ -272,20 +322,23 @@ async def set_overview(
     _append_rarity_table(lines, "Top Commons", top_commons)
     _append_rarity_table(lines, "Top Uncommons", top_uncommons)
 
-    # Trap rares
-    lines.append("## Trap Rares/Mythics")
-    lines.append("")
-    lines.append(f"Rares and mythics with GIH WR below the set median ({_fmt_pct(median_gih)}):")
-    lines.append("")
-    if trap_rares:
-        for r in trap_rares:
-            lines.append(
-                f"- **{r.name}** ({r.rarity}) \u2014 "
-                f"GIH WR: {_fmt_pct(r.ever_drawn_win_rate)}, "
-                f"ALSA: {_fmt_float(r.avg_seen)}"
-            )
-    else:
-        lines.append("No trap rares found \u2014 all rares/mythics are above the median.")
+    # Trap rares (detailed only)
+    if response_format != "concise":
+        lines.append("## Trap Rares/Mythics")
+        lines.append("")
+        lines.append(
+            f"Rares and mythics with GIH WR below the set median ({_fmt_pct(median_gih)}):"
+        )
+        lines.append("")
+        if trap_rares:
+            for r in trap_rares:
+                lines.append(
+                    f"- **{r.name}** ({r.rarity}) \u2014 "
+                    f"GIH WR: {_fmt_pct(r.ever_drawn_win_rate)}, "
+                    f"ALSA: {_fmt_float(r.avg_seen)}"
+                )
+        else:
+            lines.append("No trap rares found \u2014 all rares/mythics are above the median.")
 
     lines.append(ATTRIBUTION_17LANDS)
 
@@ -296,4 +349,24 @@ async def set_overview(
         uncommons=len(top_uncommons),
         trap_rares=len(trap_rares),
     )
-    return "\n".join(lines)
+
+    def _rating_dict(r: DraftCardRating) -> dict[str, object]:
+        return {
+            "name": r.name,
+            "color": r.color,
+            "rarity": r.rarity,
+            "gih_wr": r.ever_drawn_win_rate,
+            "alsa": r.avg_seen,
+            "iwd": r.drawn_improvement_win_rate,
+            "game_count": r.game_count,
+        }
+
+    data = {
+        "set_code": set_code,
+        "event_type": event_type,
+        "median_gih_wr": median_gih,
+        "top_commons": [_rating_dict(r) for r in top_commons],
+        "top_uncommons": [_rating_dict(r) for r in top_uncommons],
+        "trap_rares": [_rating_dict(r) for r in trap_rares],
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)
