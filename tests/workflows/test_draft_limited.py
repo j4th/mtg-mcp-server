@@ -324,7 +324,11 @@ def mock_bulk() -> AsyncMock:
     async def _get_card(name: str) -> Card | None:
         return POOL_CARDS.get(name)
 
+    async def _get_cards(names: list[str]) -> dict[str, Card | None]:
+        return {name: POOL_CARDS.get(name) for name in names}
+
     mock.get_card.side_effect = _get_card
+    mock.get_cards.side_effect = _get_cards
     return mock
 
 

@@ -572,15 +572,23 @@ async def _fetch_precon_data(
     spellbook_ok = False
     edhrec_ok = False
 
+    # Run Spellbook and EDHREC in parallel — they're independent
+    spellbook_task = asyncio.ensure_future(spellbook.find_decklist_combos([commander], decklist))
+    edhrec_task = (
+        asyncio.ensure_future(edhrec.commander_top_cards(commander)) if edhrec is not None else None
+    )
+
+    # Await Spellbook
     try:
-        combo_data = await spellbook.find_decklist_combos([commander], decklist)
+        combo_data = await spellbook_task
         spellbook_ok = True
     except Exception as exc:
         log.warning("precon_upgrade.spellbook_failed", error=str(exc))
 
-    if edhrec is not None:
+    # Await EDHREC (if requested)
+    if edhrec_task is not None:
         try:
-            edhrec_data = await edhrec.commander_top_cards(commander)
+            edhrec_data = await edhrec_task
             edhrec_ok = True
         except Exception as exc:
             log.warning("precon_upgrade.edhrec_failed", error=str(exc))
@@ -706,10 +714,12 @@ async def precon_upgrade(
         # Sort by synergy descending
         all_staples.sort(key=lambda c: c.synergy, reverse=True)
 
-        # Look up prices for top staples via bulk data
+        # Look up prices for top staples via bulk data (batch)
+        candidate_names = [e.name for e in all_staples[: num_upgrades * 3]]
+        price_map = await bulk.get_cards(candidate_names)
         upgrade_candidates: list[tuple[EDHRECCard, float]] = []
         for ecard in all_staples[: num_upgrades * 3]:
-            card_data = await bulk.get_card(ecard.name)
+            card_data = price_map.get(ecard.name)
             if card_data is not None and card_data.prices.usd is not None:
                 try:
                     price = float(card_data.prices.usd)

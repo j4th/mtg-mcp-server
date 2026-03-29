@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.utils.color_identity import parse_color_identity
 from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
@@ -119,54 +120,6 @@ ABSTRACT_THEMES: dict[str, list[str]] = {
     "light": ["light", "dawn", "radiant", "holy", "divine", "celestial", "angel"],
 }
 
-# Regex for parsing color identity strings like "BG", "sultai", "wubrg"
-_COLOR_MAP: dict[str, frozenset[str]] = {
-    "w": frozenset({"W"}),
-    "u": frozenset({"U"}),
-    "b": frozenset({"B"}),
-    "r": frozenset({"R"}),
-    "g": frozenset({"G"}),
-    "white": frozenset({"W"}),
-    "blue": frozenset({"U"}),
-    "black": frozenset({"B"}),
-    "red": frozenset({"R"}),
-    "green": frozenset({"G"}),
-    "azorius": frozenset({"W", "U"}),
-    "dimir": frozenset({"U", "B"}),
-    "rakdos": frozenset({"B", "R"}),
-    "gruul": frozenset({"R", "G"}),
-    "selesnya": frozenset({"G", "W"}),
-    "orzhov": frozenset({"W", "B"}),
-    "izzet": frozenset({"U", "R"}),
-    "golgari": frozenset({"B", "G"}),
-    "boros": frozenset({"R", "W"}),
-    "simic": frozenset({"G", "U"}),
-    "esper": frozenset({"W", "U", "B"}),
-    "grixis": frozenset({"U", "B", "R"}),
-    "jund": frozenset({"B", "R", "G"}),
-    "naya": frozenset({"R", "G", "W"}),
-    "bant": frozenset({"G", "W", "U"}),
-    "abzan": frozenset({"W", "B", "G"}),
-    "jeskai": frozenset({"U", "R", "W"}),
-    "sultai": frozenset({"B", "G", "U"}),
-    "mardu": frozenset({"R", "W", "B"}),
-    "temur": frozenset({"G", "U", "R"}),
-    "wubrg": frozenset({"W", "U", "B", "R", "G"}),
-}
-
-
-def _parse_color_identity(ci: str) -> frozenset[str]:
-    """Parse a color identity string into a frozenset of color codes."""
-    lower = ci.lower().strip()
-    if lower in _COLOR_MAP:
-        return _COLOR_MAP[lower]
-    # Try as raw color letters (e.g. "BG", "WUB")
-    colors: set[str] = set()
-    for ch in ci.upper():
-        if ch in "WUBRG":
-            colors.add(ch)
-    return frozenset(colors) if colors else frozenset()
-
 
 def _fmt_card_line(card: Card) -> str:
     """Format a single card as a markdown line."""
@@ -218,7 +171,12 @@ async def theme_search(
     log.info("theme_search.start", theme=theme)
 
     theme_lower = theme.lower().strip()
-    ci_filter = _parse_color_identity(color_identity) if color_identity else None
+    ci_filter: frozenset[str] | None = None
+    if color_identity:
+        try:
+            ci_filter = parse_color_identity(color_identity)
+        except ValueError:
+            ci_filter = None
 
     cards: list[Card] = []
 
@@ -384,12 +342,12 @@ async def build_around(
     """
     log.info("build_around.start", cards=cards, format=format)
 
-    # Step 1: Resolve build-around cards
+    # Step 1: Resolve build-around cards (batch)
+    card_map = await bulk.get_cards(cards)
     resolved: list[Card] = []
     unresolved: list[str] = []
-
     for name in cards:
-        card = await bulk.get_card(name)
+        card = card_map.get(name)
         if card is not None:
             resolved.append(card)
         else:
@@ -425,9 +383,9 @@ async def build_around(
     combo_results = await asyncio.gather(*combo_tasks, return_exceptions=True)
 
     all_combos: list[Combo] = []
-    for result_item in combo_results:
+    for i, result_item in enumerate(combo_results):
         if isinstance(result_item, BaseException):
-            log.warning("build_around.combo_error", error=str(result_item))
+            log.warning("build_around.combo_error", card=cards[i], error=str(result_item))
             continue
         all_combos.extend(result_item)
 

@@ -131,6 +131,9 @@ async def rotation_check(
 
         standard_codes = {s.code for s in standard_sets}
 
+        # Pre-compute oldest year once (not per card)
+        oldest_year = _oldest_standard_year(standard_sets)
+
         for name in cards:
             card = resolved_map.get(name)
             if card is None:
@@ -139,7 +142,9 @@ async def rotation_check(
 
             is_standard = card.legalities.get("standard") == "legal"
             in_set = card.set_code if hasattr(card, "set_code") else ""
-            rotating = in_set in standard_codes and _is_set_rotating(in_set, standard_sets, now)
+            rotating = in_set in standard_codes and _is_set_rotating(
+                in_set, standard_sets, oldest_year
+            )
 
             cards_checked.append(
                 {
@@ -223,20 +228,25 @@ async def rotation_check(
     return WorkflowResult(markdown="\n".join(lines), data=data)
 
 
+def _oldest_standard_year(standard_sets: list[SetInfo]) -> int | None:
+    """Find the oldest release year among Standard-legal sets."""
+    oldest: int | None = None
+    for s in standard_sets:
+        dt = _parse_date(s.released_at)
+        if dt is not None and (oldest is None or dt.year < oldest):
+            oldest = dt.year
+    return oldest
+
+
 def _is_set_rotating(
     set_code: str,
     standard_sets: list[SetInfo],
-    now: datetime,
+    oldest_year: int | None,
 ) -> bool:
-    """Check if a set is among the oldest that will rotate next.
-
-    In Standard rotation, the oldest ~4 sets rotate out when the new
-    fall set arrives. Sets in the oldest year of Standard are rotating.
-    """
-    if not standard_sets:
+    """Check if a set is among the oldest that will rotate next."""
+    if not standard_sets or oldest_year is None:
         return False
 
-    # Find the set
     target_set: SetInfo | None = None
     for s in standard_sets:
         if s.code == set_code:
@@ -248,16 +258,6 @@ def _is_set_rotating(
 
     released = _parse_date(target_set.released_at)
     if released is None:
-        return False
-
-    # Sets from the oldest year in Standard are rotating
-    oldest_year: int | None = None
-    for s in standard_sets:
-        dt = _parse_date(s.released_at)
-        if dt is not None and (oldest_year is None or dt.year < oldest_year):
-            oldest_year = dt.year
-
-    if oldest_year is None:
         return False
 
     return released.year == oldest_year

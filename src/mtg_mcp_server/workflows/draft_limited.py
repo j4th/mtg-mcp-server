@@ -287,10 +287,11 @@ async def sealed_pool_build(
     if on_progress is not None:
         await on_progress(1, 3)
 
+    card_map = await bulk.get_cards(pool)
     resolved: list[Card] = []
     unresolved: list[str] = []
     for name in pool:
-        card = await bulk.get_card(name)
+        card = card_map.get(name)
         if card is not None:
             resolved.append(card)
         else:
@@ -511,12 +512,13 @@ async def draft_signal_read(
     ratings = await seventeen_lands.card_ratings(set_code)
     rating_lookup = _build_rating_lookup(ratings)
 
-    # Resolve picks via bulk data for color info
+    # Resolve picks via bulk data for color info (batch)
+    pick_card_map = await bulk.get_cards(picks)
     color_counts: Counter[str] = Counter()
     pick_data: list[_PickData] = []
 
     for i, name in enumerate(picks):
-        card = await bulk.get_card(name)
+        card = pick_card_map.get(name)
         rating = rating_lookup.get(name.lower())
         pick_position = i + 1  # 1-based
 
@@ -694,7 +696,8 @@ async def draft_log_review(
     ratings = await seventeen_lands.card_ratings(set_code)
     rating_lookup = _build_rating_lookup(ratings)
 
-    # Analyze each pick
+    # Analyze each pick (batch card resolution)
+    log_card_map = await bulk.get_cards(picks)
     pick_analysis: list[_PickAnalysis] = []
     gih_wr_values: list[float] = []
     color_counts: Counter[str] = Counter()
@@ -702,7 +705,7 @@ async def draft_log_review(
     for i, name in enumerate(picks):
         label = _pick_label(i)
         rating = rating_lookup.get(name.lower())
-        card = await bulk.get_card(name)
+        card = log_card_map.get(name)
 
         gih_wr: float | None = None
         color = ""
