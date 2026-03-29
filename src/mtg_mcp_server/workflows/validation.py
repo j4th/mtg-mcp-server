@@ -7,7 +7,7 @@ keyword argument and returns a formatted markdown string. The workflow server
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 
@@ -19,7 +19,6 @@ from mtg_mcp_server.utils.format_rules import (
     is_basic_land,
     normalize_format,
 )
-from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
@@ -35,7 +34,8 @@ async def deck_validate(
     commander: str | None = None,
     sideboard: list[str] | None = None,
     bulk: ScryfallBulkClient,
-) -> WorkflowResult:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> str:
     """Validate a decklist against a format's construction rules.
 
     Checks deck size, legality, copy limits, color identity (Commander),
@@ -62,10 +62,7 @@ async def deck_validate(
     # --- Parse decklist ---
     parsed = parse_decklist(decklist)
     if not parsed:
-        return WorkflowResult(
-            markdown=f"# Deck Validation - {fmt.title()}\n\nNo cards provided.",
-            data={"format": fmt, "valid": False, "errors": [], "warnings": []},
-        )
+        return f"# Deck Validation - {fmt.title()}\n\nNo cards provided."
 
     parsed_sideboard = parse_decklist(sideboard) if sideboard else []
 
@@ -187,41 +184,42 @@ async def deck_validate(
     is_valid = len(errors) == 0
     header = "VALID" if is_valid else "INVALID"
 
-    lines: list[str] = [f"# {'V' if is_valid else 'X'} {header} - {fmt.title()}", ""]
+    if response_format == "concise":
+        lines: list[str] = []
+        if is_valid:
+            lines.append("VALID")
+        else:
+            lines.append(f"INVALID: {len(errors)} error(s)")
+            lines.append("")
+            for err in errors:
+                lines.append(f"- {err}")
+    else:
+        lines = [f"# {'V' if is_valid else 'X'} {header} - {fmt.title()}", ""]
 
-    if errors:
-        lines.append(f"**{len(errors)} error(s):**")
-        lines.append("")
-        for err in errors:
-            lines.append(f"- {err}")
-        lines.append("")
+        if errors:
+            lines.append(f"**{len(errors)} error(s):**")
+            lines.append("")
+            for err in errors:
+                lines.append(f"- {err}")
+            lines.append("")
 
-    if warnings:
-        lines.append(f"**{len(warnings)} warning(s):**")
-        lines.append("")
-        for warn in warnings:
-            lines.append(f"- {warn}")
-        lines.append("")
+        if warnings:
+            lines.append(f"**{len(warnings)} warning(s):**")
+            lines.append("")
+            for warn in warnings:
+                lines.append(f"- {warn}")
+            lines.append("")
 
-    if not errors and not warnings:
-        lines.append("All checks passed.")
-        lines.append("")
+        if not errors and not warnings:
+            lines.append("All checks passed.")
+            lines.append("")
 
-    lines.append("---")
-    lines.append(
-        f"*{sum(qty for qty, _ in parsed)} cards checked, "
-        f"{resolved_count} resolved, "
-        f"{len(unresolved_names)} unresolved*"
-    )
+        lines.append("---")
+        lines.append(
+            f"*{sum(qty for qty, _ in parsed)} cards checked, "
+            f"{resolved_count} resolved, "
+            f"{len(unresolved_names)} unresolved*"
+        )
 
     log.info("deck_validate.complete", format=fmt, valid=is_valid, errors=len(errors))
-    data = {
-        "format": fmt,
-        "valid": is_valid,
-        "errors": errors,
-        "warnings": warnings,
-        "cards_checked": sum(qty for qty, _ in parsed),
-        "resolved_count": resolved_count,
-        "unresolved_count": len(unresolved_names),
-    }
-    return WorkflowResult(markdown="\n".join(lines), data=data)
+    return "\n".join(lines)

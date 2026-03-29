@@ -127,9 +127,9 @@ class TestAllSourcesSucceed:
             num_cuts=5,
         )
 
-        assert "Suggested Cuts for Muldrotha, the Gravetide" in result.markdown
+        assert "Suggested Cuts for Muldrotha, the Gravetide" in result
         # Random Bad Card should be the top cut (low synergy, low inclusion)
-        ranked = _extract_ranked_lines(result.markdown)
+        ranked = _extract_ranked_lines(result)
         first_place = [ln for ln in ranked if ln.startswith("1.")]
         assert len(first_place) == 1
         assert "Random Bad Card" in first_place[0]
@@ -146,7 +146,7 @@ class TestAllSourcesSucceed:
             num_cuts=5,
         )
 
-        ranked = _extract_ranked_lines(result.markdown)
+        ranked = _extract_ranked_lines(result)
         spore_frog_rank = _find_rank_of("Spore Frog", ranked)
         random_bad_rank = _find_rank_of("Random Bad Card", ranked)
 
@@ -169,8 +169,8 @@ class TestAllSourcesSucceed:
         )
 
         # Cards with EDHREC data should show synergy and inclusion
-        assert "Synergy:" in result.markdown
-        assert "Inclusion:" in result.markdown
+        assert "Synergy:" in result
+        assert "Inclusion:" in result
 
     async def test_combo_piece_label_shown(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
@@ -185,7 +185,7 @@ class TestAllSourcesSucceed:
         )
 
         # Spore Frog is a combo piece — should be marked
-        assert "combo piece" in result.markdown.lower()
+        assert "combo piece" in result.lower()
 
     async def test_data_sources_status_shown(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
@@ -199,9 +199,9 @@ class TestAllSourcesSucceed:
             num_cuts=5,
         )
 
-        assert "Data Sources" in result.markdown
-        assert "Commander Spellbook](https://commanderspellbook.com)" in result.markdown
-        assert "EDHREC" in result.markdown
+        assert "Data Sources" in result
+        assert "Commander Spellbook](https://commanderspellbook.com)" in result
+        assert "EDHREC" in result
 
     async def test_unknown_card_flagged(
         self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
@@ -216,7 +216,7 @@ class TestAllSourcesSucceed:
         )
 
         # "Unknown Card" has no EDHREC data and is not a combo piece
-        assert "low confidence" in result.markdown.lower()
+        assert "low confidence" in result.lower()
 
 
 class TestEdhrecIsNone:
@@ -232,9 +232,9 @@ class TestEdhrecIsNone:
             num_cuts=5,
         )
 
-        assert "Suggested Cuts for Muldrotha, the Gravetide" in result.markdown
+        assert "Suggested Cuts for Muldrotha, the Gravetide" in result
         # Spore Frog is a combo piece, should be ranked lower
-        ranked = _extract_ranked_lines(result.markdown)
+        ranked = _extract_ranked_lines(result)
         spore_frog_rank = _find_rank_of("Spore Frog", ranked)
         assert spore_frog_rank is not None
         # Non-combo cards should be ranked first
@@ -254,9 +254,9 @@ class TestEdhrecIsNone:
             num_cuts=5,
         )
 
-        assert "EDHREC" in result.markdown
+        assert "EDHREC" in result
         # Should indicate EDHREC is unavailable
-        assert "unavailable" in result.markdown.lower() or "disabled" in result.markdown.lower()
+        assert "unavailable" in result.lower() or "disabled" in result.lower()
 
 
 class TestEdhrecRaisesException:
@@ -277,12 +277,12 @@ class TestEdhrecRaisesException:
             num_cuts=5,
         )
 
-        assert "Suggested Cuts for Muldrotha, the Gravetide" in result.markdown
+        assert "Suggested Cuts for Muldrotha, the Gravetide" in result
         # Should note the failure
-        assert "EDHREC" in result.markdown
-        assert "failed" in result.markdown.lower()
+        assert "EDHREC" in result
+        assert "failed" in result.lower()
         # Should still rank cards (combo data available)
-        ranked = _extract_ranked_lines(result.markdown)
+        ranked = _extract_ranked_lines(result)
         assert len(ranked) == len(SAMPLE_DECKLIST)
 
 
@@ -304,12 +304,12 @@ class TestSpellbookRaisesException:
             num_cuts=5,
         )
 
-        assert "Suggested Cuts for Muldrotha, the Gravetide" in result.markdown
+        assert "Suggested Cuts for Muldrotha, the Gravetide" in result
         # Should note the failure
-        assert "Spellbook" in result.markdown
-        assert "failed" in result.markdown.lower()
+        assert "Spellbook" in result
+        assert "failed" in result.lower()
         # Random Bad Card should still be top cut (low synergy/inclusion via EDHREC)
-        ranked = _extract_ranked_lines(result.markdown)
+        ranked = _extract_ranked_lines(result)
         first_place = [ln for ln in ranked if ln.startswith("1.")]
         assert len(first_place) == 1
         assert "Random Bad Card" in first_place[0]
@@ -337,9 +337,9 @@ class TestBothRaiseExceptions:
             num_cuts=5,
         )
 
-        assert "Suggested Cuts for Muldrotha, the Gravetide" in result.markdown
+        assert "Suggested Cuts for Muldrotha, the Gravetide" in result
         # All cards should be flagged as low confidence
-        low_confidence_count = result.markdown.lower().count("low confidence")
+        low_confidence_count = result.lower().count("low confidence")
         assert low_confidence_count == len(SAMPLE_DECKLIST)
 
 
@@ -362,13 +362,13 @@ class TestNoCombosFound:
         )
 
         # Random Bad Card should be top cut since no combo protection applies
-        ranked = _extract_ranked_lines(result.markdown)
+        ranked = _extract_ranked_lines(result)
         first_place = [ln for ln in ranked if ln.startswith("1.")]
         assert len(first_place) == 1
         assert "Random Bad Card" in first_place[0]
 
         # No "combo piece" labels since no combos found
-        assert "combo piece" not in result.markdown.lower()
+        assert "combo piece" not in result.lower()
 
 
 class TestNumCutsGreaterThanDeckSize:
@@ -387,7 +387,7 @@ class TestNumCutsGreaterThanDeckSize:
             num_cuts=10,
         )
 
-        ranked = _extract_ranked_lines(result.markdown)
+        ranked = _extract_ranked_lines(result)
         assert len(ranked) == 2
 
 
@@ -406,7 +406,7 @@ class TestEmptyDecklist:
             num_cuts=5,
         )
 
-        assert "no cards" in result.markdown.lower() or "empty" in result.markdown.lower()
+        assert "no cards" in result.lower() or "empty" in result.lower()
 
 
 class TestNumCutsZero:
@@ -425,6 +425,38 @@ class TestNumCutsZero:
         )
 
         # Should have the header but no ranked items
-        assert "Suggested Cuts for Muldrotha, the Gravetide" in result.markdown
-        ranked = _extract_ranked_lines(result.markdown)
+        assert "Suggested Cuts for Muldrotha, the Gravetide" in result
+        ranked = _extract_ranked_lines(result)
         assert len(ranked) == 0
+
+
+# ---------------------------------------------------------------------------
+# response_format tests
+# ---------------------------------------------------------------------------
+
+
+class TestSuggestCutsResponseFormat:
+    """Concise output is shorter than detailed."""
+
+    async def test_concise_shorter_than_detailed(
+        self, mock_spellbook: AsyncMock, mock_edhrec: AsyncMock
+    ) -> None:
+        detailed = await suggest_cuts(
+            SAMPLE_DECKLIST,
+            "Muldrotha, the Gravetide",
+            spellbook=mock_spellbook,
+            edhrec=mock_edhrec,
+            response_format="detailed",
+        )
+        concise = await suggest_cuts(
+            SAMPLE_DECKLIST,
+            "Muldrotha, the Gravetide",
+            spellbook=mock_spellbook,
+            edhrec=mock_edhrec,
+            response_format="concise",
+        )
+
+        assert len(concise) < len(detailed)
+        # Concise omits Data Sources section
+        assert "## Data Sources" not in concise
+        assert "## Data Sources" in detailed

@@ -72,16 +72,16 @@ class TestBasicPriceComparison:
             bulk=mock_bulk,
         )
 
-        assert "Price Comparison" in result.markdown
-        assert "Sol Ring" in result.markdown
-        assert "Lightning Bolt" in result.markdown
-        assert "$3.50" in result.markdown
-        assert "$1.50" in result.markdown
+        assert "Price Comparison" in result
+        assert "Sol Ring" in result
+        assert "Lightning Bolt" in result
+        assert "$3.50" in result
+        assert "$1.50" in result
         # Total
-        assert "$5.00" in result.markdown
+        assert "$5.00" in result
         # Sol Ring (more expensive) should appear before Lightning Bolt
-        sol_pos = result.markdown.index("Sol Ring")
-        bolt_pos = result.markdown.index("Lightning Bolt")
+        sol_pos = result.index("Sol Ring")
+        bolt_pos = result.index("Lightning Bolt")
         assert sol_pos < bolt_pos
 
     async def test_foil_and_eur_prices_shown(self) -> None:
@@ -103,8 +103,8 @@ class TestBasicPriceComparison:
             bulk=mock_bulk,
         )
 
-        assert "$8.00" in result.markdown  # Foil price
-        assert "3.00 EUR" in result.markdown  # EUR price
+        assert "$8.00" in result  # Foil price
+        assert "3.00 EUR" in result  # EUR price
 
 
 class TestSortingOrder:
@@ -124,9 +124,9 @@ class TestSortingOrder:
             bulk=mock_bulk,
         )
 
-        exp_pos = result.markdown.index("Expensive")
-        med_pos = result.markdown.index("Medium")
-        cheap_pos = result.markdown.index("Cheap")
+        exp_pos = result.index("Expensive")
+        med_pos = result.index("Medium")
+        cheap_pos = result.index("Cheap")
         assert exp_pos < med_pos < cheap_pos
 
     async def test_na_prices_sorted_last(self) -> None:
@@ -142,8 +142,8 @@ class TestSortingOrder:
             bulk=mock_bulk,
         )
 
-        priced_pos = result.markdown.index("Priced")
-        no_price_pos = result.markdown.index("No Price")
+        priced_pos = result.index("Priced")
+        no_price_pos = result.index("No Price")
         assert priced_pos < no_price_pos
 
 
@@ -164,8 +164,8 @@ class TestTotalRow:
             bulk=mock_bulk,
         )
 
-        assert "$17.50" in result.markdown
-        assert "Total" in result.markdown
+        assert "$17.50" in result
+        assert "Total" in result
 
     async def test_total_with_some_na(self) -> None:
         """Total only includes cards with USD prices."""
@@ -180,8 +180,8 @@ class TestTotalRow:
             bulk=mock_bulk,
         )
 
-        assert "$10.00" in result.markdown
-        assert "Total" in result.markdown
+        assert "$10.00" in result
+        assert "Total" in result
 
     async def test_total_na_when_no_prices(self) -> None:
         """Total is N/A when no cards have USD prices."""
@@ -196,7 +196,7 @@ class TestTotalRow:
             bulk=mock_bulk,
         )
 
-        assert "N/A" in result.markdown
+        assert "N/A" in result
 
 
 class TestNotFoundCards:
@@ -215,9 +215,9 @@ class TestNotFoundCards:
             bulk=mock_bulk,
         )
 
-        assert "Not Found" in result.markdown
-        assert "Fake Card" in result.markdown
-        assert "1 not found" in result.markdown.lower() or "not found" in result.markdown.lower()
+        assert "Not Found" in result
+        assert "Fake Card" in result
+        assert "1 not found" in result.lower() or "not found" in result.lower()
 
     async def test_all_not_found(self) -> None:
         """All cards not found still produces valid output."""
@@ -232,8 +232,8 @@ class TestNotFoundCards:
             bulk=mock_bulk,
         )
 
-        assert "Price Comparison" in result.markdown
-        assert "Not Found" in result.markdown
+        assert "Price Comparison" in result
+        assert "Not Found" in result
 
 
 class TestDeduplication:
@@ -253,7 +253,7 @@ class TestDeduplication:
 
         # Should only appear once in the table (not counting header/total)
         # Count occurrences in table rows (lines starting with |)
-        table_lines = [ln for ln in result.markdown.split("\n") if ln.startswith("| Sol Ring")]
+        table_lines = [ln for ln in result.split("\n") if ln.startswith("| Sol Ring")]
         assert len(table_lines) == 1
 
 
@@ -272,7 +272,7 @@ class TestNaPriceHandling:
             bulk=mock_bulk,
         )
 
-        assert "N/A" in result.markdown
+        assert "N/A" in result
 
 
 class TestAttribution:
@@ -291,7 +291,7 @@ class TestAttribution:
             bulk=mock_bulk,
         )
 
-        assert "Scryfall" in result.markdown
+        assert "Scryfall" in result
 
 
 class TestSummaryLine:
@@ -310,4 +310,43 @@ class TestSummaryLine:
             bulk=mock_bulk,
         )
 
-        assert "1 of 2" in result.markdown
+        assert "1 of 2" in result
+
+
+# ---------------------------------------------------------------------------
+# response_format tests
+# ---------------------------------------------------------------------------
+
+
+class TestPriceComparisonResponseFormat:
+    """Concise output is shorter than detailed."""
+
+    async def test_concise_shorter_than_detailed(self) -> None:
+        cards = {
+            "Sol Ring": _make_card(
+                name="Sol Ring",
+                prices=CardPrices(usd="3.50", usd_foil="8.00", eur="3.00"),
+            ),
+            "Lightning Bolt": _make_card(
+                name="Lightning Bolt",
+                prices=CardPrices(usd="1.50", usd_foil="5.00", eur="1.20"),
+            ),
+        }
+        mock_bulk = _make_bulk(cards)
+
+        detailed = await price_comparison(
+            ["Sol Ring", "Lightning Bolt"],
+            bulk=mock_bulk,
+            response_format="detailed",
+        )
+        concise = await price_comparison(
+            ["Sol Ring", "Lightning Bolt"],
+            bulk=mock_bulk,
+            response_format="concise",
+        )
+
+        assert len(concise) < len(detailed)
+        assert "Sol Ring" in concise
+        # Concise omits total row and summary
+        assert "Total" not in concise
+        assert "Total" in detailed

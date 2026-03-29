@@ -7,11 +7,9 @@ keyword argument and returns a formatted markdown string. The workflow server
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
-
-from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
@@ -35,7 +33,8 @@ async def price_comparison(
     cards: list[str],
     *,
     bulk: ScryfallBulkClient,
-) -> WorkflowResult:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> str:
     """Compare prices across multiple cards using Scryfall bulk data.
 
     Deduplicates card names, looks up prices via bulk data, and returns
@@ -105,37 +104,26 @@ async def price_comparison(
             except ValueError:
                 log.debug("price_comparison.invalid_usd", card=name, usd=usd)
 
-    # Total row
-    lines.append("|------|-----|----------|-----|")
-    if total_usd_available:
-        lines.append(f"| **Total** | **${total_usd:.2f}** | - | - |")
-    else:
-        lines.append("| **Total** | **N/A** | - | - |")
-
-    # Summary
     found_count = sum(1 for _, _, _, _, found in rows if found)
-    not_found_count = len(rows) - found_count
-    lines.append("")
-    summary = f"*{found_count} of {len(rows)} cards priced*"
-    if not_found_count:
-        summary += f" ({not_found_count} not found)"
-    lines.append(summary)
 
-    lines.append("")
-    lines.append("*Prices from Scryfall bulk data (updated daily)*")
+    if response_format != "concise":
+        # Total row
+        lines.append("|------|-----|----------|-----|")
+        if total_usd_available:
+            lines.append(f"| **Total** | **${total_usd:.2f}** | - | - |")
+        else:
+            lines.append("| **Total** | **N/A** | - | - |")
+
+        # Summary
+        not_found_count = len(rows) - found_count
+        lines.append("")
+        summary = f"*{found_count} of {len(rows)} cards priced*"
+        if not_found_count:
+            summary += f" ({not_found_count} not found)"
+        lines.append(summary)
+
+        lines.append("")
+        lines.append("*Prices from Scryfall bulk data (updated daily)*")
 
     log.info("price_comparison.complete", cards=len(unique_cards), priced=found_count)
-    data = {
-        "cards": [
-            {
-                "name": name,
-                "usd": usd,
-                "usd_foil": usd_foil,
-                "eur": eur,
-                "found": found,
-            }
-            for name, usd, usd_foil, eur, found in rows
-        ],
-        "total_usd": total_usd if total_usd_available else None,
-    }
-    return WorkflowResult(markdown="\n".join(lines), data=data)
+    return "\n".join(lines)

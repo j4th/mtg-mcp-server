@@ -9,11 +9,9 @@ ToolError conversion.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
-
-from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -178,7 +176,8 @@ async def commander_overview(
     scryfall: ScryfallClient,
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
-) -> WorkflowResult:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> str:
     """Get a comprehensive overview of a commander from all available sources.
 
     Concurrently fetches card details (Scryfall), combos (Spellbook), and
@@ -264,53 +263,65 @@ async def commander_overview(
 
     # --- Build output ---
     lines: list[str] = []
-    lines.extend(_format_card_header(card))
 
-    if card.type_line and "Legendary" not in card.type_line:
+    if response_format == "concise":
+        # Compact output: key metrics only, no full text or Data Sources footer
+        identity = ", ".join(card.color_identity) or "C"
+        lines.append(f"# {card.name}")
         lines.append("")
-        lines.append(
-            "> **Note:** This card may not be a valid commander — it is not a Legendary creature."
-        )
+        lines.append(f"Type: {card.type_line} | Colors: {identity}")
+        if card.power is not None and card.toughness is not None:
+            lines[-1] += f" | P/T: {card.power}/{card.toughness}"
 
-    if spellbook_ok:
-        lines.extend(_format_combos_section(combos))
+        if spellbook_ok:
+            lines.append(f"Combos: {len(combos)}")
+        elif not spellbook_ok:
+            lines.append(f"Combos: unavailable ({spellbook_error})")
+
+        if edhrec_enabled and edhrec_ok and edhrec_data is not None:
+            lines.append(f"EDHREC decks: {edhrec_data.total_decks}")
+        elif edhrec_enabled and edhrec_ok is False:
+            lines.append(f"EDHREC: unavailable ({edhrec_error})")
+        elif not edhrec_enabled:
+            lines.append("EDHREC: disabled")
     else:
-        lines.append("")
-        lines.append("## Combos")
-        lines.append("")
-        lines.append(f"Spellbook unavailable: {spellbook_error}")
+        lines.extend(_format_card_header(card))
 
-    if edhrec_enabled and edhrec_ok and edhrec_data is not None:
-        lines.extend(_format_edhrec_staples(edhrec_data))
-    elif edhrec_enabled and edhrec_ok is False:
-        lines.append("")
-        lines.append("## EDHREC Staples")
-        lines.append("")
-        lines.append(f"EDHREC unavailable: {edhrec_error}")
+        if card.type_line and "Legendary" not in card.type_line:
+            lines.append("")
+            lines.append(
+                "> **Note:** This card may not be a valid commander — it is not a Legendary creature."
+            )
 
-    lines.extend(
-        _source_status(
-            scryfall_ok=True,
-            spellbook_ok=spellbook_ok,
-            spellbook_error=spellbook_error,
-            edhrec_ok=edhrec_ok,
-            edhrec_error=edhrec_error,
-            edhrec_enabled=edhrec_enabled,
+        if spellbook_ok:
+            lines.extend(_format_combos_section(combos))
+        else:
+            lines.append("")
+            lines.append("## Combos")
+            lines.append("")
+            lines.append(f"Spellbook unavailable: {spellbook_error}")
+
+        if edhrec_enabled and edhrec_ok and edhrec_data is not None:
+            lines.extend(_format_edhrec_staples(edhrec_data))
+        elif edhrec_enabled and edhrec_ok is False:
+            lines.append("")
+            lines.append("## EDHREC Staples")
+            lines.append("")
+            lines.append(f"EDHREC unavailable: {edhrec_error}")
+
+        lines.extend(
+            _source_status(
+                scryfall_ok=True,
+                spellbook_ok=spellbook_ok,
+                spellbook_error=spellbook_error,
+                edhrec_ok=edhrec_ok,
+                edhrec_error=edhrec_error,
+                edhrec_enabled=edhrec_enabled,
+            )
         )
-    )
 
     log.info("commander_overview.complete", commander=commander_name)
-    data = {
-        "commander": card.model_dump(mode="json"),
-        "combos": [c.model_dump(mode="json") for c in combos],
-        "edhrec": edhrec_data.model_dump(mode="json") if edhrec_data is not None else None,
-        "sources": {
-            "scryfall": True,
-            "spellbook": spellbook_ok,
-            "edhrec": edhrec_ok,
-        },
-    }
-    return WorkflowResult(markdown="\n".join(lines), data=data)
+    return "\n".join(lines)
 
 
 async def evaluate_upgrade(
@@ -320,7 +331,8 @@ async def evaluate_upgrade(
     scryfall: ScryfallClient,
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
-) -> WorkflowResult:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> str:
     """Evaluate whether a card is worth adding to a specific commander deck.
 
     Concurrently fetches card details (Scryfall), combos (Spellbook), and
@@ -407,55 +419,67 @@ async def evaluate_upgrade(
 
     # --- Build output ---
     lines: list[str] = []
-    lines.extend(_format_card_details(card))
 
-    # Synergy section
-    if edhrec_enabled and edhrec_ok:
-        lines.extend(_format_synergy_section(synergy_card, commander_name))
-    elif edhrec_enabled and edhrec_ok is False:
+    if response_format == "concise":
+        # Compact output: card name, type, price, synergy, combo count
+        price_str = f"${card.prices.usd}" if card.prices.usd is not None else "N/A"
+        lines.append(f"# {card.name}")
         lines.append("")
-        lines.append(f"## Synergy with {commander_name}")
-        lines.append("")
-        lines.append(f"EDHREC unavailable: {edhrec_error}")
+        lines.append(f"Type: {card.type_line} | Price: {price_str}")
+
+        if edhrec_enabled and edhrec_ok and synergy_card is not None:
+            lines.append(
+                f"Synergy: {_fmt_synergy(synergy_card.synergy)} | "
+                f"Inclusion: {synergy_card.inclusion}%"
+            )
+        elif edhrec_enabled and edhrec_ok is False:
+            lines.append(f"Synergy: unavailable ({edhrec_error})")
+        elif not edhrec_enabled:
+            lines.append("Synergy: EDHREC disabled")
+
+        if spellbook_ok:
+            lines.append(f"Combos: {len(combos)}")
+        else:
+            lines.append(f"Combos: unavailable ({spellbook_error})")
     else:
-        lines.append("")
-        lines.append(f"## Synergy with {commander_name}")
-        lines.append("")
-        lines.append("EDHREC not enabled — synergy data not available.")
+        lines.extend(_format_card_details(card))
 
-    # Combos section
-    if spellbook_ok:
-        lines.extend(_format_combos_section(combos))
-    else:
-        lines.append("")
-        lines.append("## Combos")
-        lines.append("")
-        lines.append(f"Spellbook unavailable: {spellbook_error}")
+        # Synergy section
+        if edhrec_enabled and edhrec_ok:
+            lines.extend(_format_synergy_section(synergy_card, commander_name))
+        elif edhrec_enabled and edhrec_ok is False:
+            lines.append("")
+            lines.append(f"## Synergy with {commander_name}")
+            lines.append("")
+            lines.append(f"EDHREC unavailable: {edhrec_error}")
+        else:
+            lines.append("")
+            lines.append(f"## Synergy with {commander_name}")
+            lines.append("")
+            lines.append("EDHREC not enabled — synergy data not available.")
 
-    lines.extend(
-        _source_status(
-            scryfall_ok=True,
-            spellbook_ok=spellbook_ok,
-            spellbook_error=spellbook_error,
-            edhrec_ok=edhrec_ok,
-            edhrec_error=edhrec_error,
-            edhrec_enabled=edhrec_enabled,
+        # Combos section
+        if spellbook_ok:
+            lines.extend(_format_combos_section(combos))
+        else:
+            lines.append("")
+            lines.append("## Combos")
+            lines.append("")
+            lines.append(f"Spellbook unavailable: {spellbook_error}")
+
+        lines.extend(
+            _source_status(
+                scryfall_ok=True,
+                spellbook_ok=spellbook_ok,
+                spellbook_error=spellbook_error,
+                edhrec_ok=edhrec_ok,
+                edhrec_error=edhrec_error,
+                edhrec_enabled=edhrec_enabled,
+            )
         )
-    )
 
     log.info("evaluate_upgrade.complete", card=card_name, commander=commander_name)
-    data = {
-        "card": card.model_dump(mode="json"),
-        "commander_name": commander_name,
-        "synergy": synergy_card.model_dump(mode="json") if synergy_card is not None else None,
-        "combos": [c.model_dump(mode="json") for c in combos],
-        "sources": {
-            "scryfall": True,
-            "spellbook": spellbook_ok,
-            "edhrec": edhrec_ok,
-        },
-    }
-    return WorkflowResult(markdown="\n".join(lines), data=data)
+    return "\n".join(lines)
 
 
 async def card_comparison(
@@ -466,7 +490,8 @@ async def card_comparison(
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
-) -> WorkflowResult:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> str:
     """Compare multiple cards side-by-side for a specific commander deck.
 
     Resolves each card via Scryfall (prices required), then fetches synergy
@@ -603,40 +628,20 @@ async def card_comparison(
         names_str = ", ".join(not_found_names)
         lines.append(f"**Not found:** {names_str}")
 
-    lines.extend(
-        _source_status(
-            scryfall_ok=True,
-            spellbook_ok=spellbook_ok,
-            spellbook_error=spellbook_error_msg,
-            edhrec_ok=edhrec_ok,
-            edhrec_error=edhrec_error_msg,
-            edhrec_enabled=edhrec is not None,
+    if response_format != "concise":
+        lines.extend(
+            _source_status(
+                scryfall_ok=True,
+                spellbook_ok=spellbook_ok,
+                spellbook_error=spellbook_error_msg,
+                edhrec_ok=edhrec_ok,
+                edhrec_error=edhrec_error_msg,
+                edhrec_enabled=edhrec is not None,
+            )
         )
-    )
 
     log.info("card_comparison.complete", cards=cards, commander=commander_name)
-
-    # Build structured data for each card
-    card_entries: list[dict] = []
-    for i, card in enumerate(card_data):
-        syn_result = synergy_results[i]
-        cmb_result = combo_results[i]
-        entry: dict = {"card": card.model_dump(mode="json")}
-        if isinstance(syn_result, BaseException) or syn_result is None:
-            entry["synergy"] = None
-        else:
-            entry["synergy"] = syn_result.model_dump(mode="json")
-        if isinstance(cmb_result, BaseException):
-            entry["combo_count"] = None
-        else:
-            entry["combo_count"] = len(cmb_result)
-        card_entries.append(entry)
-
-    data = {
-        "commander_name": commander_name,
-        "cards": card_entries,
-    }
-    return WorkflowResult(markdown="\n".join(lines), data=data)
+    return "\n".join(lines)
 
 
 async def budget_upgrade(
@@ -647,7 +652,8 @@ async def budget_upgrade(
     scryfall: ScryfallClient,
     edhrec: EDHRECClient | None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
-) -> WorkflowResult:
+    response_format: Literal["detailed", "concise"] = "detailed",
+) -> str:
     """Suggest budget-friendly upgrades ranked by synergy-per-dollar.
 
     Fetches EDHREC staples for the commander, looks up Scryfall prices,
@@ -668,13 +674,9 @@ async def budget_upgrade(
 
     # EDHREC is required for this workflow
     if edhrec is None:
-        msg = (
+        return (
             "EDHREC is not enabled — budget upgrade requires EDHREC staples data.\n\n"
             "Set MTG_MCP_ENABLE_EDHREC=true to enable."
-        )
-        return WorkflowResult(
-            markdown=msg,
-            data={"commander_name": commander_name, "budget": budget, "error": "edhrec_disabled"},
         )
 
     # Step 1/2: Fetch EDHREC staples
@@ -689,13 +691,9 @@ async def budget_upgrade(
         all_edhrec_cards.extend(cardlist.cardviews)
 
     if not all_edhrec_cards:
-        msg = (
+        return (
             f"No staples found for '{commander_name}' on EDHREC.\n\n"
             "The commander may be too new or rarely played."
-        )
-        return WorkflowResult(
-            markdown=msg,
-            data={"commander_name": commander_name, "budget": budget, "error": "no_staples"},
         )
 
     # Step 2/2: Fetch Scryfall prices in parallel
@@ -736,10 +734,7 @@ async def budget_upgrade(
         if price_failures:
             msg += f"Note: {price_failures} card(s) could not be priced due to Scryfall errors.\n"
         msg += "Try increasing the budget ceiling."
-        return WorkflowResult(
-            markdown=msg,
-            data={"commander_name": commander_name, "budget": budget, "error": "no_candidates"},
-        )
+        return msg
 
     # Sort by synergy-per-dollar descending
     candidates.sort(key=lambda c: c[2], reverse=True)
@@ -760,26 +755,13 @@ async def budget_upgrade(
             f"{ecard.inclusion}% | ${price:.2f} | {spd:.2f} |"
         )
 
-    # Data Sources footer
-    lines.append("")
-    lines.append("---")
-    lines.append("**Data Sources:**")
-    lines.append("- [Scryfall](https://scryfall.com): OK")
-    lines.append("- [EDHREC](https://edhrec.com): OK")
+    # Data Sources footer (detailed only)
+    if response_format != "concise":
+        lines.append("")
+        lines.append("---")
+        lines.append("**Data Sources:**")
+        lines.append("- [Scryfall](https://scryfall.com): OK")
+        lines.append("- [EDHREC](https://edhrec.com): OK")
 
     log.info("budget_upgrade.complete", commander=commander_name, suggestions=len(top))
-    data = {
-        "commander_name": commander_name,
-        "budget": budget,
-        "suggestions": [
-            {
-                "name": ecard.name,
-                "synergy": ecard.synergy,
-                "inclusion": ecard.inclusion,
-                "price": price,
-                "synergy_per_dollar": spd,
-            }
-            for ecard, price, spd in top
-        ],
-    }
-    return WorkflowResult(markdown="\n".join(lines), data=data)
+    return "\n".join(lines)

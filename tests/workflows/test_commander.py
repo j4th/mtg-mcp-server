@@ -207,31 +207,27 @@ class TestCommanderOverview:
         )
 
         # Card header section
-        assert "Muldrotha, the Gravetide" in result.markdown
-        assert "{3}{B}{G}{U}" in result.markdown
-        assert "Legendary Creature" in result.markdown
-        assert "During each of your turns" in result.markdown
-        assert "245" in result.markdown  # edhrec_rank
+        assert "Muldrotha, the Gravetide" in result
+        assert "{3}{B}{G}{U}" in result
+        assert "Legendary Creature" in result
+        assert "During each of your turns" in result
+        assert "245" in result  # edhrec_rank
 
         # Combo section
-        assert "Combos" in result.markdown
-        assert "combo-1" in result.markdown or "Spore Frog" in result.markdown
-        assert "Infinite death triggers" in result.markdown
+        assert "Combos" in result
+        assert "combo-1" in result or "Spore Frog" in result
+        assert "Infinite death triggers" in result
 
         # EDHREC section
-        assert "Staples" in result.markdown or "EDHREC" in result.markdown
-        assert "Spore Frog" in result.markdown
-        assert "61%" in result.markdown or "0.61" in result.markdown
+        assert "Staples" in result or "EDHREC" in result
+        assert "Spore Frog" in result
+        assert "61%" in result or "0.61" in result
 
         # Data sources footer
-        assert "**Data Sources:**" in result.markdown
-        assert "Scryfall](https://scryfall.com)" in result.markdown
-        assert "Spellbook" in result.markdown
-        assert "EDHREC" in result.markdown
-
-        # Structured data
-        assert result.data["commander"]["name"] == "Muldrotha, the Gravetide"
-        assert result.data["sources"]["scryfall"] is True
+        assert "**Data Sources:**" in result
+        assert "Scryfall](https://scryfall.com)" in result
+        assert "Spellbook" in result
+        assert "EDHREC" in result
 
     async def test_edhrec_is_none(
         self,
@@ -252,13 +248,13 @@ class TestCommanderOverview:
         )
 
         # Card data still present
-        assert "Muldrotha, the Gravetide" in result.markdown
+        assert "Muldrotha, the Gravetide" in result
 
         # Combos still present
-        assert "Combos" in result.markdown
+        assert "Combos" in result
 
         # EDHREC noted as not enabled
-        assert "not enabled" in result.markdown.lower() or "disabled" in result.markdown.lower()
+        assert "not enabled" in result.lower() or "disabled" in result.lower()
 
     async def test_edhrec_raises_exception(
         self,
@@ -283,16 +279,16 @@ class TestCommanderOverview:
         )
 
         # Card data still present
-        assert "Muldrotha, the Gravetide" in result.markdown
+        assert "Muldrotha, the Gravetide" in result
 
         # Combos still present
-        assert "Combos" in result.markdown
+        assert "Combos" in result
 
         # EDHREC failure noted
         assert (
-            "error" in result.markdown.lower()
-            or "failed" in result.markdown.lower()
-            or "unavailable" in result.markdown.lower()
+            "error" in result.lower()
+            or "failed" in result.lower()
+            or "unavailable" in result.lower()
         )
 
     async def test_spellbook_raises_exception(
@@ -318,17 +314,17 @@ class TestCommanderOverview:
         )
 
         # Card data still present
-        assert "Muldrotha, the Gravetide" in result.markdown
+        assert "Muldrotha, the Gravetide" in result
 
         # Spellbook failure noted
         assert (
-            "error" in result.markdown.lower()
-            or "failed" in result.markdown.lower()
-            or "unavailable" in result.markdown.lower()
+            "error" in result.lower()
+            or "failed" in result.lower()
+            or "unavailable" in result.lower()
         )
 
         # EDHREC data still present
-        assert "Spore Frog" in result.markdown
+        assert "Spore Frog" in result
 
     async def test_scryfall_card_not_found_propagates(
         self,
@@ -370,11 +366,9 @@ class TestCommanderOverview:
             edhrec=None,
         )
 
-        assert "Muldrotha, the Gravetide" in result.markdown
+        assert "Muldrotha, the Gravetide" in result
         assert (
-            "no combos" in result.markdown.lower()
-            or "none" in result.markdown.lower()
-            or "0 combo" in result.markdown.lower()
+            "no combos" in result.lower() or "none" in result.lower() or "0 combo" in result.lower()
         )
 
     async def test_both_optional_fail(
@@ -397,8 +391,8 @@ class TestCommanderOverview:
         )
 
         # Card data must still be present
-        assert "Muldrotha, the Gravetide" in result.markdown
-        assert "{3}{B}{G}{U}" in result.markdown
+        assert "Muldrotha, the Gravetide" in result
+        assert "{3}{B}{G}{U}" in result
 
     async def test_non_legendary_card_warning(
         self,
@@ -427,10 +421,9 @@ class TestCommanderOverview:
             edhrec=None,
         )
 
-        assert "Sol Ring" in result.markdown
+        assert "Sol Ring" in result
         assert (
-            "not a legendary" in result.markdown.lower()
-            or "may not be a valid commander" in result.markdown.lower()
+            "not a legendary" in result.lower() or "may not be a valid commander" in result.lower()
         )
 
 
@@ -465,21 +458,21 @@ class TestEvaluateUpgrade:
         )
 
         # Card details
-        assert "Spore Frog" in result.markdown
-        assert "{G}" in result.markdown
-        assert "Creature" in result.markdown
+        assert "Spore Frog" in result
+        assert "{G}" in result
+        assert "Creature" in result
 
         # Price
-        assert "$0.25" in result.markdown or "0.25" in result.markdown
+        assert "$0.25" in result or "0.25" in result
 
         # Synergy data
-        assert "0.61" in result.markdown or "61%" in result.markdown
+        assert "0.61" in result or "61%" in result
 
         # Combos
-        assert "combo" in result.markdown.lower()
+        assert "combo" in result.lower()
 
         # Commander context
-        assert "Muldrotha" in result.markdown
+        assert "Muldrotha" in result
 
     async def test_edhrec_is_none(
         self,
@@ -501,13 +494,13 @@ class TestEvaluateUpgrade:
         )
 
         # Card data still present
-        assert "Spore Frog" in result.markdown
+        assert "Spore Frog" in result
 
         # EDHREC noted as not enabled
         assert (
-            "not enabled" in result.markdown.lower()
-            or "disabled" in result.markdown.lower()
-            or "not available" in result.markdown.lower()
+            "not enabled" in result.lower()
+            or "disabled" in result.lower()
+            or "not available" in result.lower()
         )
 
     async def test_edhrec_raises_exception(
@@ -532,13 +525,13 @@ class TestEvaluateUpgrade:
         )
 
         # Card data still present
-        assert "Spore Frog" in result.markdown
+        assert "Spore Frog" in result
 
         # EDHREC failure noted
         assert (
-            "error" in result.markdown.lower()
-            or "failed" in result.markdown.lower()
-            or "unavailable" in result.markdown.lower()
+            "error" in result.lower()
+            or "failed" in result.lower()
+            or "unavailable" in result.lower()
         )
 
     async def test_spellbook_raises_exception(
@@ -563,16 +556,16 @@ class TestEvaluateUpgrade:
         )
 
         # Card data still present
-        assert "Spore Frog" in result.markdown
+        assert "Spore Frog" in result
 
         # Synergy data still present
-        assert "0.61" in result.markdown or "61%" in result.markdown
+        assert "0.61" in result or "61%" in result
 
         # Spellbook failure noted
         assert (
-            "error" in result.markdown.lower()
-            or "failed" in result.markdown.lower()
-            or "unavailable" in result.markdown.lower()
+            "error" in result.lower()
+            or "failed" in result.lower()
+            or "unavailable" in result.lower()
         )
 
     async def test_scryfall_card_not_found_propagates(
@@ -618,9 +611,9 @@ class TestEvaluateUpgrade:
             edhrec=edhrec,
         )
 
-        assert "Spore Frog" in result.markdown
+        assert "Spore Frog" in result
         # Should note that no synergy data was found
-        assert "no synergy" in result.markdown.lower() or "not found" in result.markdown.lower()
+        assert "no synergy" in result.lower() or "not found" in result.lower()
 
     async def test_empty_combos(
         self,
@@ -643,9 +636,88 @@ class TestEvaluateUpgrade:
             edhrec=edhrec,
         )
 
-        assert "Spore Frog" in result.markdown
+        assert "Spore Frog" in result
         assert (
-            "no combos" in result.markdown.lower()
-            or "none" in result.markdown.lower()
-            or "0 combo" in result.markdown.lower()
+            "no combos" in result.lower() or "none" in result.lower() or "0 combo" in result.lower()
         )
+
+
+# ---------------------------------------------------------------------------
+# response_format tests
+# ---------------------------------------------------------------------------
+
+
+class TestCommanderOverviewResponseFormat:
+    """Concise output is shorter than detailed and omits verbose sections."""
+
+    async def test_concise_shorter_than_detailed(
+        self,
+        scryfall: AsyncMock,
+        spellbook: AsyncMock,
+        edhrec: AsyncMock,
+        mock_card: Card,
+        mock_combos: list[Combo],
+        mock_edhrec_data: EDHRECCommanderData,
+    ) -> None:
+        scryfall.get_card_by_name = AsyncMock(return_value=mock_card)
+        spellbook.find_combos = AsyncMock(return_value=mock_combos)
+        edhrec.commander_top_cards = AsyncMock(return_value=mock_edhrec_data)
+
+        detailed = await commander_overview(
+            "Muldrotha, the Gravetide",
+            scryfall=scryfall,
+            spellbook=spellbook,
+            edhrec=edhrec,
+            response_format="detailed",
+        )
+        concise = await commander_overview(
+            "Muldrotha, the Gravetide",
+            scryfall=scryfall,
+            spellbook=spellbook,
+            edhrec=edhrec,
+            response_format="concise",
+        )
+
+        assert len(concise) < len(detailed)
+        assert "Muldrotha" in concise
+        # Concise omits Data Sources footer
+        assert "**Data Sources:**" not in concise
+        assert "**Data Sources:**" in detailed
+
+
+class TestEvaluateUpgradeResponseFormat:
+    """Concise output is shorter than detailed and omits verbose sections."""
+
+    async def test_concise_shorter_than_detailed(
+        self,
+        scryfall: AsyncMock,
+        spellbook: AsyncMock,
+        edhrec: AsyncMock,
+        mock_upgrade_card: Card,
+        mock_combos: list[Combo],
+        mock_synergy_card: EDHRECCard,
+    ) -> None:
+        scryfall.get_card_by_name = AsyncMock(return_value=mock_upgrade_card)
+        spellbook.find_combos = AsyncMock(return_value=mock_combos)
+        edhrec.card_synergy = AsyncMock(return_value=mock_synergy_card)
+
+        detailed = await evaluate_upgrade(
+            "Spore Frog",
+            "Muldrotha, the Gravetide",
+            scryfall=scryfall,
+            spellbook=spellbook,
+            edhrec=edhrec,
+            response_format="detailed",
+        )
+        concise = await evaluate_upgrade(
+            "Spore Frog",
+            "Muldrotha, the Gravetide",
+            scryfall=scryfall,
+            spellbook=spellbook,
+            edhrec=edhrec,
+            response_format="concise",
+        )
+
+        assert len(concise) < len(detailed)
+        assert "Spore Frog" in concise
+        assert "**Data Sources:**" not in concise

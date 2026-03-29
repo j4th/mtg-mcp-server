@@ -13,7 +13,7 @@ so tool names stay clean (e.g. ``commander_overview``, not
 from __future__ import annotations
 
 from contextlib import AsyncExitStack
-from typing import Annotated
+from typing import Annotated, Literal
 
 import structlog
 from fastmcp import Context, FastMCP
@@ -142,6 +142,10 @@ async def commander_overview(
     commander_name: Annotated[
         str, Field(description="Commander card name (e.g. 'Muldrotha, the Gravetide')")
     ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Comprehensive commander profile combining data from all available sources.
 
@@ -154,13 +158,13 @@ async def commander_overview(
         raise ToolError("Commander name cannot be empty.")
 
     try:
-        result = await impl(
+        return await impl(
             commander_name,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
+            response_format=response_format,
         )
-        return result.markdown
     except CardNotFoundError as exc:
         raise ToolError(
             f"Commander not found: '{commander_name}'. Check spelling or try a different name."
@@ -175,6 +179,10 @@ async def evaluate_upgrade(
         str, Field(description="Card to evaluate for the deck (e.g. 'Spore Frog')")
     ],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Assess whether a card is worth adding to a specific commander deck.
 
@@ -189,14 +197,14 @@ async def evaluate_upgrade(
         raise ToolError("Commander name cannot be empty.")
 
     try:
-        result = await impl(
+        return await impl(
             card_name,
             commander_name,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
+            response_format=response_format,
         )
-        return result.markdown
     except CardNotFoundError as exc:
         raise ToolError(
             f"Card not found: '{card_name}'. Check spelling or try a different name."
@@ -215,6 +223,10 @@ async def draft_pack_pick(
         list[str] | None,
         Field(description="Cards already drafted — enables color fit analysis when provided"),
     ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Rank cards in a draft pack using 17Lands win rate data.
 
@@ -224,13 +236,13 @@ async def draft_pack_pick(
     from mtg_mcp_server.workflows.draft import draft_pack_pick as impl
 
     try:
-        result = await impl(
+        return await impl(
             pack,
             set_code,
             seventeen_lands=_require_seventeen_lands(),
             current_picks=current_picks,
+            response_format=response_format,
         )
-        return result.markdown
     except ServiceError as exc:
         raise ToolError(f"17Lands error: {exc}") from exc
 
@@ -240,6 +252,10 @@ async def suggest_cuts(
     decklist: Annotated[list[str], Field(description="List of card names in the deck")],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     num_cuts: Annotated[int, Field(description="Number of cut candidates to suggest")] = 5,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Identify the weakest cards to cut from a commander decklist.
 
@@ -252,14 +268,14 @@ async def suggest_cuts(
         raise ToolError("Commander name cannot be empty.")
 
     try:
-        result = await impl(
+        return await impl(
             decklist,
             commander_name,
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             num_cuts=num_cuts,
+            response_format=response_format,
         )
-        return result.markdown
     except ServiceError as exc:
         raise ToolError(f"suggest_cuts failed: {exc}") from exc
 
@@ -269,6 +285,10 @@ async def card_comparison(
     cards: Annotated[list[str], Field(description="2-5 card names to compare side-by-side")],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     ctx: Context,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Compare 2-5 cards side-by-side for a specific commander deck.
 
@@ -288,15 +308,15 @@ async def card_comparison(
         raise ToolError("Maximum 5 cards can be compared at once.")
 
     try:
-        result = await impl(
+        return await impl(
             cards,
             commander_name,
             scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
-        return result.markdown
     except CardNotFoundError as exc:
         raise ToolError(f"{exc}. Check spelling.") from exc
     except ServiceError as exc:
@@ -312,6 +332,10 @@ async def budget_upgrade(
     num_suggestions: Annotated[
         int, Field(description="Number of upgrade suggestions to return")
     ] = 10,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
     *,
     ctx: Context,
 ) -> str:
@@ -328,15 +352,15 @@ async def budget_upgrade(
         raise ToolError("Budget must be a positive number.")
 
     try:
-        result = await impl(
+        return await impl(
             commander_name,
             budget=budget,
             num_suggestions=num_suggestions,
             scryfall=_require_scryfall(),
             edhrec=_require_edhrec(),
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
-        return result.markdown
     except CommanderNotFoundError as exc:
         raise ToolError(f"Commander not found: '{commander_name}'.") from exc
     except ServiceError as exc:
@@ -350,6 +374,10 @@ async def deck_analysis(
     ],
     commander_name: Annotated[str, Field(description="Commander the deck is built around")],
     ctx: Context,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Full decklist health check — mana curve, colors, combos, bracket, budget, synergy.
 
@@ -363,7 +391,7 @@ async def deck_analysis(
         raise ToolError("Provide at least one card in the decklist.")
 
     try:
-        result = await impl(
+        return await impl(
             decklist,
             commander_name,
             bulk=_bulk,
@@ -371,8 +399,8 @@ async def deck_analysis(
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
-        return result.markdown
     except ServiceError as exc:
         raise ToolError(f"deck_analysis failed: {exc}") from exc
 
@@ -385,6 +413,10 @@ async def set_overview(
     event_type: Annotated[
         str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
     ] = "PremierDraft",
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
     *,
     ctx: Context,
 ) -> str:
@@ -396,13 +428,13 @@ async def set_overview(
     from mtg_mcp_server.workflows.draft import set_overview as impl
 
     try:
-        result = await impl(
+        return await impl(
             set_code,
             event_type=event_type,
             seventeen_lands=_require_seventeen_lands(),
             on_progress=lambda step, total: _progress(ctx, step, total),
+            response_format=response_format,
         )
-        return result.markdown
     except ServiceError as exc:
         raise ToolError(f"17Lands error: {exc}") from exc
 
@@ -541,6 +573,10 @@ async def deck_validate(
     sideboard: Annotated[
         list[str] | None, Field(description="Sideboard card names, same format as decklist")
     ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Validate a decklist against a format's construction rules.
 
@@ -553,14 +589,14 @@ async def deck_validate(
         raise ToolError("Provide at least one card in the decklist.")
 
     try:
-        result = await impl(
+        return await impl(
             decklist,
             format,
             commander=commander,
             sideboard=sideboard,
             bulk=_require_bulk(),
+            response_format=response_format,
         )
-        return result.markdown
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
     except ServiceError as exc:
@@ -577,6 +613,10 @@ async def suggest_mana_base(
         int | None,
         Field(description="Override total land count (default: auto-calculated from avg CMC)"),
     ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Suggest a mana base for a decklist based on color pip distribution.
 
@@ -589,13 +629,13 @@ async def suggest_mana_base(
         raise ToolError("Provide at least one card in the decklist.")
 
     try:
-        result = await impl(
+        return await impl(
             decklist,
             format,
             total_lands=total_lands,
             bulk=_require_bulk(),
+            response_format=response_format,
         )
-        return result.markdown
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
     except ServiceError as exc:
@@ -605,6 +645,10 @@ async def suggest_mana_base(
 @workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_PRICING)
 async def price_comparison(
     cards: Annotated[list[str], Field(description="2-20 card names to compare prices")],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> str:
     """Compare prices across multiple cards using Scryfall bulk data.
 
@@ -620,11 +664,11 @@ async def price_comparison(
         raise ToolError("Maximum 20 cards for price comparison.")
 
     try:
-        result = await impl(
+        return await impl(
             cards,
             bulk=_require_bulk(),
+            response_format=response_format,
         )
-        return result.markdown
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
     except ServiceError as exc:
