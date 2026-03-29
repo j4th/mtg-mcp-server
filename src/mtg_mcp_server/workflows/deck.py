@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.workflows import WorkflowResult
+
 if TYPE_CHECKING:
     from mtg_mcp_server.services.edhrec import EDHRECClient
     from mtg_mcp_server.services.spellbook import SpellbookClient
@@ -47,17 +49,23 @@ async def suggest_cuts(
     edhrec: EDHRECClient | None,
     num_cuts: int = 5,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Identify the weakest cards in a Commander decklist.
 
     Uses EDHREC synergy/inclusion data and Spellbook combo analysis to rank
     cards by cuttability. Combo pieces are protected.
     """
     if not decklist:
-        return f"# Suggested Cuts for {commander_name}\n\nNo cards in decklist to evaluate."
+        return WorkflowResult(
+            markdown=f"# Suggested Cuts for {commander_name}\n\nNo cards in decklist to evaluate.",
+            data={"commander_name": commander_name, "cuts": []},
+        )
 
     if num_cuts <= 0:
-        return f"# Suggested Cuts for {commander_name}\n\nNo cuts requested."
+        return WorkflowResult(
+            markdown=f"# Suggested Cuts for {commander_name}\n\nNo cuts requested.",
+            data={"commander_name": commander_name, "cuts": []},
+        )
 
     sources = _DataSources(edhrec_available=edhrec is not None)
 
@@ -81,7 +89,27 @@ async def suggest_cuts(
     top_cuts = scored[:cut_count]
 
     # -- 6. Format output ------------------------------------------------------
-    return _format_output(commander_name, top_cuts, sources, response_format=response_format)
+    markdown = _format_output(commander_name, top_cuts, sources, response_format=response_format)
+    data = {
+        "commander_name": commander_name,
+        "cuts": [
+            {
+                "name": cs.name,
+                "cuttability": cs.cuttability,
+                "synergy_score": cs.synergy_score,
+                "inclusion_rate": cs.inclusion_rate,
+                "is_combo_piece": cs.is_combo_piece,
+                "has_edhrec_data": cs.has_edhrec_data,
+                "has_data": cs.has_data,
+            }
+            for cs in top_cuts
+        ],
+        "sources": {
+            "spellbook": sources.spellbook_ok,
+            "edhrec": sources.edhrec_ok,
+        },
+    }
+    return WorkflowResult(markdown=markdown, data=data)
 
 
 async def _fetch_spellbook(

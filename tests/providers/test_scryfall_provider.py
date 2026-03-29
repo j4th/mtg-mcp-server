@@ -48,6 +48,12 @@ class TestSearchCards:
         assert fixture["data"][0]["name"] in text
         assert "Data provided by [Scryfall]" in text
 
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["query"] == "f:commander id:sultai t:creature"
+        assert sc["total_cards"] == 9273
+        assert isinstance(sc["cards"], list)
+
 
 class TestSearchCardsConcise:
     """Scryfall search_cards tool concise mode."""
@@ -82,6 +88,11 @@ class TestSearchCardsConcise:
         assert fixture["data"][0]["name"] in concise_text
         assert "Data provided by [Scryfall]" in concise_text
 
+        sc = result_concise.structured_content
+        assert isinstance(sc, dict)
+        assert sc["query"] == "f:commander id:sultai t:creature"
+        assert isinstance(sc["cards"], list)
+
 
 class TestCardDetails:
     """Scryfall card_details tool behavior."""
@@ -99,6 +110,11 @@ class TestCardDetails:
         assert "Muldrotha, the Gravetide" in text
         assert "{3}{B}{G}{U}" in text
         assert "6/6" in text
+
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert "type_line" in sc
 
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
@@ -143,6 +159,11 @@ class TestCardDetailsConcise:
         assert "Legalities:" not in concise_text
         assert "Scryfall:" not in concise_text
 
+        sc = result_concise.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert "type_line" in sc
+
 
 class TestCardPrice:
     """Scryfall card_price tool behavior."""
@@ -159,6 +180,11 @@ class TestCardPrice:
         text = result.content[0].text
         assert "Sol Ring" in text
         assert "$" in text
+
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Sol Ring"
+        assert "prices" in sc
 
 
 class TestCardRulings:
@@ -183,6 +209,12 @@ class TestCardRulings:
         assert "Muldrotha" in text
         assert "8 ruling" in text.lower()
 
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Muldrotha, the Gravetide"
+        assert sc["total_rulings"] == 8
+        assert isinstance(sc["rulings"], list)
+
 
 class TestSetInfo:
     """Scryfall set_info tool behavior."""
@@ -201,6 +233,11 @@ class TestSetInfo:
         assert "2018-04-27" in text
         assert "280" in text
         assert "Data provided by [Scryfall]" in text
+
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["name"] == "Dominaria"
+        assert sc["code"] == "dom"
 
     @respx.mock
     async def test_set_not_found(self, client: Client):
@@ -231,6 +268,11 @@ class TestWhatsNew:
         assert "card" in text.lower()
         assert "Data provided by [Scryfall]" in text
 
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_cards"] == 9273
+        assert isinstance(sc["cards"], list)
+
     @respx.mock
     async def test_with_set_and_format_filters(self, client: Client):
         """whats_new accepts optional set_code and format filters."""
@@ -242,6 +284,11 @@ class TestWhatsNew:
         )
         text = result.content[0].text
         assert "Found" in text
+
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["days"] == 7
+        assert sc["set_code"] == "dom"
 
     async def test_invalid_days_zero(self, client: Client):
         """whats_new rejects days < 1."""
@@ -284,6 +331,11 @@ class TestWhatsNewConcise:
         concise_text = result_concise.content[0].text
         assert len(concise_text) < len(detailed_text)
         assert "Found" in concise_text
+
+        sc = result_concise.structured_content
+        assert isinstance(sc, dict)
+        assert sc["total_cards"] == 9273
+        assert isinstance(sc["cards"], list)
 
 
 class TestToolRegistration:

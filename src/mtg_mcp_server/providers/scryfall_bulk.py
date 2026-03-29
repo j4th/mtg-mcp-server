@@ -13,6 +13,7 @@ import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from mtg_mcp_server.config import Settings
@@ -147,7 +148,7 @@ async def card_lookup(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Look up a Magic card by exact name using Scryfall bulk data.
 
     Returns full card details including mana cost, type, oracle text,
@@ -163,9 +164,12 @@ async def card_lookup(
     if card is None:
         raise ToolError(f"Card not found: '{name}'. Check spelling.")
 
-    return (
-        "\n".join(_format_card_detail_with_legalities(card, response_format=response_format))
-        + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(
+            _format_card_detail_with_legalities(card, response_format=response_format)
+        )
+        + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content=card.model_dump(mode="json"),
     )
 
 
@@ -183,7 +187,7 @@ async def card_search(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Search for Magic cards in Scryfall bulk data.
 
     Args:
@@ -214,7 +218,15 @@ async def card_search(
         else:
             cost = f" {card.mana_cost}" if card.mana_cost else ""
             lines.append(f"  {card.name}{cost} -- {card.type_line}")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "query": query,
+            "search_field": search_field,
+            "total_results": len(results),
+            "cards": [card.model_dump(mode="json") for card in results],
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +261,7 @@ async def format_legality(
         str,
         Field(description="Format to check (e.g. 'commander', 'modern', 'standard', 'legacy')"),
     ],
-) -> str:
+) -> ToolResult:
     """Batch legality check for cards in a specific format.
 
     Returns a markdown table showing the legality status of each card
@@ -268,17 +280,27 @@ async def format_legality(
         raise ToolError(f"Scryfall bulk data error: {exc}") from exc
 
     lines = [f"## Legality Check: {fmt.title()}", "", "| Card | Status |", "|------|--------|"]
+    cards_data = []
 
     for name in cards:
         card = resolved.get(name)
         if card is None:
             lines.append(f"| {name} | Not Found |")
+            cards_data.append({"name": name, "status": "not_found"})
         else:
             status = card.legalities.get(fmt, "unknown")
             display_status = status.replace("_", " ").title()
             lines.append(f"| {card.name} | {display_status} |")
+            cards_data.append({"name": card.name, "status": status})
 
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "format": fmt,
+            "total_cards": len(cards),
+            "cards": cards_data,
+        },
+    )
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
@@ -312,7 +334,7 @@ async def format_search(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Search for legal cards in a specific format using natural language.
 
     Combines format legality filtering with name/type/text search and
@@ -420,7 +442,16 @@ async def format_search(
             price = f" (${card.prices.usd})" if card.prices.usd else ""
             lines.append(f"  {card.name}{cost} -- {card.type_line}{price}")
 
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "format": fmt,
+            "query": query,
+            "color_identity": color_identity,
+            "total_results": len(matches),
+            "cards": [card.model_dump(mode="json") for card in matches],
+        },
+    )
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
@@ -444,7 +475,7 @@ async def format_staples(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Find the most popular (staple) cards legal in a format.
 
     Returns cards sorted by EDHREC rank (most popular first). Cards
@@ -497,7 +528,16 @@ async def format_staples(
             cost = card.mana_cost or ""
             lines.append(f"| #{card.edhrec_rank} | {card.name} | {cost} | {card.type_line} |")
 
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "format": fmt,
+            "color": color,
+            "card_type": card_type,
+            "total_results": len(matches),
+            "cards": [card.model_dump(mode="json") for card in matches],
+        },
+    )
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
@@ -519,7 +559,7 @@ async def similar_cards(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Find cards similar to a given card.
 
     Scores similarity based on shared keywords, type words, CMC
@@ -580,7 +620,17 @@ async def similar_cards(
             price = f" (${card.prices.usd})" if card.prices.usd else ""
             lines.append(f"  {card.name}{cost} -- {card.type_line}{price} [score: {score:.1f}]")
 
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "source_card": source.name,
+            "total_results": len(top),
+            "similar": [
+                {"name": card.name, "score": score, **card.model_dump(mode="json")}
+                for score, card in top
+            ],
+        },
+    )
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
@@ -603,7 +653,7 @@ async def random_card(
         str | None,
         Field(description="Rarity filter (e.g. 'common', 'uncommon', 'rare', 'mythic')"),
     ] = None,
-) -> str:
+) -> ToolResult:
     """Get a random Magic card, optionally filtered by format, color, type, and rarity.
 
     Returns full card details in the same format as card_lookup.
@@ -628,7 +678,10 @@ async def random_card(
     if card is None:
         raise ToolError("No cards match the specified filters.")
 
-    return "\n".join(_format_card_detail_with_legalities(card)) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(_format_card_detail_with_legalities(card)) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content=card.model_dump(mode="json"),
+    )
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_ALL_FORMATS)
@@ -637,7 +690,7 @@ async def ban_list(
         str,
         Field(description="Format to check ban list for (e.g. 'commander', 'modern', 'standard')"),
     ],
-) -> str:
+) -> ToolResult:
     """Get the banned and restricted cards for a format.
 
     Returns alphabetically sorted lists of banned and restricted cards,
@@ -680,7 +733,14 @@ async def ban_list(
     if not banned and not restricted:
         lines[-1] = "No banned or restricted cards in this format."
 
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "format": fmt,
+            "banned": [{"name": c.name, "type_line": c.type_line} for c in banned],
+            "restricted": [{"name": c.name, "type_line": c.type_line} for c in restricted],
+        },
+    )
 
 
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
@@ -689,7 +749,7 @@ async def card_in_formats(
         str,
         Field(description="Card name to check format legality for"),
     ],
-) -> str:
+) -> ToolResult:
     """Show a card's legality across all Magic formats.
 
     Returns a table with the card's legality status in each format,
@@ -728,7 +788,14 @@ async def card_in_formats(
             status = card.legalities[fmt].replace("_", " ").title()
             lines.append(f"| {fmt.title()} | {status} |")
 
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "name": card.name,
+            "type_line": card.type_line,
+            "legalities": card.legalities,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

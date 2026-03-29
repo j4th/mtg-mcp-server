@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.workflows import WorkflowResult
+
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
     from mtg_mcp_server.types import Card
@@ -34,7 +36,7 @@ async def price_comparison(
     *,
     bulk: ScryfallBulkClient,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Compare prices across multiple cards using Scryfall bulk data.
 
     Deduplicates card names, looks up prices via bulk data, and returns
@@ -45,7 +47,7 @@ async def price_comparison(
         bulk: Initialized ScryfallBulkClient.
 
     Returns:
-        Formatted markdown price comparison table.
+        WorkflowResult with markdown and structured data.
     """
     log.info("price_comparison.start", cards=len(cards))
 
@@ -126,4 +128,13 @@ async def price_comparison(
         lines.append("*Prices from Scryfall bulk data (updated daily)*")
 
     log.info("price_comparison.complete", cards=len(unique_cards), priced=found_count)
-    return "\n".join(lines)
+    data = {
+        "cards": [
+            {"name": name, "usd": usd, "usd_foil": usd_foil, "eur": eur, "found": found}
+            for name, usd, usd_foil, eur, found in rows
+        ],
+        "total_usd": total_usd if total_usd_available else None,
+        "found_count": found_count,
+        "not_found_count": len(rows) - found_count,
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)

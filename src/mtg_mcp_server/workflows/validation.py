@@ -19,6 +19,7 @@ from mtg_mcp_server.utils.format_rules import (
     is_basic_land,
     normalize_format,
 )
+from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
@@ -35,12 +36,12 @@ async def deck_validate(
     sideboard: list[str] | None = None,
     bulk: ScryfallBulkClient,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Validate a decklist against a format's construction rules.
 
     Checks deck size, legality, copy limits, color identity (Commander),
-    Pauper rarity, and Vintage restricted list. Returns a formatted
-    markdown string with VALID/INVALID status and actionable messages.
+    Pauper rarity, and Vintage restricted list. Returns a WorkflowResult
+    with VALID/INVALID status and actionable messages.
 
     Args:
         decklist: Card entries (e.g. ``["4x Lightning Bolt", "Sol Ring"]``).
@@ -50,7 +51,7 @@ async def deck_validate(
         bulk: Initialized ScryfallBulkClient.
 
     Returns:
-        Formatted markdown validation result.
+        WorkflowResult with markdown and structured data.
     """
     log.info("deck_validate.start", format=format, cards=len(decklist))
 
@@ -62,7 +63,10 @@ async def deck_validate(
     # --- Parse decklist ---
     parsed = parse_decklist(decklist)
     if not parsed:
-        return f"# Deck Validation - {fmt.title()}\n\nNo cards provided."
+        return WorkflowResult(
+            markdown=f"# Deck Validation - {fmt.title()}\n\nNo cards provided.",
+            data={"format": fmt, "valid": False, "errors": ["No cards provided"], "warnings": []},
+        )
 
     parsed_sideboard = parse_decklist(sideboard) if sideboard else []
 
@@ -222,4 +226,13 @@ async def deck_validate(
         )
 
     log.info("deck_validate.complete", format=fmt, valid=is_valid, errors=len(errors))
-    return "\n".join(lines)
+    data = {
+        "format": fmt,
+        "valid": is_valid,
+        "errors": errors,
+        "warnings": warnings,
+        "total_cards": total_main,
+        "resolved_count": resolved_count,
+        "unresolved": unresolved_names,
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)

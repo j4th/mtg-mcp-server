@@ -14,6 +14,7 @@ import structlog
 from mtg_mcp_server.utils.decklist import parse_decklist
 from mtg_mcp_server.utils.format_rules import normalize_format
 from mtg_mcp_server.utils.mana import count_pips, suggest_land_count
+from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
@@ -45,7 +46,7 @@ async def suggest_mana_base(
     total_lands: int | None = None,
     bulk: ScryfallBulkClient,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Suggest a mana base based on color pip distribution.
 
     Analyzes the mana costs of non-land cards, counts color pips weighted
@@ -59,7 +60,7 @@ async def suggest_mana_base(
         bulk: Initialized ScryfallBulkClient.
 
     Returns:
-        Formatted markdown with mana base recommendations.
+        WorkflowResult with markdown and structured data.
     """
     log.info("suggest_mana_base.start", format=format, cards=len(decklist))
 
@@ -69,7 +70,10 @@ async def suggest_mana_base(
     # --- Parse and resolve ---
     parsed = parse_decklist(decklist)
     if not parsed:
-        return "# Mana Base Suggestion\n\nNo cards provided."
+        return WorkflowResult(
+            markdown="# Mana Base Suggestion\n\nNo cards provided.",
+            data={"format": fmt, "land_count": 0, "basic_lands": {}, "dual_lands": []},
+        )
 
     unique_names = list(dict.fromkeys(name for _, name in parsed))
     resolved = await bulk.get_cards(unique_names)
@@ -230,4 +234,18 @@ async def suggest_mana_base(
         lines.append(f"*{', '.join(summary_parts)}*")
 
     log.info("suggest_mana_base.complete", format=fmt, land_count=land_count)
-    return "\n".join(lines)
+    data: dict[str, object] = {
+        "format": fmt,
+        "avg_cmc": avg_cmc,
+        "land_count": land_count,
+        "pip_ratios": pip_ratios,
+        "basic_lands": basic_lands,
+        "dual_lands": [
+            {"name": c.name, "color_identity": list(c.color_identity), "price_usd": c.prices.usd}
+            for c in dual_lands
+        ],
+        "heavy_warnings": heavy_warnings,
+        "resolved_count": resolved_count,
+        "unresolved_count": unresolved_count,
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)

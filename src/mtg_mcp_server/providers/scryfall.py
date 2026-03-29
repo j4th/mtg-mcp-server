@@ -10,6 +10,7 @@ import structlog
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.lifespan import lifespan
+from fastmcp.tools.tool import ToolResult
 from pydantic import Field
 
 from mtg_mcp_server.config import Settings
@@ -70,7 +71,7 @@ async def search_cards(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Search for Magic cards using Scryfall syntax.
 
     Examples: "f:commander id:sultai t:creature", "o:destroy t:instant cmc<=3"
@@ -89,7 +90,16 @@ async def search_cards(
         lines.append(format_card_line(card, response_format=response_format))
     if result.has_more:
         lines.append(f"\nMore results available — use page={page + 1}")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL,
+        structured_content={
+            "query": query,
+            "total_cards": result.total_cards,
+            "page": page,
+            "has_more": result.has_more,
+            "cards": [card.model_dump(mode="json") for card in result.data],
+        },
+    )
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
@@ -108,7 +118,7 @@ async def card_details(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Get full details for a Magic card by exact or fuzzy name."""
     client = _get_client()
     try:
@@ -122,13 +132,16 @@ async def card_details(
     if response_format == "detailed":
         lines.append(f"Legalities: {format_legalities(card.legalities)}")
         lines.append(f"Scryfall: {card.scryfall_uri}")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL,
+        structured_content=card.model_dump(mode="json"),
+    )
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_PRICING)
 async def card_price(
     name: Annotated[str, Field(description="Card name for price lookup (exact match)")],
-) -> str:
+) -> ToolResult:
     """Get current prices for a Magic card. Prices update once per day."""
     client = _get_client()
     try:
@@ -147,13 +160,19 @@ async def card_price(
         lines.append(f"  EUR: \u20ac{card.prices.eur}")
     if not any([card.prices.usd, card.prices.usd_foil, card.prices.eur]):
         lines.append("  No price data available.")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL,
+        structured_content={
+            "name": card.name,
+            "prices": card.prices.model_dump(mode="json"),
+        },
+    )
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
 async def card_rulings(
     name: Annotated[str, Field(description="Card name to get official rulings for (exact match)")],
-) -> str:
+) -> ToolResult:
     """Get official rulings and clarifications for a Magic card."""
     client = _get_client()
     try:
@@ -164,13 +183,24 @@ async def card_rulings(
     except ScryfallError as exc:
         raise ToolError(f"Scryfall API error: {exc}") from exc
 
+    rulings_data = [r.model_dump(mode="json") for r in rulings]
     if not rulings:
-        return f"**{card.name}** — No rulings available." + ATTRIBUTION_SCRYFALL
+        return ToolResult(
+            content=f"**{card.name}** — No rulings available." + ATTRIBUTION_SCRYFALL,
+            structured_content={"name": card.name, "total_rulings": 0, "rulings": []},
+        )
 
     lines = [f"**{card.name}** — {len(rulings)} ruling(s):"]
     for ruling in rulings:
         lines.append(f"  [{ruling.published_at}] {ruling.comment}")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL,
+        structured_content={
+            "name": card.name,
+            "total_rulings": len(rulings),
+            "rulings": rulings_data,
+        },
+    )
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_LOOKUP)
@@ -179,7 +209,7 @@ async def set_info(
         str,
         Field(description="Set code (e.g. 'dom', 'mh2', 'lci')"),
     ],
-) -> str:
+) -> ToolResult:
     """Get metadata for a Magic set by its code."""
     client = _get_client()
     try:
@@ -200,7 +230,10 @@ async def set_info(
         lines.append("Digital-only set")
     if info.scryfall_uri:
         lines.append(f"Scryfall: {info.scryfall_uri}")
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL,
+        structured_content=info.model_dump(mode="json"),
+    )
 
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
@@ -223,7 +256,7 @@ async def whats_new(
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
     ] = "detailed",
-) -> str:
+) -> ToolResult:
     """Find recently printed or released Magic cards.
 
     Searches Scryfall for cards released within the given number of days.
@@ -265,7 +298,17 @@ async def whats_new(
         lines.append(
             "\nMore results available — refine your search with set_code or format filters."
         )
-    return "\n".join(lines) + ATTRIBUTION_SCRYFALL
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL,
+        structured_content={
+            "days": days,
+            "set_code": set_code,
+            "format": format,
+            "total_cards": result.total_cards,
+            "has_more": result.has_more,
+            "cards": [card.model_dump(mode="json") for card in result.data],
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -80,9 +80,10 @@ class TestBasicManaBase:
             bulk=mock_bulk,
         )
 
-        assert "Mountain" in result
-        assert "Red" in result or "R" in result
-        assert "100%" in result or "100" in result
+        assert "Mountain" in result.markdown
+        assert "Red" in result.markdown or "R" in result.markdown
+        assert "100%" in result.markdown or "100" in result.markdown
+        assert isinstance(result.data, dict)
 
     async def test_two_color_deck(self) -> None:
         """Two-color deck gets both basic lands in proportional amounts."""
@@ -112,10 +113,10 @@ class TestBasicManaBase:
             bulk=mock_bulk,
         )
 
-        assert "Mountain" in result
-        assert "Island" in result
+        assert "Mountain" in result.markdown
+        assert "Island" in result.markdown
         # Red should have more lands than blue
-        assert "60%" in result or "Red" in result
+        assert "60%" in result.markdown or "Red" in result.markdown
 
     async def test_colorless_deck(self) -> None:
         """Colorless deck gets Wastes recommendation."""
@@ -137,7 +138,7 @@ class TestBasicManaBase:
             bulk=mock_bulk,
         )
 
-        assert "Wastes" in result or "colorless" in result.lower()
+        assert "Wastes" in result.markdown or "colorless" in result.markdown.lower()
 
 
 class TestLandCountRecommendation:
@@ -157,7 +158,8 @@ class TestLandCountRecommendation:
             bulk=mock_bulk,
         )
 
-        assert "18" in result
+        assert "18" in result.markdown
+        assert isinstance(result.data, dict)
 
     async def test_high_cmc_gets_more_lands(self) -> None:
         """Higher average CMC should recommend more lands."""
@@ -179,7 +181,7 @@ class TestLandCountRecommendation:
 
         # High CMC deck should get 24+ lands in 60-card format
         # The exact number depends on suggest_land_count but should be >= 24
-        assert "Recommended Lands" in result
+        assert "Recommended Lands" in result.markdown
 
     async def test_commander_format_lands(self) -> None:
         """Commander format gets more lands than 60-card formats."""
@@ -200,8 +202,8 @@ class TestLandCountRecommendation:
         )
 
         # Commander decks need 33-40 lands
-        assert "Recommended Lands" in result
-        assert "Commander" in result
+        assert "Recommended Lands" in result.markdown
+        assert "Commander" in result.markdown
 
 
 class TestPipDistribution:
@@ -221,11 +223,12 @@ class TestPipDistribution:
             bulk=mock_bulk,
         )
 
-        assert "Color Pip Distribution" in result
-        assert "| Color" in result
-        assert "Red" in result
-        assert "Green" in result
-        assert "50%" in result  # Equal split between R and G
+        assert "Color Pip Distribution" in result.markdown
+        assert "| Color" in result.markdown
+        assert "Red" in result.markdown
+        assert "Green" in result.markdown
+        assert "50%" in result.markdown  # Equal split between R and G
+        assert isinstance(result.data, dict)
 
     async def test_hybrid_mana_counted(self) -> None:
         """Hybrid mana pips are split between colors."""
@@ -240,8 +243,8 @@ class TestPipDistribution:
             bulk=mock_bulk,
         )
 
-        assert "Green" in result
-        assert "White" in result
+        assert "Green" in result.markdown
+        assert "White" in result.markdown
 
 
 class TestDualLandSuggestions:
@@ -267,7 +270,8 @@ class TestDualLandSuggestions:
             bulk=mock_bulk,
         )
 
-        assert "Dual Lands" in result or "Steam Vents" in result
+        assert "Dual Lands" in result.markdown or "Steam Vents" in result.markdown
+        assert isinstance(result.data, dict)
 
     async def test_no_duals_for_mono_color(self) -> None:
         """Mono-color decks don't get dual land suggestions."""
@@ -309,7 +313,8 @@ class TestHeavyColorWarnings:
         )
 
         # 6 cards * 2 red pips = 12 pips -> should warn
-        assert "Warnings" in result or "Red" in result
+        assert "Warnings" in result.markdown or "Red" in result.markdown
+        assert isinstance(result.data, dict)
 
 
 class TestEdgeCases:
@@ -334,7 +339,8 @@ class TestEdgeCases:
             bulk=mock_bulk,
         )
 
-        assert "No cards" in result
+        assert "No cards" in result.markdown
+        assert isinstance(result.data, dict)
 
     async def test_all_unresolved(self) -> None:
         """All cards unresolved still produces output."""
@@ -347,7 +353,7 @@ class TestEdgeCases:
         )
 
         # Should still produce output with warnings
-        assert "unresolved" in result.lower()
+        assert "unresolved" in result.markdown.lower()
 
     async def test_lands_skipped_for_pip_counting(self) -> None:
         """Land cards don't contribute to pip counts."""
@@ -369,9 +375,9 @@ class TestEdgeCases:
         )
 
         # Only Bolt contributes pips
-        assert "Red" in result
+        assert "Red" in result.markdown
         # Green should NOT appear in pips (Forest is a land, not a spell)
-        assert "Green" not in result or "100%" not in result
+        assert "Green" not in result.markdown or "100%" not in result.markdown
 
     async def test_quantity_weighting(self) -> None:
         """Card quantity is weighted in pip counting."""
@@ -388,7 +394,7 @@ class TestEdgeCases:
         )
 
         # 4 red pips vs 1 green pip -> Red should be ~80%
-        assert "80%" in result
+        assert "80%" in result.markdown
 
 
 # ---------------------------------------------------------------------------
@@ -425,8 +431,9 @@ class TestSuggestManaBaseResponseFormat:
             response_format="concise",
         )
 
-        assert len(concise) < len(detailed)
+        assert len(concise.markdown) < len(detailed.markdown)
         # Concise has basic lands but no dual land section or warnings
-        assert "Mountain" in concise
-        assert "## Color Pip Distribution" not in concise
-        assert "## Color Pip Distribution" in detailed
+        assert "Mountain" in concise.markdown
+        assert "## Color Pip Distribution" not in concise.markdown
+        assert "## Color Pip Distribution" in detailed.markdown
+        assert isinstance(detailed.data, dict)

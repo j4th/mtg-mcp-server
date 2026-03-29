@@ -128,9 +128,10 @@ class TestDraftPackPickBasic:
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
         # Mulldrifter (61.2%) should be ranked first, then Nameless Inversion (58.7%), then Leaf Gilder (54.1%)
-        mul_pos = result.index("Mulldrifter")
-        ni_pos = result.index("Nameless Inversion")
-        lg_pos = result.index("Leaf Gilder")
+        assert isinstance(result.data, dict)
+        mul_pos = result.markdown.index("Mulldrifter")
+        ni_pos = result.markdown.index("Nameless Inversion")
+        lg_pos = result.markdown.index("Leaf Gilder")
         assert mul_pos < ni_pos < lg_pos
 
     async def test_output_contains_header(self):
@@ -140,9 +141,9 @@ class TestDraftPackPickBasic:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "Draft Pack Analysis" in result
-        assert "LRW" in result
-        assert "Data provided by [17Lands]" in result
+        assert "Draft Pack Analysis" in result.markdown
+        assert "LRW" in result.markdown
+        assert "Data provided by [17Lands]" in result.markdown
 
     async def test_output_contains_gih_wr_as_percentage(self):
         """GIH WR displayed as a percentage (e.g., 61.2%)."""
@@ -151,7 +152,7 @@ class TestDraftPackPickBasic:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "61.2%" in result
+        assert "61.2%" in result.markdown
 
     async def test_output_contains_alsa(self):
         """ALSA (Average Last Seen At) value displayed in output."""
@@ -160,7 +161,7 @@ class TestDraftPackPickBasic:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "2.8" in result
+        assert "2.8" in result.markdown
 
     async def test_output_contains_iwd_with_sign(self):
         """Positive IWD displayed with + sign (e.g., +4.5%)."""
@@ -170,7 +171,7 @@ class TestDraftPackPickBasic:
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
         # IWD 0.045 => "+4.5%"
-        assert "+4.5%" in result
+        assert "+4.5%" in result.markdown
 
     async def test_negative_iwd_displayed_correctly(self):
         """Negative IWD displayed with - sign (e.g., -0.2%)."""
@@ -180,7 +181,7 @@ class TestDraftPackPickBasic:
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
         # IWD -0.002 => "-0.2%"
-        assert "-0.2%" in result
+        assert "-0.2%" in result.markdown
 
     async def test_output_contains_rarity_and_color(self):
         """Card color and rarity included in output."""
@@ -189,8 +190,8 @@ class TestDraftPackPickBasic:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "U" in result
-        assert "common" in result.lower()
+        assert "U" in result.markdown
+        assert "common" in result.markdown.lower()
 
     async def test_output_contains_game_count(self):
         """Game count (sample size) displayed in output."""
@@ -199,7 +200,7 @@ class TestDraftPackPickBasic:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "18000" in result
+        assert "18000" in result.markdown
 
     async def test_calls_card_ratings_with_set_code(self):
         """17Lands card_ratings called with the provided set code."""
@@ -217,9 +218,9 @@ class TestDraftPackPickBasic:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "1." in result
-        assert "2." in result
-        assert "3." in result
+        assert "1." in result.markdown
+        assert "2." in result.markdown
+        assert "3." in result.markdown
 
 
 class TestDraftPackPickMissingData:
@@ -232,8 +233,8 @@ class TestDraftPackPickMissingData:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "Totally Fake Card" in result
-        assert "No data" in result
+        assert "Totally Fake Card" in result.markdown
+        assert "No data" in result.markdown
 
     async def test_all_cards_missing(self):
         """All pack cards in No data section when none found in 17Lands."""
@@ -242,9 +243,9 @@ class TestDraftPackPickMissingData:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "No data" in result
-        assert "Fake Card A" in result
-        assert "Fake Card B" in result
+        assert "No data" in result.markdown
+        assert "Fake Card A" in result.markdown
+        assert "Fake Card B" in result.markdown
 
     async def test_case_insensitive_matching(self):
         """Card names in the pack should match 17Lands data case-insensitively."""
@@ -254,8 +255,8 @@ class TestDraftPackPickMissingData:
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
         # Both should be found and ranked, not in the "No data" section
-        assert "61.2%" in result  # Mulldrifter's GIH WR
-        assert "58.7%" in result  # Nameless Inversion's GIH WR
+        assert "61.2%" in result.markdown  # Mulldrifter's GIH WR
+        assert "58.7%" in result.markdown  # Nameless Inversion's GIH WR
 
 
 class TestDraftPackPickNoneGihWr:
@@ -270,9 +271,9 @@ class TestDraftPackPickNoneGihWr:
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
         # Mulldrifter and Leaf Gilder should appear before Mystery Card
-        mul_pos = result.index("Mulldrifter")
-        lg_pos = result.index("Leaf Gilder")
-        mc_pos = result.index("Mystery Card")
+        mul_pos = result.markdown.index("Mulldrifter")
+        lg_pos = result.markdown.index("Leaf Gilder")
+        mc_pos = result.markdown.index("Mystery Card")
         assert mul_pos < mc_pos
         assert lg_pos < mc_pos
 
@@ -284,7 +285,7 @@ class TestDraftPackPickNoneGihWr:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "N/A" in result
+        assert "N/A" in result.markdown
 
 
 class TestDraftPackPickColorAnalysis:
@@ -300,9 +301,9 @@ class TestDraftPackPickColorAnalysis:
             pack, "LRW", seventeen_lands=client, current_picks=current_picks
         )
 
-        assert "Current colors" in result
-        assert "U" in result
-        assert "B" in result
+        assert "Current colors" in result.markdown
+        assert "U" in result.markdown
+        assert "B" in result.markdown
 
     async def test_on_color_annotation(self):
         """Cards matching current pick colors annotated as on-color."""
@@ -315,7 +316,7 @@ class TestDraftPackPickColorAnalysis:
             pack, "LRW", seventeen_lands=client, current_picks=current_picks
         )
 
-        assert "on-color" in result.lower()
+        assert "on-color" in result.markdown.lower()
 
     async def test_off_color_annotation(self):
         """Cards not matching current pick colors annotated as off-color."""
@@ -328,7 +329,7 @@ class TestDraftPackPickColorAnalysis:
             pack, "LRW", seventeen_lands=client, current_picks=current_picks
         )
 
-        assert "off-color" in result.lower()
+        assert "off-color" in result.markdown.lower()
 
     async def test_no_color_analysis_without_picks(self):
         """No color analysis section when current_picks is not provided."""
@@ -337,7 +338,7 @@ class TestDraftPackPickColorAnalysis:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "Current colors" not in result
+        assert "Current colors" not in result.markdown
 
     async def test_no_color_analysis_with_empty_picks(self):
         """No color analysis section when current_picks is an empty list."""
@@ -346,7 +347,7 @@ class TestDraftPackPickColorAnalysis:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client, current_picks=[])
 
-        assert "Current colors" not in result
+        assert "Current colors" not in result.markdown
 
     async def test_picks_not_in_data_ignored_for_color_analysis(self):
         """If a current pick isn't in 17Lands data, skip it for color counting."""
@@ -359,7 +360,7 @@ class TestDraftPackPickColorAnalysis:
         )
 
         # No recognized picks → no color counts → color section omitted
-        assert "Current colors" not in result
+        assert "Current colors" not in result.markdown
 
 
 class TestDraftPackPickEdgeCases:
@@ -372,7 +373,7 @@ class TestDraftPackPickEdgeCases:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "empty" in result.lower() or "no cards" in result.lower()
+        assert "empty" in result.markdown.lower() or "no cards" in result.markdown.lower()
 
     async def test_single_card_pack(self):
         """Single-card pack returns that card with its stats."""
@@ -381,8 +382,8 @@ class TestDraftPackPickEdgeCases:
 
         result = await draft_pack_pick(pack, "LRW", seventeen_lands=client)
 
-        assert "Mulldrifter" in result
-        assert "61.2%" in result
+        assert "Mulldrifter" in result.markdown
+        assert "61.2%" in result.markdown
 
     async def test_none_alsa_shows_na(self):
         """Cards with None ALSA display N/A."""
@@ -391,7 +392,7 @@ class TestDraftPackPickEdgeCases:
 
         result = await draft_pack_pick(["No ALSA Card"], "LRW", seventeen_lands=client)
 
-        assert "N/A" in result
+        assert "N/A" in result.markdown
 
 
 # ---------------------------------------------------------------------------
@@ -413,8 +414,8 @@ class TestDraftPackPickResponseFormat:
             pack, "LRW", seventeen_lands=client, response_format="concise"
         )
 
-        assert len(concise) < len(detailed)
-        assert "Mulldrifter" in concise
+        assert len(concise.markdown) < len(detailed.markdown)
+        assert "Mulldrifter" in concise.markdown
         # Concise table has fewer columns (no Color, Rarity, IWD, Games)
-        assert "Rarity" not in concise
-        assert "Rarity" in detailed
+        assert "Rarity" not in concise.markdown
+        assert "Rarity" in detailed.markdown

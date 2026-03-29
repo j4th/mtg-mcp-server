@@ -184,8 +184,9 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "Deck Analysis" in result
-        assert COMMANDER in result
+        assert isinstance(result.data, dict)
+        assert "Deck Analysis" in result.markdown
+        assert COMMANDER in result.markdown
 
     async def test_mana_curve_section_present(self) -> None:
         """Mana Curve section present in output."""
@@ -197,7 +198,7 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "## Mana Curve" in result
+        assert "## Mana Curve" in result.markdown
 
     async def test_color_requirements_section_present(self) -> None:
         """Color Requirements section present in output."""
@@ -209,7 +210,7 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "## Color Requirements" in result
+        assert "## Color Requirements" in result.markdown
 
     async def test_combos_bracket_section_present(self) -> None:
         """Combos and Bracket section present with bracket tag."""
@@ -221,8 +222,8 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "## Combos & Bracket" in result
-        assert "Bracket:" in result
+        assert "## Combos & Bracket" in result.markdown
+        assert "Bracket:" in result.markdown
 
     async def test_budget_section_present(self) -> None:
         """Budget section present with total price."""
@@ -234,8 +235,8 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "## Budget" in result
-        assert "Total:" in result
+        assert "## Budget" in result.markdown
+        assert "Total:" in result.markdown
 
     async def test_lowest_synergy_section_present(self) -> None:
         """Lowest Synergy Cards section present in output."""
@@ -247,7 +248,7 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "## Lowest Synergy Cards" in result
+        assert "## Lowest Synergy Cards" in result.markdown
 
     async def test_data_sources_footer_present(self) -> None:
         """Data Sources footer lists all four backends with OK status."""
@@ -259,11 +260,11 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "**Data Sources:**" in result
-        assert "Scryfall](https://scryfall.com): OK" in result
-        assert "Commander Spellbook](https://commanderspellbook.com): OK" in result
-        assert "EDHREC](https://edhrec.com): OK" in result
-        assert "Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): OK" in result
+        assert "**Data Sources:**" in result.markdown
+        assert "Scryfall](https://scryfall.com): OK" in result.markdown
+        assert "Commander Spellbook](https://commanderspellbook.com): OK" in result.markdown
+        assert "EDHREC](https://edhrec.com): OK" in result.markdown
+        assert "Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): OK" in result.markdown
 
     async def test_bracket_tag_displayed(self) -> None:
         """Bracket tag from Spellbook displayed in output."""
@@ -275,7 +276,7 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "Bracket:" in result
+        assert "Bracket:" in result.markdown
 
     async def test_included_combos_count(self) -> None:
         """Included combo count shown when Spellbook finds combos."""
@@ -287,7 +288,7 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(combos=_make_decklist_combos(included=[SAMPLE_COMBO])),
             edhrec=_make_edhrec(),
         )
-        assert "Included combos:" in result
+        assert "Included combos:" in result.markdown
 
     async def test_lowest_synergy_cards_listed(self) -> None:
         """Bad Card (lowest synergy) listed in lowest synergy section."""
@@ -300,7 +301,7 @@ class TestDeckAnalysisHappyPath:
             edhrec=_make_edhrec(),
         )
         # Bad Card has -10% synergy, should be listed first
-        assert "Bad Card" in result
+        assert "Bad Card" in result.markdown
 
     async def test_color_pips_counted(self) -> None:
         """Color pip counts computed from mana costs (G: 1, B: 2)."""
@@ -315,8 +316,8 @@ class TestDeckAnalysisHappyPath:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "G: 1" in result
-        assert "B: 2" in result
+        assert "G: 1" in result.markdown
+        assert "B: 2" in result.markdown
 
 
 class TestDeckAnalysisBulkDisabled:
@@ -332,8 +333,11 @@ class TestDeckAnalysisBulkDisabled:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "Deck Analysis" in result
-        assert "Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): Disabled" in result
+        assert "Deck Analysis" in result.markdown
+        assert (
+            "Scryfall Bulk Data](https://scryfall.com/docs/api/bulk-data): Disabled"
+            in result.markdown
+        )
 
     async def test_mana_curve_still_computed(self) -> None:
         """Mana curve computed via Scryfall fallback when bulk data is disabled."""
@@ -345,7 +349,7 @@ class TestDeckAnalysisBulkDisabled:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "## Mana Curve" in result
+        assert "## Mana Curve" in result.markdown
 
 
 class TestDeckAnalysisEdhrecDisabled:
@@ -361,8 +365,8 @@ class TestDeckAnalysisEdhrecDisabled:
             spellbook=_make_spellbook(),
             edhrec=None,
         )
-        assert "not enabled" in result.lower() or "disabled" in result.lower()
-        assert "EDHREC](https://edhrec.com): Disabled" in result
+        assert "not enabled" in result.markdown.lower() or "disabled" in result.markdown.lower()
+        assert "EDHREC](https://edhrec.com): Disabled" in result.markdown
 
     async def test_other_sections_still_present(self) -> None:
         """Mana Curve, Budget, and Combos sections still present without EDHREC."""
@@ -374,9 +378,9 @@ class TestDeckAnalysisEdhrecDisabled:
             spellbook=_make_spellbook(),
             edhrec=None,
         )
-        assert "## Mana Curve" in result
-        assert "## Budget" in result
-        assert "## Combos & Bracket" in result
+        assert "## Mana Curve" in result.markdown
+        assert "## Budget" in result.markdown
+        assert "## Combos & Bracket" in result.markdown
 
 
 class TestDeckAnalysisSpellbookFailure:
@@ -400,8 +404,8 @@ class TestDeckAnalysisSpellbookFailure:
             edhrec=_make_edhrec(),
         )
         assert (
-            "Spellbook unavailable" in result
-            or "Spellbook](https://commanderspellbook.com): Failed" in result
+            "Spellbook unavailable" in result.markdown
+            or "Spellbook](https://commanderspellbook.com): Failed" in result.markdown
         )
 
     async def test_other_sections_still_present(self) -> None:
@@ -419,9 +423,9 @@ class TestDeckAnalysisSpellbookFailure:
             spellbook=spellbook,
             edhrec=_make_edhrec(),
         )
-        assert "## Mana Curve" in result
-        assert "## Budget" in result
-        assert "## Lowest Synergy Cards" in result
+        assert "## Mana Curve" in result.markdown
+        assert "## Budget" in result.markdown
+        assert "## Lowest Synergy Cards" in result.markdown
 
 
 class TestDeckAnalysisPartialSpellbookFailure:
@@ -443,8 +447,8 @@ class TestDeckAnalysisPartialSpellbookFailure:
             edhrec=_make_edhrec(),
         )
         # Spellbook should be marked OK since bracket succeeded
-        assert "Spellbook](https://commanderspellbook.com): OK" in result
-        assert "## Mana Curve" in result
+        assert "Spellbook](https://commanderspellbook.com): OK" in result.markdown
+        assert "## Mana Curve" in result.markdown
 
 
 class TestDeckAnalysisPartialCardResolution:
@@ -461,8 +465,8 @@ class TestDeckAnalysisPartialCardResolution:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "Unknown Card" in result
-        assert "Unresolved" in result
+        assert "Unknown Card" in result.markdown
+        assert "Unresolved" in result.markdown
 
     async def test_resolved_cards_still_analyzed(self) -> None:
         """Successfully resolved cards still produce mana curve and budget data."""
@@ -475,8 +479,8 @@ class TestDeckAnalysisPartialCardResolution:
             edhrec=_make_edhrec(),
         )
         # Should still have mana curve data from resolved cards
-        assert "## Mana Curve" in result
-        assert "Total mana value" in result
+        assert "## Mana Curve" in result.markdown
+        assert "Total mana value" in result.markdown
 
 
 class TestDeckAnalysisEmptyDecklist:
@@ -492,7 +496,7 @@ class TestDeckAnalysisEmptyDecklist:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "No cards in decklist" in result
+        assert "No cards in decklist" in result.markdown
 
 
 class TestDeckAnalysisProgressCallback:
@@ -526,7 +530,7 @@ class TestDeckAnalysisProgressCallback:
             edhrec=_make_edhrec(),
             on_progress=None,
         )
-        assert "Deck Analysis" in result
+        assert "Deck Analysis" in result.markdown
 
 
 class TestDeckAnalysisEdhrecFailure:
@@ -546,8 +550,8 @@ class TestDeckAnalysisEdhrecFailure:
             spellbook=_make_spellbook(),
             edhrec=edhrec,
         )
-        assert "EDHREC" in result
-        assert "Failed" in result
+        assert "EDHREC" in result.markdown
+        assert "Failed" in result.markdown
 
     async def test_other_sections_still_present(self) -> None:
         """Mana Curve and Budget sections still present despite EDHREC failure."""
@@ -561,8 +565,8 @@ class TestDeckAnalysisEdhrecFailure:
             spellbook=_make_spellbook(),
             edhrec=edhrec,
         )
-        assert "## Mana Curve" in result
-        assert "## Budget" in result
+        assert "## Mana Curve" in result.markdown
+        assert "## Budget" in result.markdown
 
 
 class TestDeckAnalysisBudget:
@@ -580,7 +584,7 @@ class TestDeckAnalysisBudget:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "$3.60" in result
+        assert "$3.60" in result.markdown
 
     async def test_average_price_shown(self) -> None:
         """Average card price displayed in the Budget section."""
@@ -592,7 +596,7 @@ class TestDeckAnalysisBudget:
             spellbook=_make_spellbook(),
             edhrec=_make_edhrec(),
         )
-        assert "Average card:" in result
+        assert "Average card:" in result.markdown
 
 
 # ---------------------------------------------------------------------------
@@ -623,9 +627,9 @@ class TestDeckAnalysisResponseFormat:
             response_format="concise",
         )
 
-        assert len(concise) < len(detailed)
+        assert len(concise.markdown) < len(detailed.markdown)
         # Concise keeps Mana Curve
-        assert "Mana Curve" in concise
+        assert "Mana Curve" in concise.markdown
         # Concise omits Budget and Data Sources
-        assert "Budget" not in concise
-        assert "**Data Sources:**" not in concise
+        assert "Budget" not in concise.markdown
+        assert "**Data Sources:**" not in concise.markdown

@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.workflows import WorkflowResult
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
@@ -177,7 +179,7 @@ async def commander_overview(
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Get a comprehensive overview of a commander from all available sources.
 
     Concurrently fetches card details (Scryfall), combos (Spellbook), and
@@ -191,7 +193,7 @@ async def commander_overview(
         edhrec: Initialized EDHRECClient, or None if disabled.
 
     Returns:
-        Formatted markdown string combining all available data.
+        WorkflowResult with markdown and structured data.
 
     Raises:
         CardNotFoundError: If the commander is not found on Scryfall.
@@ -321,7 +323,13 @@ async def commander_overview(
         )
 
     log.info("commander_overview.complete", commander=commander_name)
-    return "\n".join(lines)
+    data = {
+        "commander": card.model_dump(mode="json"),
+        "combos": [c.model_dump(mode="json") for c in combos],
+        "edhrec": edhrec_data.model_dump(mode="json") if edhrec_data else None,
+        "sources": {"scryfall": True, "spellbook": spellbook_ok, "edhrec": edhrec_ok},
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)
 
 
 async def evaluate_upgrade(
@@ -332,7 +340,7 @@ async def evaluate_upgrade(
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Evaluate whether a card is worth adding to a specific commander deck.
 
     Concurrently fetches card details (Scryfall), combos (Spellbook), and
@@ -347,7 +355,7 @@ async def evaluate_upgrade(
         edhrec: Initialized EDHRECClient, or None if disabled.
 
     Returns:
-        Formatted markdown string with evaluation data.
+        WorkflowResult with markdown and structured data.
 
     Raises:
         CardNotFoundError: If the card is not found on Scryfall.
@@ -479,7 +487,14 @@ async def evaluate_upgrade(
         )
 
     log.info("evaluate_upgrade.complete", card=card_name, commander=commander_name)
-    return "\n".join(lines)
+    data = {
+        "card": card.model_dump(mode="json"),
+        "commander_name": commander_name,
+        "combos": [c.model_dump(mode="json") for c in combos],
+        "synergy": synergy_card.model_dump(mode="json") if synergy_card else None,
+        "sources": {"scryfall": True, "spellbook": spellbook_ok, "edhrec": edhrec_ok},
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)
 
 
 async def card_comparison(
@@ -491,7 +506,7 @@ async def card_comparison(
     edhrec: EDHRECClient | None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Compare multiple cards side-by-side for a specific commander deck.
 
     Resolves each card via Scryfall (prices required), then fetches synergy
@@ -507,7 +522,7 @@ async def card_comparison(
         on_progress: Optional callback for progress reporting.
 
     Returns:
-        Formatted markdown comparison table.
+        WorkflowResult with markdown and structured data.
 
     Raises:
         CardNotFoundError: If a card is not found on Scryfall (propagated).
@@ -641,7 +656,12 @@ async def card_comparison(
         )
 
     log.info("card_comparison.complete", cards=cards, commander=commander_name)
-    return "\n".join(lines)
+    data = {
+        "commander_name": commander_name,
+        "cards": [c.model_dump(mode="json") for c in card_data],
+        "not_found": not_found_names,
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)
 
 
 async def budget_upgrade(
@@ -653,7 +673,7 @@ async def budget_upgrade(
     edhrec: EDHRECClient | None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
     response_format: Literal["detailed", "concise"] = "detailed",
-) -> str:
+) -> WorkflowResult:
     """Suggest budget-friendly upgrades ranked by synergy-per-dollar.
 
     Fetches EDHREC staples for the commander, looks up Scryfall prices,
@@ -668,15 +688,18 @@ async def budget_upgrade(
         on_progress: Optional callback for progress reporting.
 
     Returns:
-        Formatted markdown with ranked budget upgrade suggestions.
+        WorkflowResult with markdown and structured data.
     """
     log.info("budget_upgrade.start", commander=commander_name, budget=budget)
 
     # EDHREC is required for this workflow
     if edhrec is None:
-        return (
-            "EDHREC is not enabled — budget upgrade requires EDHREC staples data.\n\n"
-            "Set MTG_MCP_ENABLE_EDHREC=true to enable."
+        return WorkflowResult(
+            markdown=(
+                "EDHREC is not enabled — budget upgrade requires EDHREC staples data.\n\n"
+                "Set MTG_MCP_ENABLE_EDHREC=true to enable."
+            ),
+            data={"commander_name": commander_name, "budget": budget, "suggestions": []},
         )
 
     # Step 1/2: Fetch EDHREC staples
@@ -691,9 +714,12 @@ async def budget_upgrade(
         all_edhrec_cards.extend(cardlist.cardviews)
 
     if not all_edhrec_cards:
-        return (
-            f"No staples found for '{commander_name}' on EDHREC.\n\n"
-            "The commander may be too new or rarely played."
+        return WorkflowResult(
+            markdown=(
+                f"No staples found for '{commander_name}' on EDHREC.\n\n"
+                "The commander may be too new or rarely played."
+            ),
+            data={"commander_name": commander_name, "budget": budget, "suggestions": []},
         )
 
     # Step 2/2: Fetch Scryfall prices in parallel
@@ -734,7 +760,10 @@ async def budget_upgrade(
         if price_failures:
             msg += f"Note: {price_failures} card(s) could not be priced due to Scryfall errors.\n"
         msg += "Try increasing the budget ceiling."
-        return msg
+        return WorkflowResult(
+            markdown=msg,
+            data={"commander_name": commander_name, "budget": budget, "suggestions": []},
+        )
 
     # Sort by synergy-per-dollar descending
     candidates.sort(key=lambda c: c[2], reverse=True)
@@ -764,4 +793,18 @@ async def budget_upgrade(
         lines.append("- [EDHREC](https://edhrec.com): OK")
 
     log.info("budget_upgrade.complete", commander=commander_name, suggestions=len(top))
-    return "\n".join(lines)
+    data = {
+        "commander_name": commander_name,
+        "budget": budget,
+        "suggestions": [
+            {
+                "name": ecard.name,
+                "synergy": ecard.synergy,
+                "inclusion": ecard.inclusion,
+                "price": price,
+                "synergy_per_dollar": spd,
+            }
+            for ecard, price, spd in top
+        ],
+    }
+    return WorkflowResult(markdown="\n".join(lines), data=data)
