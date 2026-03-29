@@ -61,7 +61,7 @@ Get recently released or previewed cards.
 
 | Field | Detail |
 |-------|--------|
-| Input | `days: int = 7` |
+| Input | `days: int = 30` |
 | Output | List of recently released cards with names, sets, rarities |
 | Backend | `ScryfallClient.search_cards()` (date filter) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
@@ -359,7 +359,7 @@ Search for cards matching a mechanical, tribal, or abstract theme via oracle tex
 | Field | Detail |
 |-------|--------|
 | Input | `theme: str` (e.g. "sacrifice", "lifegain", "tokens"), `color_identity: str | None = None`, `format: str | None = None`, `max_price: float | None = None`, `limit: int = 20` |
-| Output | Markdown with: cards grouped by relevance tier (direct match, related, support) with oracle text excerpts |
+| Output | Formatted list of matching cards with type, oracle text excerpt, price. Sorted by match quality. |
 | Backends | Bulk data (required) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -369,7 +369,7 @@ Detect synergies from 1-5 key cards and find cards that work with them.
 | Field | Detail |
 |-------|--------|
 | Input | `cards: list[str]` (1-5 card names), `format: str` (required), `budget: float | None = None`, `limit: int = 20` |
-| Output | Markdown with: resolved cards, detected keywords/mechanics, synergy candidates grouped by category, combo potential |
+| Output | Markdown with: resolved cards, detected keywords/mechanics, synergy candidates with type and oracle text, combo potential from Spellbook |
 | Backends | Bulk data (required) + Spellbook (required) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -378,9 +378,9 @@ Gap analysis and card suggestions to fill out a partial decklist.
 
 | Field | Detail |
 |-------|--------|
-| Input | `decklist: list[str]`, `format: str`, `commander: str | None = None` |
+| Input | `decklist: list[str]`, `format: str`, `commander: str | None = None`, `budget: float | None = None` |
 | Output | Markdown with: current deck composition, format-specific target size, category gaps (creatures, removal, card draw, etc.), suggested cards per gap |
-| Backends | Bulk data (required) + EDHREC (optional) |
+| Backends | Bulk data (required) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `commander_comparison`
@@ -410,7 +410,7 @@ Analyze a precon decklist and suggest swaps — pair weakest cards with upgrade 
 
 | Field | Detail |
 |-------|--------|
-| Input | `decklist: list[str]`, `commander: str`, `budget: float = 50.0` |
+| Input | `decklist: list[str]`, `commander: str`, `budget: float = 50.0`, `num_upgrades: int = 10` |
 | Output | Markdown with: data source status, ranked swap pairs (cut → add with reasoning), upgrade priority based on synergy delta |
 | Backends | Bulk data (required) + Spellbook (required) + EDHREC (optional) |
 | Scoring | Cuts scored by low synergy + low inclusion. Upgrades ranked by synergy improvement |
@@ -422,7 +422,7 @@ Top-played cards across all commanders in a color identity.
 | Field | Detail |
 |-------|--------|
 | Input | `color_identity: str` (e.g. "simic", "UG"), `category: str | None = None` (e.g. "creatures") |
-| Output | Markdown with: staple cards ranked by inclusion rate, synergy scores, prices |
+| Output | Markdown with: staple cards ranked by EDHREC rank (popularity), with prices |
 | Backends | Bulk data (required) + EDHREC (optional, for enrichment) |
 | Partial failure | Degrades gracefully when EDHREC is disabled — falls back to EDHREC rank from bulk data |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
@@ -642,7 +642,7 @@ Build a deck around specific cards or a win condition in any format.
 | Field | Detail |
 |-------|--------|
 | Input | `cards: str`, `format: str`, `budget: float | None = None` |
-| Output | Multi-step prompt: theme/synergy search → build_around → rotation_check (if Standard) → complete_deck → deck_validate |
+| Output | Multi-step prompt: theme/synergy search → build_around → rotation_check (if Standard) → complete_deck → deck_validate → suggest_mana_base |
 
 ### `build_tribal_deck`
 Build a tribal deck for any format.
@@ -666,7 +666,7 @@ Upgrade a precon Commander deck with a budget.
 | Field | Detail |
 |-------|--------|
 | Input | `commander: str`, `budget: float` |
-| Output | Multi-step prompt: precon_upgrade → budget_upgrade → suggest_mana_base |
+| Output | Multi-step prompt: commander_overview → deck_analysis → suggest_cuts → precon_upgrade → deck_validate |
 
 ### `sealed_session`
 Guide a sealed deck building session.
@@ -674,7 +674,7 @@ Guide a sealed deck building session.
 | Field | Detail |
 |-------|--------|
 | Input | `set_code: str` |
-| Output | Multi-step prompt: sealed_pool_build → suggest_mana_base → deck_validate |
+| Output | Multi-step prompt: sealed_pool_build → build evaluation with 17Lands data → sideboard planning |
 
 ### `draft_review`
 Review a completed draft with analysis and grade.

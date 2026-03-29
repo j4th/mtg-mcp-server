@@ -19,7 +19,6 @@ from mtg_mcp_server.workflows import WorkflowResult
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from mtg_mcp_server.services.edhrec import EDHRECClient
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
     from mtg_mcp_server.services.spellbook import SpellbookClient
     from mtg_mcp_server.types import Card, Combo
@@ -143,7 +142,6 @@ async def theme_search(
     theme: str,
     *,
     bulk: ScryfallBulkClient,
-    edhrec: EDHRECClient | None = None,
     color_identity: str | None = None,
     format: str | None = None,
     max_price: float | None = None,
@@ -158,7 +156,6 @@ async def theme_search(
     Args:
         theme: Theme name (e.g. 'aristocrats', 'merfolk', 'music').
         bulk: Initialized ScryfallBulkClient.
-        edhrec: Optional EDHRECClient for enrichment.
         color_identity: Color filter (e.g. 'BG', 'sultai').
         format: Format legality filter (e.g. 'commander').
         max_price: Maximum USD price per card.
@@ -321,7 +318,6 @@ async def build_around(
     *,
     bulk: ScryfallBulkClient,
     spellbook: SpellbookClient,
-    edhrec: EDHRECClient | None = None,
     budget: float | None = None,
     limit: int = 20,
     response_format: Literal["detailed", "concise"] = "detailed",
@@ -336,7 +332,6 @@ async def build_around(
         format: Format for legality filtering.
         bulk: Initialized ScryfallBulkClient.
         spellbook: Initialized SpellbookClient.
-        edhrec: Optional EDHRECClient for synergy data.
         budget: Optional max price per card in USD.
         limit: Maximum suggestions.
         response_format: Output verbosity.
@@ -537,7 +532,6 @@ async def complete_deck(
     format: str,
     *,
     bulk: ScryfallBulkClient,
-    edhrec: EDHRECClient | None = None,
     commander: str | None = None,
     budget: float | None = None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
@@ -552,8 +546,7 @@ async def complete_deck(
         decklist: Partial list of card names.
         format: Format for target size and legality.
         bulk: Initialized ScryfallBulkClient.
-        edhrec: Optional EDHRECClient for commander suggestions.
-        commander: Commander name for EDHREC lookups.
+        commander: Commander name (unused currently, reserved for future enrichment).
         budget: Optional max price per card.
         on_progress: Optional progress callback.
         response_format: Output verbosity.

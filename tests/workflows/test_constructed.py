@@ -201,6 +201,36 @@ class TestRotationCheck:
             or result.data.get("unresolved") is not None
         )
 
+    async def test_rotating_soon_flag(self, mock_scryfall: AsyncMock, mock_bulk: AsyncMock) -> None:
+        """Cards in the oldest standard year have rotating_soon=True; newer do not."""
+        # Create sets spanning two years so the oldest rotates.
+        # Use dates within the 3-year standard window from today (2026-03-29).
+        old_set = _mock_set("old", "Old Expansion", released_at="2024-01-15")
+        new_set = _mock_set("new", "New Expansion", released_at="2025-09-05")
+        mock_scryfall.get_sets = AsyncMock(return_value=[old_set, new_set])
+
+        card_old = _mock_card("Card Old", set_code="old", legalities={"standard": "legal"})
+        card_new = _mock_card("Card New", set_code="new", legalities={"standard": "legal"})
+        mock_bulk.get_cards = AsyncMock(return_value={"Card Old": card_old, "Card New": card_new})
+
+        result = await rotation_check(
+            scryfall=mock_scryfall,
+            bulk=mock_bulk,
+            cards=["Card Old", "Card New"],
+        )
+
+        cards_checked = result.data["cards_checked"]
+        assert len(cards_checked) == 2
+
+        # Find each card's entry
+        old_entry = next(c for c in cards_checked if c["name"] == "Card Old")
+        new_entry = next(c for c in cards_checked if c["name"] == "Card New")
+
+        # The card from the oldest release year should be rotating
+        assert old_entry["rotating_soon"] is True
+        # The card from the newer release year should NOT be rotating
+        assert new_entry["rotating_soon"] is False
+
     async def test_empty_sets_response(
         self, mock_scryfall: AsyncMock, mock_bulk: AsyncMock
     ) -> None:

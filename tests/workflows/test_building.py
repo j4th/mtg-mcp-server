@@ -10,15 +10,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mtg_mcp_server.services.spellbook import SpellbookError
 from mtg_mcp_server.types import (
     Card,
     CardPrices,
     Combo,
     ComboCard,
     ComboResult,
-    EDHRECCard,
-    EDHRECCardList,
-    EDHRECCommanderData,
 )
 from mtg_mcp_server.workflows.building import build_around, complete_deck, theme_search
 
@@ -87,20 +85,6 @@ def mock_spellbook() -> AsyncMock:
     """Provide an AsyncMock SpellbookClient."""
     client = AsyncMock()
     client.find_combos = AsyncMock(return_value=[])
-    return client
-
-
-@pytest.fixture
-def mock_edhrec() -> AsyncMock:
-    """Provide an AsyncMock EDHRECClient."""
-    client = AsyncMock()
-    client.commander_top_cards = AsyncMock(
-        return_value=EDHRECCommanderData(
-            commander_name="Test Commander",
-            total_decks=1000,
-            cardlists=[],
-        )
-    )
     return client
 
 
@@ -237,14 +221,13 @@ class TestThemeSearch:
         # Should search for music-related terms
         assert result.data["theme"] == "music"
 
-    async def test_edhrec_enrichment(self, mock_bulk: AsyncMock, mock_edhrec: AsyncMock) -> None:
-        """EDHREC data enriches results when available."""
+    async def test_works_without_optional_backends(self, mock_bulk: AsyncMock) -> None:
+        """Theme search works with only bulk data (no optional backends)."""
         card = _mock_card("Blood Artist", oracle_text="Whenever a creature dies...")
         mock_bulk.filter_cards = AsyncMock(return_value=[card])
 
-        result = await theme_search("aristocrats", bulk=mock_bulk, edhrec=mock_edhrec)
+        result = await theme_search("aristocrats", bulk=mock_bulk)
 
-        # Should succeed with or without EDHREC data
         assert "Blood Artist" in result.markdown
 
 
@@ -381,39 +364,18 @@ class TestBuildAround:
         # Should mention the card could not be found
         assert "not found" in result.markdown.lower() or "unresolved" in result.markdown.lower()
 
-    async def test_edhrec_enrichment(
+    async def test_works_without_optional_backends(
         self,
         mock_bulk: AsyncMock,
         mock_spellbook: AsyncMock,
-        mock_edhrec: AsyncMock,
     ) -> None:
-        """EDHREC synergy data enriches results for commander format."""
+        """Build around works with only bulk data and spellbook (no optional backends)."""
         card = _mock_card(
             "Teysa Karlov",
             oracle_text="Death triggers double",
             type_line="Legendary Creature - Human Advisor",
         )
         mock_bulk.get_cards = AsyncMock(return_value={"Teysa Karlov": card})
-
-        mock_edhrec.commander_top_cards = AsyncMock(
-            return_value=EDHRECCommanderData(
-                commander_name="Teysa Karlov",
-                total_decks=5000,
-                cardlists=[
-                    EDHRECCardList(
-                        header="Creatures",
-                        cardviews=[
-                            EDHRECCard(
-                                name="Viscera Seer",
-                                synergy=0.45,
-                                inclusion=55,
-                                num_decks=2750,
-                            ),
-                        ],
-                    )
-                ],
-            )
-        )
         mock_bulk.filter_cards = AsyncMock(return_value=[])
 
         result = await build_around(
@@ -421,7 +383,6 @@ class TestBuildAround:
             "commander",
             bulk=mock_bulk,
             spellbook=mock_spellbook,
-            edhrec=mock_edhrec,
         )
 
         assert result.markdown is not None
@@ -441,6 +402,32 @@ class TestBuildAround:
         )
 
         assert result.markdown is not None
+
+    async def test_spellbook_failure_degrades_gracefully(
+        self, mock_bulk: AsyncMock, mock_spellbook: AsyncMock
+    ) -> None:
+        """Spellbook failure is caught and combos section is omitted."""
+        card = _mock_card(
+            "Thassa's Oracle",
+            oracle_text="When Thassa's Oracle enters the battlefield...",
+        )
+        mock_bulk.get_cards = AsyncMock(return_value={"Thassa's Oracle": card})
+        mock_bulk.filter_cards = AsyncMock(return_value=[])
+        mock_spellbook.find_combos = AsyncMock(
+            side_effect=SpellbookError("service unavailable", status_code=503)
+        )
+
+        result = await build_around(
+            ["Thassa's Oracle"],
+            "commander",
+            bulk=mock_bulk,
+            spellbook=mock_spellbook,
+        )
+
+        # Should succeed despite Spellbook failure — combos just show 0
+        assert result.markdown is not None
+        assert result.data["combos_found"] == 0
+        assert result.data["build_around_cards"] == ["Thassa's Oracle"]
 
 
 # ===========================================================================
@@ -541,40 +528,16 @@ class TestCompleteDeck:
         # Should categorize cards
         assert "creature" in result.markdown.lower() or "Creature" in result.markdown
 
-    async def test_commander_with_edhrec(
-        self, mock_bulk: AsyncMock, mock_edhrec: AsyncMock
-    ) -> None:
-        """EDHREC staples data is used for commander suggestions."""
+    async def test_commander_with_commander_name(self, mock_bulk: AsyncMock) -> None:
+        """Commander name is accepted for commander format."""
         creature = _mock_card("Sol Ring", type_line="Artifact", cmc=1.0)
         mock_bulk.get_cards = AsyncMock(return_value={"Sol Ring": creature})
-
-        staple = _mock_card("Arcane Signet", type_line="Artifact", cmc=2.0)
-        mock_edhrec.commander_top_cards = AsyncMock(
-            return_value=EDHRECCommanderData(
-                commander_name="Test Commander",
-                total_decks=5000,
-                cardlists=[
-                    EDHRECCardList(
-                        header="Artifacts",
-                        cardviews=[
-                            EDHRECCard(
-                                name="Arcane Signet",
-                                synergy=0.1,
-                                inclusion=90,
-                                num_decks=4500,
-                            ),
-                        ],
-                    )
-                ],
-            )
-        )
-        mock_bulk.filter_cards = AsyncMock(return_value=[staple])
+        mock_bulk.filter_cards = AsyncMock(return_value=[])
 
         result = await complete_deck(
             ["Sol Ring"],
             "commander",
             bulk=mock_bulk,
-            edhrec=mock_edhrec,
             commander="Test Commander",
         )
 

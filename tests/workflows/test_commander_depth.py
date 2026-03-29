@@ -679,6 +679,32 @@ class TestPreconUpgrade:
         assert progress_calls[0] == (1, 4)
         assert progress_calls[3] == (4, 4)
 
+    async def test_spellbook_failure(
+        self,
+        mock_bulk: AsyncMock,
+        mock_spellbook: AsyncMock,
+        muldrotha: Card,
+    ) -> None:
+        """Spellbook failure degrades gracefully in precon upgrade."""
+        weak = _mock_card("Golgari Signet", usd="0.50")
+        mock_bulk.get_cards = AsyncMock(
+            return_value={"Muldrotha, the Gravetide": muldrotha, "Golgari Signet": weak}
+        )
+        mock_spellbook.find_decklist_combos = AsyncMock(
+            side_effect=SpellbookError("timeout", status_code=503)
+        )
+
+        result = await precon_upgrade(
+            ["Golgari Signet"],
+            "Muldrotha, the Gravetide",
+            bulk=mock_bulk,
+            spellbook=mock_spellbook,
+        )
+
+        # Should still produce output even without combo data
+        assert isinstance(result.data, dict)
+        assert result.data["sources"]["spellbook"] is False
+
     async def test_combo_pieces_protected(
         self,
         mock_bulk: AsyncMock,
@@ -845,6 +871,16 @@ class TestColorIdentityStaples:
         concise = await color_identity_staples("sultai", bulk=mock_bulk, response_format="concise")
 
         assert len(concise.markdown) <= len(detailed.markdown)
+
+    async def test_invalid_color_identity_xyz(self, mock_bulk: AsyncMock) -> None:
+        """Completely invalid color identity returns a graceful error message."""
+        result = await color_identity_staples("xyz", bulk=mock_bulk)
+
+        assert "unrecognized" in result.markdown.lower() or "error" in result.markdown.lower()
+        assert isinstance(result.data, dict)
+        assert result.data.get("error") is not None
+        # Bulk data should not have been queried
+        mock_bulk.filter_cards.assert_not_called()
 
     async def test_edhrec_enrichment(self, mock_bulk: AsyncMock, mock_edhrec: AsyncMock) -> None:
         """EDHREC data is noted but not required."""

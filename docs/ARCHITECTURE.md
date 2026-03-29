@@ -216,7 +216,8 @@ mtg-mcp/
     ├── SERVICE_CONTRACTS.md
     ├── CACHING_DESIGN.md
     ├── DATA_SOURCES.md
-    └── PROJECT_PLAN.md
+    ├── PROJECT_PLAN.md
+    └── ...                          # Spec and plan docs per branch
 ```
 
 ### Key Structural Decisions

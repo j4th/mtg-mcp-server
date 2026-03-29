@@ -1,9 +1,10 @@
 # Branch B: Format Workflow Tools
 
+> **Status:** Complete
 > **Branch:** `feat/format-workflows`
 > **Base:** `feat/structured-output-rules` (Branch A)
 > **Prerequisite:** Branch A merged — all tools return `ToolResult`, Rules engine working, CodeMode ready
-> **Goal:** 11 new workflow tools + 9 prompts + 7 resources + comprehensive codebase review
+> **Goal:** 11 new workflow tools + 8 prompts + 3 resources + comprehensive codebase review
 > **Result:** 51 tools total, completing the v2.0 vision
 
 ## Context
@@ -16,7 +17,7 @@ These tools compose existing backends (Scryfall bulk, EDHREC, Spellbook, 17Lands
 
 ## Phase 1: Scaffold
 
-**What:** Stub all 11 new workflow tools, 8 prompts, 7 resources. Wire into workflow server.
+**What:** Stub all 11 new workflow tools, 8 prompts, 3 resources. Wire into workflow server.
 
 **Why:** All shared file modifications happen once. Parallel agents only touch exclusive files.
 

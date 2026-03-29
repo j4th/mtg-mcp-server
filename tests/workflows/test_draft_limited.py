@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mtg_mcp_server.services.seventeen_lands import SeventeenLandsError
 from mtg_mcp_server.types import Card, CardPrices, DraftCardRating
 
 # ---------------------------------------------------------------------------
@@ -555,6 +556,19 @@ class TestDraftSignalRead:
 
         assert "TST" in result.markdown
 
+    async def test_17lands_failure_propagates(self, mock_bulk: AsyncMock):
+        """SeventeenLandsError propagates when 17Lands raises during signal read."""
+        from mtg_mcp_server.workflows.draft_limited import draft_signal_read
+
+        mock_17lands_err = AsyncMock()
+        mock_17lands_err.card_ratings = AsyncMock(
+            side_effect=SeventeenLandsError("rate limited", status_code=429)
+        )
+
+        picks = ["Mulldrifter", "Nameless Inversion"]
+        with pytest.raises(SeventeenLandsError):
+            await draft_signal_read(picks, "TST", bulk=mock_bulk, seventeen_lands=mock_17lands_err)
+
     async def test_concise_format(self, mock_bulk: AsyncMock, mock_17lands: AsyncMock):
         """Concise output should be shorter than detailed."""
         from mtg_mcp_server.workflows.draft_limited import draft_signal_read
@@ -716,6 +730,19 @@ class TestDraftLogReview:
         )
 
         assert len(concise.markdown) <= len(detailed.markdown)
+
+    async def test_17lands_failure_propagates(self, mock_bulk: AsyncMock):
+        """SeventeenLandsError propagates when 17Lands raises during log review."""
+        from mtg_mcp_server.workflows.draft_limited import draft_log_review
+
+        mock_17lands_err = AsyncMock()
+        mock_17lands_err.card_ratings = AsyncMock(
+            side_effect=SeventeenLandsError("service unavailable", status_code=503)
+        )
+
+        picks = ["Mulldrifter", "Serra Angel"]
+        with pytest.raises(SeventeenLandsError):
+            await draft_log_review(picks, "TST", bulk=mock_bulk, seventeen_lands=mock_17lands_err)
 
     async def test_unknown_cards_handled(self, mock_bulk: AsyncMock, mock_17lands: AsyncMock):
         """Cards not in 17Lands data should show N/A for GIH WR."""

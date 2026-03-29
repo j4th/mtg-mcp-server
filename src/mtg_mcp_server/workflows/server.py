@@ -518,7 +518,6 @@ async def theme_search(
         result = await impl(
             theme,
             bulk=_require_bulk(),
-            edhrec=_edhrec,
             color_identity=color_identity,
             format=format,
             max_price=max_price,
@@ -563,7 +562,6 @@ async def build_around(
             format,
             bulk=_require_bulk(),
             spellbook=_require_spellbook(),
-            edhrec=_edhrec,
             budget=budget,
             limit=limit,
             response_format=response_format,
@@ -612,7 +610,6 @@ async def complete_deck(
             decklist,
             format,
             bulk=_require_bulk(),
-            edhrec=_edhrec,
             commander=commander,
             budget=budget,
             on_progress=lambda step, total: _progress(ctx, step, total),
