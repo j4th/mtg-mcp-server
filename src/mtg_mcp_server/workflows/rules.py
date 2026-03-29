@@ -105,6 +105,72 @@ _STOP_WORDS = frozenset(
     }
 )
 
+# Known keyword interactions for keyword_explain and rules_interaction.
+# Maps lowercased keyword to list of (related_keyword, interaction_note).
+_KEYWORD_INTERACTIONS: dict[str, list[tuple[str, str]]] = {
+    "deathtouch": [
+        (
+            "trample",
+            "Only 1 damage needs to be assigned to each blocker for lethal (702.2b + 702.19b)",
+        ),
+        (
+            "first strike",
+            "Deathtouch applies in the first strike damage step — blockers die before dealing regular damage",
+        ),
+        (
+            "indestructible",
+            "Indestructible prevents destruction from deathtouch (702.2b references 704, but 702.12b overrides)",
+        ),
+    ],
+    "trample": [
+        (
+            "deathtouch",
+            "Only 1 damage needs to be assigned to each blocker for lethal (702.2b + 702.19b)",
+        ),
+        (
+            "indestructible",
+            "Must still assign lethal damage to indestructible blockers before trampling over",
+        ),
+        (
+            "protection",
+            "Can't assign damage to a creature with protection — all damage tramples through",
+        ),
+    ],
+    "flying": [
+        (
+            "reach",
+            "Reach allows a creature without flying to block a creature with flying (702.17b)",
+        ),
+    ],
+    "first strike": [
+        (
+            "double strike",
+            "Both deal damage in the first strike step; double strike also deals in the regular step",
+        ),
+        ("deathtouch", "First strike + deathtouch kills blockers before they deal regular damage"),
+    ],
+    "double strike": [
+        (
+            "first strike",
+            "Both deal damage in the first strike step; double strike also deals in the regular step",
+        ),
+        ("trample", "Trample excess applies in both damage steps"),
+        ("lifelink", "Lifelink triggers on both damage steps"),
+    ],
+    "lifelink": [
+        ("double strike", "Lifelink triggers on both damage steps"),
+        ("deathtouch", "No special interaction — both apply independently"),
+    ],
+    "indestructible": [
+        ("deathtouch", "Indestructible prevents destruction from deathtouch"),
+        ("trample", "Must still assign lethal damage before trampling over"),
+        (
+            "-1/-1 counters",
+            "Indestructible doesn't prevent death from 0 toughness (state-based action 704.5f)",
+        ),
+    ],
+}
+
 
 # ---------------------------------------------------------------------------
 # Formatting helpers
@@ -276,6 +342,15 @@ async def keyword_explain(
             lines.append(f"- {fmt(rule)}")
         lines.append("")
 
+    # Interactions section — known interactions with other keywords
+    interactions = _KEYWORD_INTERACTIONS.get(keyword.lower(), [])
+    if interactions:
+        lines.append("## Interactions")
+        lines.append("")
+        for related_kw, note in interactions:
+            lines.append(f"- **{related_kw.title()}**: {note}")
+        lines.append("")
+
     # Examples section (detailed only)
     if response_format == "detailed" and example_cards:
         lines.append("## Example Cards")
@@ -289,6 +364,7 @@ async def keyword_explain(
         "keyword": keyword,
         "glossary": glossary.model_dump(mode="json") if glossary else None,
         "rules": [r.model_dump(mode="json") for r in related_rules],
+        "interactions": [{"keyword": kw, "note": note} for kw, note in interactions],
         "example_cards": [c.name for c in example_cards],
     }
 
@@ -383,6 +459,26 @@ async def rules_interaction(
         lines.append(f"*Card: {_fmt_card_example(card_b)}*")
         lines.append("")
 
+    # Interaction notes — cross-reference _KEYWORD_INTERACTIONS for both directions
+    interaction_note: str | None = None
+    a_lower = mechanic_a.lower()
+    b_lower = mechanic_b.lower()
+    for related_kw, note in _KEYWORD_INTERACTIONS.get(a_lower, []):
+        if related_kw.lower() == b_lower:
+            interaction_note = note
+            break
+    if interaction_note is None:
+        for related_kw, note in _KEYWORD_INTERACTIONS.get(b_lower, []):
+            if related_kw.lower() == a_lower:
+                interaction_note = note
+                break
+
+    if interaction_note is not None:
+        lines.append("## Interaction")
+        lines.append("")
+        lines.append(f"**{mechanic_a.title()} + {mechanic_b.title()}:** {interaction_note}")
+        lines.append("")
+
     # Build data
     data = {
         "mechanic_a": {
@@ -395,6 +491,7 @@ async def rules_interaction(
             "glossary": glossary_b.model_dump(mode="json") if glossary_b else None,
             "rules": [r.model_dump(mode="json") for r in rules_b],
         },
+        "interaction": interaction_note,
     }
 
     log.info(

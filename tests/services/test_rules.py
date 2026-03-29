@@ -132,6 +132,24 @@ class TestLookupByNumber:
         assert rule is not None
         assert rule.number == "100.1"
 
+    async def test_subrule_hierarchy(self, service: RulesService) -> None:
+        """Parent rules contain their subrules."""
+        rule = await service.lookup_by_number("704.5")
+        assert rule is not None
+        assert len(rule.subrules) >= 4  # 704.5a, 704.5b, 704.5c, 704.5j, 704.5k
+        subrule_numbers = {sr.number for sr in rule.subrules}
+        assert "704.5a" in subrule_numbers
+        assert "704.5j" in subrule_numbers
+
+    async def test_subrule_hierarchy_keywords(self, service: RulesService) -> None:
+        """Keyword section parent has subrules."""
+        rule = await service.lookup_by_number("702.2")
+        assert rule is not None
+        assert len(rule.subrules) >= 3  # 702.2a, 702.2b, 702.2c, 702.2d
+        subrule_numbers = {sr.number for sr in rule.subrules}
+        assert "702.2a" in subrule_numbers
+        assert "702.2b" in subrule_numbers
+
 
 # ---------------------------------------------------------------------------
 # keyword_search

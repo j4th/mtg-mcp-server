@@ -286,6 +286,37 @@ class TestKeywordExplain:
         assert len(concise.markdown) <= len(detailed.markdown)
 
     @pytest.mark.anyio
+    async def test_interactions_included(self) -> None:
+        """Keywords with known interactions should include an Interactions section."""
+        rules = _make_rules()
+
+        result = await keyword_explain("deathtouch", rules=rules)
+
+        assert "## Interactions" in result.markdown
+        assert "Trample" in result.markdown
+        assert "First Strike" in result.markdown
+        assert "Indestructible" in result.markdown
+        # Data dict should also have interactions
+        assert "interactions" in result.data
+        assert len(result.data["interactions"]) == 3
+
+    @pytest.mark.anyio
+    async def test_no_interactions_for_unknown_keyword(self) -> None:
+        """Keywords without known interactions should not have an Interactions section."""
+        rules = _make_rules()
+        rules.glossary_lookup.return_value = GlossaryEntry(
+            term="Menace", definition="Can't be blocked except by two or more creatures."
+        )
+        rules.keyword_search.return_value = [
+            Rule(number="702.110a", text="Menace is an evasion ability.")
+        ]
+
+        result = await keyword_explain("menace", rules=rules)
+
+        assert "## Interactions" not in result.markdown
+        assert result.data["interactions"] == []
+
+    @pytest.mark.anyio
     async def test_data_contains_glossary(self) -> None:
         """The data dict should contain glossary and rules."""
         rules = _make_rules()
@@ -389,6 +420,62 @@ class TestRulesInteraction:
         )
 
         assert len(concise.markdown) <= len(detailed.markdown)
+
+    @pytest.mark.anyio
+    async def test_interaction_note_included(self) -> None:
+        """Known interactions should include an Interaction section with note."""
+        rules = _make_rules()
+        rules.keyword_search.side_effect = [
+            [Rule(number="702.2a", text="Deathtouch is a static ability.")],
+            [Rule(number="702.19a", text="Trample is a static ability.")],
+        ]
+        rules.glossary_lookup.side_effect = [
+            GlossaryEntry(term="Deathtouch", definition="Lethal with any damage."),
+            GlossaryEntry(term="Trample", definition="Excess damage goes through."),
+        ]
+
+        result = await rules_interaction("deathtouch", "trample", rules=rules)
+
+        assert "## Interaction" in result.markdown
+        assert "lethal" in result.markdown.lower()
+        assert "702.2b" in result.markdown or "702.19b" in result.markdown
+        assert result.data["interaction"] is not None
+
+    @pytest.mark.anyio
+    async def test_interaction_note_reverse_order(self) -> None:
+        """Interaction note should be found regardless of argument order."""
+        rules = _make_rules()
+        rules.keyword_search.side_effect = [
+            [Rule(number="702.19a", text="Trample is a static ability.")],
+            [Rule(number="702.2a", text="Deathtouch is a static ability.")],
+        ]
+        rules.glossary_lookup.side_effect = [
+            GlossaryEntry(term="Trample", definition="Excess damage goes through."),
+            GlossaryEntry(term="Deathtouch", definition="Lethal with any damage."),
+        ]
+
+        result = await rules_interaction("trample", "deathtouch", rules=rules)
+
+        assert "## Interaction" in result.markdown
+        assert result.data["interaction"] is not None
+
+    @pytest.mark.anyio
+    async def test_no_interaction_note_for_unrelated(self) -> None:
+        """Mechanics without known interactions should not have an Interaction section."""
+        rules = _make_rules()
+        rules.keyword_search.side_effect = [
+            [Rule(number="702.2a", text="Deathtouch is a static ability.")],
+            [],
+        ]
+        rules.glossary_lookup.side_effect = [
+            GlossaryEntry(term="Deathtouch", definition="Lethal with any damage."),
+            None,
+        ]
+
+        result = await rules_interaction("deathtouch", "nonsense", rules=rules)
+
+        assert "## Interaction" not in result.markdown
+        assert result.data["interaction"] is None
 
     @pytest.mark.anyio
     async def test_data_contains_both_mechanics(self) -> None:

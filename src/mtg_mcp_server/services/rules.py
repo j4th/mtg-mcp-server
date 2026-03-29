@@ -317,10 +317,34 @@ class RulesService:
                     # Definition continuation
                     glossary_lines.append(stripped)
 
+        # Build subrule hierarchy: "704.5a" is a subrule of "704.5"
+        for number, rule in rules.items():
+            parent_number = _parent_rule_number(number)
+            if parent_number and parent_number in rules:
+                rules[parent_number].subrules.append(rule)
+
         # Assign parsed data
         self._rules = rules
         self._glossary = glossary
         self._sections = sections
+
+
+def _parent_rule_number(number: str) -> str | None:
+    """Return the parent rule number, or None if this is a top-level rule.
+
+    ``"704.5k"`` -> ``"704.5"``, ``"704.5"`` -> ``"704"``, ``"704"`` -> ``None``.
+    """
+    if "." not in number:
+        return None
+    parts = number.split(".", 1)
+    rest = parts[1]
+    # If rest ends with letter(s), parent is the numeric portion
+    if rest and rest[-1].isalpha():
+        parent_rest = rest.rstrip("abcdefghijklmnopqrstuvwxyz")
+        if parent_rest:
+            return f"{parts[0]}.{parent_rest}"
+        return parts[0]
+    return parts[0]
 
 
 def _is_keyword_glossary_entry(entry: GlossaryEntry) -> bool:
