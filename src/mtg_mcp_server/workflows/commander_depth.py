@@ -417,8 +417,23 @@ async def tribal_staples(
     lord_query = f"{tribe_lower} creatures you control get"
     lords_task = bulk.search_by_text(lord_query, limit=limit)
 
-    # 2. Tribal synergy: cards that mention the tribe name
-    synergy_task = bulk.search_by_text(tribe_lower, limit=limit * 2)
+    # 2. Tribal synergy: cards that mention the tribe in tribal context.
+    # Bare substring match (e.g. "elf") produces false positives from
+    # "itself", "yourself", "shelf" etc. Use contextual patterns instead.
+    synergy_patterns = [
+        f"{tribe_lower} creature",
+        f"{tribe_lower} you control",
+        f"each {tribe_lower}",
+        f"other {tribe_lower}",
+        f"target {tribe_lower}",
+        f"all {tribe_lower}",
+        f"a {tribe_lower}",
+        f"another {tribe_lower}",
+    ]
+    synergy_task = bulk.filter_cards(
+        text_any=synergy_patterns,
+        limit=limit * 2,
+    )
 
     # 3. Best members: creatures of the tribe type
     members_task = bulk.search_by_type(tribe, limit=limit * 3)

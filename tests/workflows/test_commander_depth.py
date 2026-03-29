@@ -405,17 +405,12 @@ class TestTribalStaples:
             edhrec_rank=300,
         )
 
-        # Lords/anthems
-        mock_bulk.search_by_text = AsyncMock(
-            side_effect=[
-                [lord],  # "other zombie" or "zombie creatures you control get"
-                [lord, member],  # tribe name text search
-            ]
-        )
+        # Lords/anthems (search_by_text — one call now)
+        mock_bulk.search_by_text = AsyncMock(return_value=[lord])
         # Type search for members
         mock_bulk.search_by_type = AsyncMock(return_value=[lord, member])
-        # Tribal support search
-        mock_bulk.filter_cards = AsyncMock(return_value=[tribal_support])
+        # Synergy (filter_cards call 1) + tribal support (filter_cards call 2)
+        mock_bulk.filter_cards = AsyncMock(side_effect=[[lord, member], [tribal_support]])
 
         result = await tribal_staples("Zombie", bulk=mock_bulk)
 
@@ -490,6 +485,40 @@ class TestTribalStaples:
             len(group.get("cards", [])) for group in result.data.get("categories", [])
         )
         assert total_cards <= 5
+
+    async def test_synergy_search_uses_tribal_context_not_bare_substring(
+        self, mock_bulk: AsyncMock
+    ) -> None:
+        """Synergy search should match 'elf' in tribal context, not 'itself'/'yourself'.
+
+        The bare substring 'elf' matches 'self', 'itself', 'yourself' — producing
+        false positives like Sunflare Shaman and Shield Dancer for Elf tribal.
+        """
+        true_synergy = _mock_card(
+            "Elvish Clancaller",
+            type_line="Creature — Elf Druid",
+            oracle_text="Other Elf creatures you control get +1/+1.",
+            color_identity=["G"],
+            edhrec_rank=500,
+        )
+
+        # Lords search still uses search_by_text (one call only now)
+        mock_bulk.search_by_text = AsyncMock(return_value=[true_synergy])
+        mock_bulk.search_by_type = AsyncMock(return_value=[true_synergy])
+        # Synergy + support both use filter_cards — return synergy card for first, empty for second
+        mock_bulk.filter_cards = AsyncMock(side_effect=[[true_synergy], []])
+
+        await tribal_staples("Elf", bulk=mock_bulk)
+
+        # Synergy search should use filter_cards with contextual text_any patterns
+        synergy_call = mock_bulk.filter_cards.call_args_list[0]
+        text_any = synergy_call.kwargs.get("text_any", [])
+        assert len(text_any) > 1, "Synergy search should use multiple contextual patterns"
+        # All patterns should include the tribe name in context
+        for pattern in text_any:
+            assert "elf" in pattern, f"Pattern '{pattern}' doesn't reference the tribe"
+        # No pattern should be just the bare tribe name
+        assert "elf" not in text_any, "Bare 'elf' in text_any will match 'itself', 'yourself' etc."
 
     async def test_concise_format(self, mock_bulk: AsyncMock) -> None:
         """Concise format is shorter."""
