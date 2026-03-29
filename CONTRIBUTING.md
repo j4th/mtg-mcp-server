@@ -98,12 +98,24 @@ src/mtg_mcp_server/
   services/    -- Pure async API clients (no MCP awareness)
   providers/   -- FastMCP sub-servers (one per backend)
   workflows/   -- Composed tools calling multiple services
+  utils/       -- Shared utilities (color identity, decklist, format rules, mana)
   server.py    -- Orchestrator that mounts everything
   types.py     -- Shared Pydantic models
   config.py    -- Settings from env vars (MTG_MCP_ prefix)
 ```
 
 For full architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full technical reference: stack, patterns, structure, decisions |
+| [TOOL_DESIGN.md](docs/TOOL_DESIGN.md) | All 51 tools, 17 prompts, 18 resources with inputs/outputs |
+| [SERVICE_CONTRACTS.md](docs/SERVICE_CONTRACTS.md) | API endpoints, rate limits, response shapes |
+| [DATA_SOURCES.md](docs/DATA_SOURCES.md) | Data sources evaluated, auth, stability, access patterns |
+| [CACHING_DESIGN.md](docs/CACHING_DESIGN.md) | TTL cache strategy, per-method TTLs, bulk data design |
+| [COOKBOOK.md](docs/COOKBOOK.md) | Usage recipes: Commander, draft, deck building, rules |
 
 ## Pull Request Process
 

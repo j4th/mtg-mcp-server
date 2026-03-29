@@ -12,7 +12,7 @@ All four service clients make unconditional HTTP requests on every invocation. T
 - **Scryfall** card data changes almost never; prices update once daily.
 - **Spellbook** combos are added infrequently.
 
-`Settings.cache_ttl_seconds` exists (default 3600) but no service uses it.
+`Settings.disable_cache` exists but no service uses it.
 
 ## Decision
 
@@ -40,6 +40,7 @@ Our server runs a single asyncio event loop — no thread contention on dict acc
 | Scryfall | `get_card_by_id` | 24h | 500 | Same data, different lookup path |
 | Scryfall | `search_cards` | 1h | 100 | Result sets change as new cards are added; shorter TTL ensures fresh results |
 | Scryfall | `get_rulings` | 24h | 200 | Rulings change very rarely |
+| Scryfall | `get_sets` / `get_set` | 24h | 50 | Set metadata is static after release |
 | Spellbook | `find_combos` | 24h | 200 | Combos rarely added to the database |
 | Spellbook | `get_combo` | 24h | 100 | Static once created |
 | Spellbook | `find_decklist_combos` | 12h | 50 | User-specific query; 12h diverges from the blanket 24h recommendation because decklist analysis may change as the user iterates |
@@ -139,7 +140,7 @@ log.debug("cache.miss", method="get_card_by_name", key=name)
 
 ### Config integration
 
-Per-method TTLs are hardcoded as class-level constants (the table above), since they reflect data staleness characteristics of the upstream APIs, not deployment config. The existing `Settings.cache_ttl_seconds` will be removed — it was a placeholder for a single global TTL that this design supersedes. If a global disable is needed for debugging, a `Settings.disable_cache: bool = False` flag is simpler and more explicit.
+Per-method TTLs are hardcoded as class-level constants (the table above), since they reflect data staleness characteristics of the upstream APIs, not deployment config. A global `Settings.disable_cache: bool = False` flag disables all caching for debugging and testing. The `disable_all_caches()` function in `services/cache.py` sets a module-level kill switch that makes `@async_cached` a no-op.
 
 ## Cache Lifecycle
 
@@ -166,39 +167,41 @@ Per-method TTLs are hardcoded as class-level constants (the table above), since 
 
 ---
 
-## MTGJSON Bulk Card Cache
+## Scryfall Bulk Data Cache
 
 ### Overview
 
-MTGJSON provides `AtomicCards.json` — a ~120MB JSON file keyed by card name containing oracle-level card data (no prices, rulings, or set-specific data). This serves as:
+Scryfall provides Oracle Cards bulk data — a ~30MB JSON file containing every unique card with full details (oracle text, prices, legalities, images, EDHREC rank). This replaced MTGJSON in Phase 4 because Scryfall bulk data includes prices, legalities, and image URIs that MTGJSON lacked. It serves as:
 
 1. **Cold-start cache** — eliminates Scryfall API calls for basic card lookups when the server first starts (before TTL caches warm up).
-2. **Standalone MCP provider** — rate-limit-free card search via `mtgjson_card_lookup` and `mtgjson_card_search` tools.
+2. **Standalone MCP provider** — rate-limit-free card search via `bulk_card_lookup`, `bulk_card_search`, and 7 additional tools (format legality, staples, ban lists, similar cards, random card).
+3. **Workflow backbone** — workflows use `card_resolver.py` for bulk-data-first card resolution with Scryfall API fallback.
 
 ### Data Source
 
 | Field | Value |
 |-------|-------|
-| URL | `https://mtgjson.com/api/v5/AtomicCards.json.gz` (~20MB gzipped) |
-| Format | JSON dict keyed by card name, each value is array of printings |
-| Contains | name, mana_cost, type, oracle_text, colors, color_identity, types, subtypes, supertypes, keywords, power, toughness, mana_value |
-| Does NOT contain | prices, rulings, images, set-specific data |
+| URL | Discovered via `https://api.scryfall.com/bulk-data` (Oracle Cards type) |
+| Format | JSON array of card objects — same shape as Scryfall API responses |
+| Contains | name, mana_cost, type_line, oracle_text, colors, color_identity, keywords, power, toughness, prices (USD/EUR/foil), legalities, image_uris, edhrec_rank, rarity, set |
 | Update frequency | Daily |
 
 ### Download Strategy
 
 - **Lazy download**: Data is fetched on first access (not at server startup), avoiding blocking server initialization.
-- **Refresh via TTL**: Configurable via `MTG_MCP_MTGJSON_REFRESH_HOURS` (default 24h). After the TTL expires, the next access triggers a re-download.
-- **In-memory storage**: Parsed into `dict[str, MTGJSONCard]` keyed by lowercase card name for O(1) exact lookups.
-- **Gzip decompression**: Downloaded as `.json.gz`, decompressed in memory.
+- **Background refresh**: After initial load, `start_background_refresh()` periodically re-downloads in the background.
+- **Refresh via TTL**: Configurable via `MTG_MCP_BULK_DATA_REFRESH_HOURS` (default 12h).
+- **In-memory storage**: Parsed into `dict[str, Card]` keyed by lowercase card name for O(1) exact lookups. Non-playable layouts (art_series, token, double_faced_token, emblem, vanguard, planar, scheme, augment, host) are filtered out during loading.
+- **Layout filtering**: Prevents non-playable card layouts from overwriting real cards with the same name.
 
 ### Integration with Scryfall
 
-MTGJSON is a **standalone provider** (not wired into the workflow server). This preserves service independence:
+Scryfall bulk data is both a **standalone provider** and **wired into the workflow server**:
 
-- MTGJSON has its own provider lifespan (`providers/mtgjson.py`) and is mounted on the orchestrator with `namespace="mtgjson"`.
+- `providers/scryfall_bulk.py` mounts on the orchestrator with `namespace="bulk"` (9 tools).
+- Workflow server creates its own `ScryfallBulkClient` instance for rate-limit-free card resolution.
+- `card_resolver.py` checks bulk data first, falls back to Scryfall API for unresolved cards.
 - Provider-level Scryfall tools continue to hit the API directly (with TTL caching).
-- Future workflow-layer integration (checking MTGJSON before Scryfall) can be added when a workflow needs it, without modifying existing services.
 
 ### Relationship to TTL Caching
 
@@ -207,13 +210,13 @@ The two caching layers are complementary:
 | Layer | Purpose | When it helps |
 |-------|---------|---------------|
 | TTL cache (cachetools) | Hot-path deduplication | Repeated calls for the same card within a session |
-| MTGJSON bulk cache | Cold-start + offline data | First call for any card, rate limit avoidance, bulk search |
+| Scryfall bulk data | Cold-start + offline data | First call for any card, rate limit avoidance, bulk search, format legality |
 
-A typical request flow: MTGJSON hit → TTL cache miss → Scryfall API call → TTL cache populated.
+A typical workflow request flow: bulk data hit → return Card. If miss: Scryfall API call → TTL cache populated.
 
 ### Feature Flag
 
-MTGJSON is behind `MTG_MCP_ENABLE_MTGJSON` (default `true`). When disabled:
-- The MTGJSON provider is not mounted on the orchestrator.
-- Workflow tools skip the MTGJSON lookup step.
+Scryfall bulk data is behind `MTG_MCP_ENABLE_BULK_DATA` (default `true`). When disabled:
+- The bulk data provider is not mounted on the orchestrator.
+- Workflow tools skip bulk data lookups and go directly to Scryfall API.
 - No downloads are attempted.

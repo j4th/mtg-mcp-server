@@ -260,6 +260,10 @@ Workflow tools compose data from multiple backends. They are implemented as pure
 in `workflows/` modules and wrapped as MCP tools in `workflows/server.py`. All use
 `asyncio.gather(return_exceptions=True)` for concurrent backend calls with graceful partial failure.
 
+All workflow tools return `ToolResult` with both markdown (`content`) and structured data
+(`structured_content`). All accept an optional `response_format: "detailed" | "concise"` parameter
+(default `"detailed"`) that controls output verbosity without requiring separate tool variants.
+
 ### `commander_overview`
 Comprehensive data for a commander from all available sources.
 
