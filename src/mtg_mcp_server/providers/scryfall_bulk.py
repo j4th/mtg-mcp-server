@@ -26,11 +26,11 @@ from mtg_mcp_server.providers import (
     TOOL_ANNOTATIONS,
     format_legalities,
 )
-from mtg_mcp_server.utils.slim import slim_card
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient, ScryfallBulkError
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
 from mtg_mcp_server.utils.formatters import ResponseFormat, format_card_detail
 from mtg_mcp_server.utils.query_parser import parse_query
+from mtg_mcp_server.utils.slim import slim_card
 
 # Lightweight format alias map — maps common abbreviations to Scryfall legality
 # keys. Unlike utils.format_rules.normalize_format, this does NOT reject unknown

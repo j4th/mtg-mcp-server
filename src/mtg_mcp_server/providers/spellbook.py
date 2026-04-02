@@ -20,12 +20,12 @@ from mtg_mcp_server.providers import (
     TAGS_SEARCH,
     TOOL_ANNOTATIONS,
 )
-from mtg_mcp_server.utils.slim import slim_combo
 from mtg_mcp_server.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
     SpellbookError,
 )
+from mtg_mcp_server.utils.slim import slim_combo
 
 if TYPE_CHECKING:
     from mtg_mcp_server.types import Combo
