@@ -15,6 +15,7 @@ from pydantic import Field
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import ATTRIBUTION_17LANDS, TAGS_DRAFT, TOOL_ANNOTATIONS
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
+from mtg_mcp_server.utils.slim import slim_rating
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: SeventeenLandsClient | None = None
@@ -52,6 +53,10 @@ async def card_ratings(
     event_type: Annotated[
         str, Field(description="Draft format — 'PremierDraft' (default) or 'TradDraft'")
     ] = "PremierDraft",
+    limit: Annotated[int, Field(description="Max cards to return (default 50, 0 for all)")] = 50,
+    sort_by: Annotated[
+        str, Field(description="Sort order: 'gih_wr' (default), 'alsa', 'iwd', 'name'")
+    ] = "gih_wr",
 ) -> ToolResult:
     """Get win rate and draft performance data for cards in a set.
 
@@ -60,10 +65,6 @@ async def card_ratings(
 
     Note: 17Lands data skews toward above-average players (~56% baseline WR).
     Cards with <500 games may not have reliable data.
-
-    Args:
-        set_code: Three-letter set code (e.g. "LCI", "MKM", "OTJ").
-        event_type: Draft format — "PremierDraft" (default) or "TradDraft".
     """
     client = _get_client()
     try:
@@ -83,9 +84,29 @@ async def card_ratings(
             },
         )
 
-    lines = [f"Card ratings for {set_code} ({event_type}) — {len(ratings)} cards:"]
+    # Sort ratings
+    sort_keys = {
+        "gih_wr": lambda c: c.ever_drawn_win_rate if c.ever_drawn_win_rate is not None else -1.0,
+        "alsa": lambda c: c.avg_seen if c.avg_seen is not None else 999.0,
+        "iwd": lambda c: (
+            c.drawn_improvement_win_rate if c.drawn_improvement_win_rate is not None else -1.0
+        ),
+        "name": lambda c: c.name.lower(),
+    }
+    key_fn = sort_keys.get(sort_by, sort_keys["gih_wr"])
+    reverse = sort_by != "name" and sort_by != "alsa"
+    sorted_ratings = sorted(ratings, key=key_fn, reverse=reverse)
+
+    total = len(sorted_ratings)
+    cards = sorted_ratings if limit == 0 else sorted_ratings[:limit]
+    showing = len(cards)
+
+    lines = [
+        f"Card ratings for {set_code} ({event_type}) — "
+        f"showing {showing} of {total} cards (sorted by {sort_by}):"
+    ]
     lines.append("")
-    for card in ratings:
+    for card in cards:
         gih_wr = (
             f"{card.ever_drawn_win_rate:.1%}" if card.ever_drawn_win_rate is not None else "N/A"
         )
@@ -105,8 +126,10 @@ async def card_ratings(
         structured_content={
             "set_code": set_code,
             "event_type": event_type,
-            "total_cards": len(ratings),
-            "cards": [card.model_dump(mode="json") for card in ratings],
+            "total_cards": total,
+            "showing": showing,
+            "full_data_uri": f"mtg://draft/{set_code}/ratings",
+            "cards": [slim_rating(card) for card in cards],
         },
     )
 

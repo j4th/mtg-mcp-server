@@ -56,7 +56,66 @@ class TestCardRatings:
         assert sc["total_cards"] == 5
         assert isinstance(sc["cards"], list)
         assert len(sc["cards"]) == 5
-        assert sc["cards"][0]["name"] == "Abuelo's Awakening"
+        assert sc["showing"] == 5
+        assert sc["full_data_uri"] == "mtg://draft/LCI/ratings"
+        # Slim fields only
+        card = sc["cards"][0]
+        assert "name" in card
+        assert "gih_wr" in card
+        assert "alsa" in card
+        assert "iwd" in card
+        assert "game_count" in card
+        # Bloat fields excluded
+        assert "seen_count" not in card
+        assert "pick_count" not in card
+        assert "avg_pick" not in card
+        assert "play_rate" not in card
+        assert "win_rate" not in card
+
+    @respx.mock
+    async def test_limit_truncates_results(self, client: Client):
+        """card_ratings respects limit parameter."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool("card_ratings", {"set_code": "LCI", "limit": 2})
+        sc = result.structured_content
+        assert sc["showing"] == 2
+        assert len(sc["cards"]) == 2
+        assert sc["total_cards"] == 5
+
+    @respx.mock
+    async def test_limit_zero_returns_all(self, client: Client):
+        """card_ratings with limit=0 returns all cards."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool("card_ratings", {"set_code": "LCI", "limit": 0})
+        sc = result.structured_content
+        assert sc["showing"] == 5
+        assert len(sc["cards"]) == 5
+
+    @respx.mock
+    async def test_sort_by_name(self, client: Client):
+        """card_ratings sorts alphabetically when sort_by=name."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "card_ratings", {"set_code": "LCI", "sort_by": "name", "limit": 0}
+        )
+        sc = result.structured_content
+        names = [c["name"] for c in sc["cards"]]
+        assert names == sorted(names, key=str.lower)
 
     @respx.mock
     async def test_empty_results(self, client: Client):

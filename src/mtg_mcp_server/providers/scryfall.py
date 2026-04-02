@@ -24,6 +24,7 @@ from mtg_mcp_server.providers import (
 )
 from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient, ScryfallError
 from mtg_mcp_server.utils.formatters import ResponseFormat, format_card_detail, format_card_line
+from mtg_mcp_server.utils.slim import slim_card
 
 # Module-level client set by the lifespan. This pattern is required because
 # FastMCP's Depends()/lifespan_context DI doesn't propagate through mount().
@@ -67,6 +68,10 @@ async def search_cards(
         ),
     ],
     page: Annotated[int, Field(description="Page number for paginated results, 1-indexed")] = 1,
+    limit: Annotated[
+        int,
+        Field(description="Max cards to return (default 30, 0 for all)"),
+    ] = 30,
     response_format: Annotated[
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
@@ -85,11 +90,17 @@ async def search_cards(
     except ScryfallError as exc:
         raise ToolError(f"Scryfall API error: {exc}") from exc
 
-    lines = [f"Found {result.total_cards} cards (showing {len(result.data)}, page {page}):"]
-    for card in result.data:
+    cards = result.data if limit == 0 else result.data[:limit]
+    showing = len(cards)
+    total = len(result.data)
+
+    lines = [f"Found {result.total_cards} cards (showing {showing} of {total}, page {page}):"]
+    for card in cards:
         lines.append(format_card_line(card, response_format=response_format))
+    if showing < total:
+        lines.append(f"\n{total - showing} more on this page — increase limit to see them.")
     if result.has_more:
-        lines.append(f"\nMore results available — use page={page + 1}")
+        lines.append(f"More results available — use page={page + 1}")
     return ToolResult(
         content="\n".join(lines) + ATTRIBUTION_SCRYFALL,
         structured_content={
@@ -97,7 +108,9 @@ async def search_cards(
             "total_cards": result.total_cards,
             "page": page,
             "has_more": result.has_more,
-            "cards": [card.model_dump(mode="json") for card in result.data],
+            "showing": showing,
+            "card_detail_uri_template": "mtg://card/{name}",
+            "cards": [slim_card(card) for card in cards],
         },
     )
 
@@ -306,7 +319,7 @@ async def whats_new(
             "format": format,
             "total_cards": result.total_cards,
             "has_more": result.has_more,
-            "cards": [card.model_dump(mode="json") for card in result.data],
+            "cards": [slim_card(card) for card in result.data],
         },
     )
 
