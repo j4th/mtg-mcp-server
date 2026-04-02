@@ -84,17 +84,21 @@ async def card_ratings(
             },
         )
 
-    # Sort ratings
-    sort_keys = {
-        "gih_wr": lambda c: c.ever_drawn_win_rate if c.ever_drawn_win_rate is not None else -1.0,
-        "alsa": lambda c: c.avg_seen if c.avg_seen is not None else 999.0,
-        "iwd": lambda c: (
-            c.drawn_improvement_win_rate if c.drawn_improvement_win_rate is not None else -1.0
+    sort_configs = {
+        "gih_wr": (
+            lambda c: c.ever_drawn_win_rate if c.ever_drawn_win_rate is not None else -1.0,
+            True,
         ),
-        "name": lambda c: c.name.lower(),
+        "alsa": (lambda c: c.avg_seen if c.avg_seen is not None else 999.0, False),
+        "iwd": (
+            lambda c: (
+                c.drawn_improvement_win_rate if c.drawn_improvement_win_rate is not None else -1.0
+            ),
+            True,
+        ),
+        "name": (lambda c: c.name.lower(), False),
     }
-    key_fn = sort_keys.get(sort_by, sort_keys["gih_wr"])
-    reverse = sort_by != "name" and sort_by != "alsa"
+    key_fn, reverse = sort_configs.get(sort_by, sort_configs["gih_wr"])
     sorted_ratings = sorted(ratings, key=key_fn, reverse=reverse)
 
     total = len(sorted_ratings)

@@ -20,6 +20,7 @@ from mtg_mcp_server.providers import (
     TAGS_SEARCH,
     TOOL_ANNOTATIONS,
 )
+from mtg_mcp_server.utils.slim import slim_combo
 from mtg_mcp_server.services.spellbook import (
     ComboNotFoundError,
     SpellbookClient,
@@ -114,7 +115,7 @@ async def find_combos(
         structured_content={
             "card_name": card_name,
             "total_combos": len(combos),
-            "combos": [combo.model_dump(mode="json") for combo in combos],
+            "combos": [slim_combo(combo) for combo in combos],
         },
     )
 

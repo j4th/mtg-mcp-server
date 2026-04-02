@@ -93,6 +93,7 @@ async def commander_staples(
             },
         )
 
+    categories = []
     for cardlist in data.cardlists:
         cards = cardlist.cardviews if limit == 0 else cardlist.cardviews[:limit]
         lines.append(f"\n### {cardlist.header}")
@@ -102,24 +103,16 @@ async def commander_staples(
             lines.append(
                 f"  {card.name} — synergy: {synergy_str}, in {pct}% of decks ({card.num_decks})"
             )
+        categories.append(
+            {"header": cardlist.header, "cards": [slim_edhrec_card(c) for c in cards]}
+        )
 
     return ToolResult(
         content="\n".join(lines) + ATTRIBUTION_EDHREC,
         structured_content={
             "commander_name": data.commander_name,
             "total_decks": data.total_decks,
-            "categories": [
-                {
-                    "header": cardlist.header,
-                    "cards": [
-                        slim_edhrec_card(card)
-                        for card in (
-                            cardlist.cardviews if limit == 0 else cardlist.cardviews[:limit]
-                        )
-                    ],
-                }
-                for cardlist in data.cardlists
-            ],
+            "categories": categories,
         },
     )
 
