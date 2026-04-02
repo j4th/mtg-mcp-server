@@ -254,6 +254,19 @@ class TestCardComparison:
         # Structured data check
         assert isinstance(result.data, dict)
 
+        # Slim card fields
+        assert isinstance(result.data["cards"], list)
+        assert len(result.data["cards"]) == 2
+        card_out = result.data["cards"][0]
+        assert "name" in card_out
+        assert "mana_cost" in card_out
+        assert "type_line" in card_out
+        assert "rarity" in card_out
+        # Bloat fields excluded
+        assert "oracle_text" not in card_out
+        assert "legalities" not in card_out
+        assert "id" not in card_out
+
         # Table header
         assert "Card Comparison" in result.markdown
         assert COMMANDER_NAME in result.markdown

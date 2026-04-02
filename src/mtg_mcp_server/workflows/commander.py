@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.utils.slim import slim_card, slim_combo, slim_edhrec_card
 from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
@@ -323,10 +324,23 @@ async def commander_overview(
         )
 
     log.info("commander_overview.complete", commander=commander_name)
+    edhrec_slim = None
+    if edhrec_data is not None:
+        edhrec_slim = {
+            "commander_name": edhrec_data.commander_name,
+            "total_decks": edhrec_data.total_decks,
+            "categories": [
+                {
+                    "header": cl.header,
+                    "cards": [slim_edhrec_card(c) for c in cl.cardviews[:_MAX_STAPLES]],
+                }
+                for cl in edhrec_data.cardlists
+            ],
+        }
     data = {
-        "commander": card.model_dump(mode="json"),
-        "combos": [c.model_dump(mode="json") for c in combos],
-        "edhrec": edhrec_data.model_dump(mode="json") if edhrec_data else None,
+        "commander": slim_card(card),
+        "combos": [slim_combo(c) for c in combos[:_MAX_COMBOS]],
+        "edhrec": edhrec_slim,
         "sources": {"scryfall": True, "spellbook": spellbook_ok, "edhrec": edhrec_ok},
     }
     return WorkflowResult(markdown="\n".join(lines), data=data)
@@ -488,10 +502,10 @@ async def evaluate_upgrade(
 
     log.info("evaluate_upgrade.complete", card=card_name, commander=commander_name)
     data = {
-        "card": card.model_dump(mode="json"),
+        "card": slim_card(card),
         "commander_name": commander_name,
-        "combos": [c.model_dump(mode="json") for c in combos],
-        "synergy": synergy_card.model_dump(mode="json") if synergy_card else None,
+        "combos": [slim_combo(c) for c in combos[:_MAX_COMBOS]],
+        "synergy": slim_edhrec_card(synergy_card) if synergy_card else None,
         "sources": {"scryfall": True, "spellbook": spellbook_ok, "edhrec": edhrec_ok},
     }
     return WorkflowResult(markdown="\n".join(lines), data=data)
@@ -658,7 +672,7 @@ async def card_comparison(
     log.info("card_comparison.complete", cards=cards, commander=commander_name)
     data = {
         "commander_name": commander_name,
-        "cards": [c.model_dump(mode="json") for c in card_data],
+        "cards": [slim_card(c) for c in card_data],
         "not_found": not_found_names,
     }
     return WorkflowResult(markdown="\n".join(lines), data=data)
