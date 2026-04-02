@@ -105,9 +105,19 @@ if _settings.enable_bulk_data:
 # Workflow tools mounted without namespace for clean names.
 mcp.mount(workflow_mcp)
 
-# Limit response sizes to 500KB to prevent edge-case payloads from overwhelming
-# LLM context windows. Most tool outputs are well under 10KB.
-mcp.add_middleware(ResponseLimitingMiddleware(max_size=500_000))
+# Per-tool limits for known heavy tools — tighter than the global ceiling.
+# These are safety nets; slim field sets and limit params in the tools themselves
+# are the primary size control mechanism.
+mcp.add_middleware(
+    ResponseLimitingMiddleware(
+        max_size=30_000,
+        tools=["scryfall_search_cards", "draft_card_ratings", "edhrec_commander_staples"],
+    )
+)
+
+# Global safety net — lowered from 500KB to 100KB. Most tool outputs are well
+# under 10KB after slim field sets; this catches regressions.
+mcp.add_middleware(ResponseLimitingMiddleware(max_size=100_000))
 
 # CodeMode: experimental transform that replaces individual tools with meta-tools
 # for discovery and code execution. Useful at 40+ tools to reduce LLM context.
