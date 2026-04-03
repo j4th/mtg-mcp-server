@@ -17,6 +17,7 @@ def _make_card(
     *,
     name: str = "Sol Ring",
     mana_cost: str | None = "{1}",
+    cmc: float = 0.0,
     type_line: str = "Artifact",
     oracle_text: str | None = "{T}: Add {C}{C}.",
     colors: list[str] | None = None,
@@ -35,6 +36,7 @@ def _make_card(
         id="test-id",
         name=name,
         mana_cost=mana_cost,
+        cmc=cmc,
         type_line=type_line,
         oracle_text=oracle_text,
         colors=colors or [],
@@ -379,6 +381,7 @@ def _make_test_pool() -> list[Card]:
         _make_card(
             name="Sol Ring",
             mana_cost="{1}",
+            cmc=1.0,
             type_line="Artifact",
             oracle_text="{T}: Add {C}{C}.",
             keywords=[],
@@ -390,6 +393,7 @@ def _make_test_pool() -> list[Card]:
         _make_card(
             name="Lightning Bolt",
             mana_cost="{R}",
+            cmc=1.0,
             type_line="Instant",
             oracle_text="Lightning Bolt deals 3 damage to any target.",
             colors=["R"],
@@ -403,6 +407,7 @@ def _make_test_pool() -> list[Card]:
         _make_card(
             name="Muldrotha, the Gravetide",
             mana_cost="{3}{B}{G}{U}",
+            cmc=6.0,
             type_line="Legendary Creature \u2014 Elemental Avatar",
             oracle_text="During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.",
             colors=["B", "G", "U"],
@@ -418,6 +423,7 @@ def _make_test_pool() -> list[Card]:
         _make_card(
             name="Counterspell",
             mana_cost="{U}{U}",
+            cmc=2.0,
             type_line="Instant",
             oracle_text="Counter target spell.",
             colors=["U"],
@@ -431,6 +437,7 @@ def _make_test_pool() -> list[Card]:
         _make_card(
             name="Swords to Plowshares",
             mana_cost="{W}",
+            cmc=1.0,
             type_line="Instant",
             oracle_text="Exile target creature. Its controller gains life equal to its power.",
             colors=["W"],
@@ -444,6 +451,7 @@ def _make_test_pool() -> list[Card]:
         _make_card(
             name="Birds of Paradise",
             mana_cost="{G}",
+            cmc=1.0,
             type_line="Creature \u2014 Bird",
             oracle_text="{T}: Add one mana of any color.",
             colors=["G"],
@@ -455,6 +463,23 @@ def _make_test_pool() -> list[Card]:
             edhrec_rank=50,
             prices=CardPrices(usd="8.00", usd_foil="15.00", eur="6.00"),
             rarity="rare",
+        ),
+        # Card with no EDHREC rank — competitive-only staple
+        _make_card(
+            name="Monastery Swiftspear",
+            mana_cost="{R}",
+            cmc=1.0,
+            type_line="Creature \u2014 Human Monk",
+            oracle_text="Haste\nProwess",
+            colors=["R"],
+            color_identity=["R"],
+            power="1",
+            toughness="2",
+            keywords=["Haste", "Prowess"],
+            legalities={"commander": "legal", "modern": "legal", "pauper": "legal"},
+            edhrec_rank=None,
+            prices=CardPrices(usd="0.50", usd_foil="1.50", eur="0.30"),
+            rarity="uncommon",
         ),
     ]
 
@@ -755,6 +780,143 @@ class TestFormatStaples:
                     raise_on_error=False,
                 )
         assert result.is_error
+
+    async def test_staples_auto_selects_edhrec_for_commander(self):
+        """Singleton formats auto-select EDHREC ranking mode (no regression)."""
+        mock = _make_pool_client()
+        with patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock):
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result = await client.call_tool(
+                    "format_staples",
+                    {"format": "commander"},
+                )
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["ranking_mode"] == "edhrec"
+        # Sol Ring (rank 1) should appear first
+        cards = sc["cards"]
+        assert cards[0]["name"] == "Sol Ring"
+
+    async def test_staples_competitive_for_modern_without_goldfish(self):
+        """Non-singleton formats fall back to competitive when MTGGoldfish unavailable."""
+        mock = _make_pool_client()
+        with (
+            patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock),
+            patch("mtg_mcp_server.providers.scryfall_bulk._goldfish_mod") as gf_mod,
+        ):
+            gf_mod._client = None
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result = await client.call_tool(
+                    "format_staples",
+                    {"format": "modern"},
+                )
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["ranking_mode"] == "competitive"
+
+    async def test_staples_competitive_prefers_bolt_over_muldrotha(self):
+        """Competitive heuristic ranks low-CMC instants above expensive creatures."""
+        mock = _make_pool_client()
+        with (
+            patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock),
+            patch("mtg_mcp_server.providers.scryfall_bulk._goldfish_mod") as gf_mod,
+        ):
+            gf_mod._client = None
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result = await client.call_tool(
+                    "format_staples",
+                    {"format": "modern"},
+                )
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        card_names = [c["name"] for c in sc["cards"]]
+        bolt_idx = card_names.index("Lightning Bolt")
+        muldrotha_idx = card_names.index("Muldrotha, the Gravetide")
+        assert bolt_idx < muldrotha_idx, "Bolt should rank higher than Muldrotha in competitive"
+
+    async def test_staples_competitive_includes_cards_without_edhrec_rank(self):
+        """Cards without EDHREC rank are NOT excluded in competitive mode."""
+        mock = _make_pool_client()
+        with (
+            patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock),
+            patch("mtg_mcp_server.providers.scryfall_bulk._goldfish_mod") as gf_mod,
+        ):
+            gf_mod._client = None
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result = await client.call_tool(
+                    "format_staples",
+                    {"format": "modern"},
+                )
+        text = result.content[0].text
+        assert "Monastery Swiftspear" in text
+
+    async def test_staples_explicit_edhrec_override_for_modern(self):
+        """ranking_mode='edhrec' forces EDHREC rank even for non-singleton formats."""
+        mock = _make_pool_client()
+        with patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock):
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result = await client.call_tool(
+                    "format_staples",
+                    {"format": "modern", "ranking_mode": "edhrec"},
+                )
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["ranking_mode"] == "edhrec"
+        # Monastery Swiftspear (no EDHREC rank) should be excluded in edhrec mode
+        card_names = [c["name"] for c in sc["cards"]]
+        assert "Monastery Swiftspear" not in card_names
+
+    async def test_staples_tournament_mode_with_goldfish(self):
+        """Tournament mode uses MTGGoldfish data when available."""
+        from mtg_mcp_server.types import GoldfishFormatStaple
+
+        mock = _make_pool_client()
+        goldfish_staples = [
+            GoldfishFormatStaple(
+                rank=1, name="Lightning Bolt", pct_of_decks=45.0, copies_played=4.0
+            ),
+            GoldfishFormatStaple(rank=2, name="Counterspell", pct_of_decks=30.0, copies_played=3.5),
+        ]
+        mock_gf = AsyncMock()
+        mock_gf.get_format_staples = AsyncMock(return_value=goldfish_staples)
+
+        with (
+            patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock),
+            patch("mtg_mcp_server.providers.scryfall_bulk._goldfish_mod") as gf_mod,
+        ):
+            gf_mod._client = mock_gf
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result = await client.call_tool(
+                    "format_staples",
+                    {"format": "modern"},
+                )
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        assert sc["ranking_mode"] == "tournament"
+        card_names = [c["name"] for c in sc["cards"]]
+        assert card_names[0] == "Lightning Bolt"
+        assert card_names[1] == "Counterspell"
+
+    async def test_staples_tournament_graceful_fallback(self):
+        """Tournament mode falls back to competitive if MTGGoldfish errors."""
+        mock = _make_pool_client()
+        mock_gf = AsyncMock()
+        mock_gf.get_format_staples = AsyncMock(side_effect=Exception("scrape failed"))
+
+        with (
+            patch("mtg_mcp_server.providers.scryfall_bulk.ScryfallBulkClient", return_value=mock),
+            patch("mtg_mcp_server.providers.scryfall_bulk._goldfish_mod") as gf_mod,
+        ):
+            gf_mod._client = mock_gf
+            async with Client(transport=scryfall_bulk_mcp) as client:
+                result = await client.call_tool(
+                    "format_staples",
+                    {"format": "modern"},
+                )
+        sc = result.structured_content
+        assert isinstance(sc, dict)
+        # Should fall back to competitive, not error
+        assert sc["ranking_mode"] == "competitive"
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ including prices, legalities, and EDHREC rank.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from typing import TYPE_CHECKING, Annotated, Literal
 
@@ -26,6 +27,7 @@ from mtg_mcp_server.providers import (
     TOOL_ANNOTATIONS,
     format_legalities,
 )
+from mtg_mcp_server.providers import mtggoldfish as _goldfish_mod
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient, ScryfallBulkError
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
 from mtg_mcp_server.utils.formatters import ResponseFormat, format_card_detail
@@ -455,6 +457,80 @@ async def format_search(
     )
 
 
+# ---------------------------------------------------------------------------
+# Format staples ranking helpers
+# ---------------------------------------------------------------------------
+
+_SINGLETON_FORMATS = frozenset({"commander", "brawl", "oathbreaker"})
+
+_COMPETITIVE_KEYWORDS = frozenset({"flash", "haste", "hexproof", "cycling"})
+
+_TYPE_SCORES: dict[str, float] = {
+    "instant": -10.0,
+    "sorcery": -8.0,
+    "creature": -5.0,
+    "enchantment": -3.0,
+    "artifact": -2.0,
+    "planeswalker": -4.0,
+}
+
+_RARITY_SCORES: dict[str, float] = {
+    "mythic": 0.0,
+    "rare": 5.0,
+    "uncommon": 10.0,
+    "common": 15.0,
+}
+
+
+def _score_competitive(card: Card) -> float:
+    """Score a card for competitive (non-singleton) format relevance.
+
+    Lower score = better card (matches EDHREC rank semantics where lower = more popular).
+    Combines CMC efficiency, card type, rarity, market price, and keyword presence.
+    """
+    # CMC: lower is better in competitive (0-40 range)
+    cmc_score = min(card.cmc * 8.0, 40.0)
+
+    # Type: instants/sorceries score best in 60-card formats
+    type_lower = card.type_line.lower()
+    type_score = 0.0
+    for type_key, bonus in _TYPE_SCORES.items():
+        if type_key in type_lower:
+            type_score = bonus
+            break
+
+    # Rarity: rarer cards tend to define formats
+    rarity_score = _RARITY_SCORES.get(card.rarity, 10.0)
+
+    # Price as demand proxy: higher price → lower score
+    price_score = 0.0
+    if card.prices and card.prices.usd:
+        with contextlib.suppress(ValueError, TypeError):
+            price_score = max(-15.0, -float(card.prices.usd) * 1.5)
+
+    # Competitive keyword bonus
+    keyword_score = 0.0
+    if card.keywords:
+        keyword_score = sum(-3.0 for k in card.keywords if k.lower() in _COMPETITIVE_KEYWORDS)
+
+    return cmc_score + type_score + rarity_score + price_score + keyword_score
+
+
+RankingMode = Literal["auto", "edhrec", "competitive", "tournament"]
+
+
+def _resolve_ranking_mode(mode: RankingMode, fmt: str) -> str:
+    """Resolve 'auto' to a concrete ranking mode based on format and availability."""
+    if mode != "auto":
+        return mode
+    if fmt in _SINGLETON_FORMATS:
+        return "edhrec"
+    # Prefer tournament data when MTGGoldfish is available
+    if _goldfish_mod._client is not None:
+        return "tournament"
+    return "competitive"
+
+
 @scryfall_bulk_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_SEARCH)
 async def format_staples(
     format: Annotated[
@@ -472,6 +548,16 @@ async def format_staples(
         Field(description="Card type filter (e.g. 'creature', 'instant', 'land')"),
     ] = None,
     limit: Annotated[int, Field(description="Maximum results to return")] = 20,
+    ranking_mode: Annotated[
+        RankingMode,
+        Field(
+            description=(
+                "How to rank staples: 'auto' (default) picks the best mode for the format, "
+                "'edhrec' uses Commander popularity, 'competitive' uses a mana-efficiency heuristic, "
+                "'tournament' uses MTGGoldfish metagame frequency."
+            )
+        ),
+    ] = "auto",
     response_format: Annotated[
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
@@ -479,16 +565,35 @@ async def format_staples(
 ) -> ToolResult:
     """Find the most popular (staple) cards legal in a format.
 
-    Returns cards sorted by EDHREC rank (most popular first). Cards
-    without a rank are excluded. Optionally filter by color identity
-    and card type.
+    Ranking adapts to the format: singleton formats (Commander, Brawl, Oathbreaker)
+    use EDHREC rank; competitive formats use MTGGoldfish tournament frequency when
+    available, falling back to a mana-efficiency heuristic.
     """
     client = _get_client()
     fmt = normalize_format(format)
+    resolved_mode = _resolve_ranking_mode(ranking_mode, fmt)
+
     try:
         identity = parse_color_identity(color) if color else None
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
+
+    # --- Tournament mode: MTGGoldfish-driven ranking ---
+    if resolved_mode == "tournament":
+        result = await _format_staples_tournament(
+            client,
+            fmt,
+            identity,
+            card_type,
+            limit,
+            response_format,
+            color,
+        )
+        if result is not None:
+            return result
+        # Goldfish failed — fall back to competitive
+        log.warning("format_staples.goldfish_fallback", format=fmt)
+        resolved_mode = "competitive"
 
     try:
         all_cards = await client.all_cards()
@@ -499,7 +604,8 @@ async def format_staples(
     for card in all_cards:
         if card.legalities.get(fmt) != "legal":
             continue
-        if card.edhrec_rank is None:
+        # EDHREC mode excludes cards without rank; competitive does not
+        if resolved_mode == "edhrec" and card.edhrec_rank is None:
             continue
         if identity is not None and not is_within_identity(card.color_identity, identity):
             continue
@@ -510,7 +616,10 @@ async def format_staples(
     if not matches:
         raise ToolError(f"No staples found for {fmt}" + (f" ({color})" if color else "") + ".")
 
-    matches.sort(key=lambda c: c.edhrec_rank or 0)
+    if resolved_mode == "edhrec":
+        matches.sort(key=lambda c: c.edhrec_rank or 0)
+    else:
+        matches.sort(key=_score_competitive)
     matches = matches[:limit]
 
     lines = [f"## {fmt.title()} Staples"]
@@ -519,15 +628,27 @@ async def format_staples(
     if card_type:
         lines[0] += f" -- {card_type.title()}"
     lines.append("")
+
     if response_format == "concise":
         for card in matches:
-            lines.append(f"  {card.name} (rank: {card.edhrec_rank})")
+            if resolved_mode == "edhrec":
+                lines.append(f"  {card.name} (rank: {card.edhrec_rank})")
+            else:
+                lines.append(f"  {card.name} (score: {_score_competitive(card):.1f})")
     else:
-        lines.append("| Rank | Card | Mana Cost | Type |")
-        lines.append("|------|------|-----------|------|")
-        for card in matches:
-            cost = card.mana_cost or ""
-            lines.append(f"| #{card.edhrec_rank} | {card.name} | {cost} | {card.type_line} |")
+        if resolved_mode == "edhrec":
+            lines.append("| Rank | Card | Mana Cost | Type |")
+            lines.append("|------|------|-----------|------|")
+            for card in matches:
+                cost = card.mana_cost or ""
+                lines.append(f"| #{card.edhrec_rank} | {card.name} | {cost} | {card.type_line} |")
+        else:
+            lines.append("| Score | Card | Mana Cost | Type |")
+            lines.append("|-------|------|-----------|------|")
+            for card in matches:
+                cost = card.mana_cost or ""
+                score = _score_competitive(card)
+                lines.append(f"| {score:.1f} | {card.name} | {cost} | {card.type_line} |")
 
     return ToolResult(
         content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
@@ -535,8 +656,87 @@ async def format_staples(
             "format": fmt,
             "color": color,
             "card_type": card_type,
+            "ranking_mode": resolved_mode,
             "total_results": len(matches),
             "cards": [slim_card(card) for card in matches],
+        },
+    )
+
+
+async def _format_staples_tournament(
+    client: ScryfallBulkClient,
+    fmt: str,
+    identity: frozenset[str] | None,
+    card_type: str | None,
+    limit: int,
+    response_format: ResponseFormat,
+    color: str | None,
+) -> ToolResult | None:
+    """Attempt tournament-mode ranking via MTGGoldfish. Returns None on failure."""
+    goldfish = _goldfish_mod._client
+    if goldfish is None:
+        return None
+    try:
+        staples = await goldfish.get_format_staples(fmt, limit=limit * 2)
+    except Exception:
+        log.warning("format_staples.goldfish_error", format=fmt, exc_info=True)
+        return None
+
+    if not staples:
+        return None
+
+    # Cross-reference goldfish names with bulk data for full Card details
+    try:
+        all_cards = await client.all_cards()
+    except ScryfallBulkError:
+        return None
+
+    cards_by_name: dict[str, Card] = {c.name.lower(): c for c in all_cards}
+    ranked: list[tuple[float, Card]] = []
+    for gs in staples:
+        card = cards_by_name.get(gs.name.lower())
+        if card is None:
+            continue
+        if card.legalities.get(fmt) != "legal":
+            continue
+        if identity is not None and not is_within_identity(card.color_identity, identity):
+            continue
+        if card_type is not None and card_type.lower() not in card.type_line.lower():
+            continue
+        ranked.append((gs.pct_of_decks, card))
+
+    if not ranked:
+        return None
+
+    ranked.sort(key=lambda t: t[0], reverse=True)
+    ranked = ranked[:limit]
+
+    lines = [f"## {fmt.title()} Staples (Tournament Data)"]
+    if color:
+        lines[0] = lines[0].replace(")", f", {color})")
+    if card_type:
+        lines[0] += f" -- {card_type.title()}"
+    lines.append("")
+
+    if response_format == "concise":
+        for pct, card in ranked:
+            lines.append(f"  {card.name} ({pct:.1f}% of decks)")
+    else:
+        lines.append("| % Decks | Card | Mana Cost | Type |")
+        lines.append("|---------|------|-----------|------|")
+        for pct, card in ranked:
+            cost = card.mana_cost or ""
+            lines.append(f"| {pct:.1f}% | {card.name} | {cost} | {card.type_line} |")
+
+    return ToolResult(
+        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        structured_content={
+            "format": fmt,
+            "color": color,
+            "card_type": card_type,
+            "ranking_mode": "tournament",
+            "total_results": len(ranked),
+            "cards": [slim_card(card) for _, card in ranked],
         },
     )
 
