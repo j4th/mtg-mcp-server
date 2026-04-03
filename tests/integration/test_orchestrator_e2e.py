@@ -20,8 +20,8 @@ pytestmark = pytest.mark.integration
 class TestToolRegistration:
     """Verify the orchestrator exposes the expected tools."""
 
-    async def test_all_56_tools_registered(self, mcp_client: Client):
-        """The orchestrator exposes exactly 56 tools."""
+    async def test_all_60_tools_registered(self, mcp_client: Client):
+        """The orchestrator exposes exactly 60 tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
         # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 moxfield + 3 spicerack + 4 goldfish + 9 bulk + 22 workflows + 5 rules = 60
