@@ -24,6 +24,7 @@ __all__ = [
     "ATTRIBUTION_SCRYFALL",
     "ATTRIBUTION_SCRYFALL_BULK",
     "ATTRIBUTION_SPELLBOOK",
+    "ATTRIBUTION_SPICERACK",
     "TAGS_ALL_FORMATS",
     "TAGS_BETA",
     "TAGS_BUILD",
@@ -73,6 +74,7 @@ ATTRIBUTION_SPELLBOOK = (
 ATTRIBUTION_17LANDS = "\n\n*Data provided by [17Lands](https://www.17lands.com)*"
 ATTRIBUTION_EDHREC = "\n\n*Data provided by [EDHREC](https://edhrec.com)*"
 ATTRIBUTION_MOXFIELD = "\n\n*Data provided by [Moxfield](https://www.moxfield.com)*"
+ATTRIBUTION_SPICERACK = "\n\n*Data provided by [Spicerack](https://spicerack.gg)*"
 
 
 def format_legalities(legalities: dict[str, str]) -> str:

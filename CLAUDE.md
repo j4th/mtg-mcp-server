@@ -60,7 +60,7 @@ See @docs/ARCHITECTURE.md for full details.
 - **`src/mtg_mcp_server/services/`** — Pure async API clients. No MCP awareness. Return Pydantic models.
 - **`src/mtg_mcp_server/providers/`** — FastMCP sub-servers. Each independently runnable. Register tools that call services.
 - **`src/mtg_mcp_server/workflows/`** — Composed tools calling multiple services. Mounted without namespace.
-- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `bulk_`.
+- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `moxfield_`, `bulk_`, `spicerack_`.
 
 ## Conventions
 
@@ -110,6 +110,32 @@ When PR review comments come in:
 6. Commit referencing the PR, push
 7. Resolve threads via GraphQL `resolveReviewThread` mutation (get thread IDs from `repository.pullRequest.reviewThreads`)
 
+## PR Review Checklist
+
+When reviewing PRs (automated CI or manual), verify these project-specific completeness checks:
+
+**New provider/backend added:**
+- [ ] `docs/TOOL_DESIGN.md` — tool specs, resource templates
+- [ ] `docs/ARCHITECTURE.md` — system diagram, project structure, tool/resource counts, decisions log
+- [ ] `docs/SERVICE_CONTRACTS.md` — endpoint, response shape, rate limits, caching, feature flag
+- [ ] `docs/CACHING_DESIGN.md` — TTL table entry for new service methods
+- [ ] `.claude/skills/smoke-test/SKILL.md` — new test steps, updated totals
+- [ ] `tests/integration/conftest.py` — respx mocks for new HTTP backends
+- [ ] `tests/integration/test_orchestrator_e2e.py` — tool count assertion updated
+- [ ] `tests/test_parameter_descriptions.py` — new provider in parametrize list
+- [ ] `server.py` — mount statement, instructions string with new tool category
+
+**Error handling in changed code:**
+- [ ] Service exceptions caught → `ToolError` raised with `from exc` (never bare `raise ToolError(...)`)
+- [ ] No broad `except Exception` hiding specific service errors — catch typed exceptions
+- [ ] Workflows handle partial failures — return available data if one backend is down
+- [ ] No silent fallback to defaults without logging (structlog with bound context)
+
+**Data integrity:**
+- [ ] Optional numeric fields use `is not None`, never truthiness (`0` and `0.0` are valid)
+- [ ] New caches: `@async_cached` with class-level `TTLCache`, clearing added to `tests/conftest.py`
+- [ ] Pydantic v2: `.model_validate()` not `.parse_obj()`
+
 ## Gotchas
 
 - FastMCP 3.x import: `from fastmcp import FastMCP` (NOT `from mcp.server.fastmcp`).
@@ -141,6 +167,7 @@ When PR review comments come in:
 - **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for bulk-data-first lookups with Scryfall fallback. Tool tagging via `tags` parameter.
 - **Branch A** (Structured Output + Rules): Complete — All tools return `ToolResult` with structured `data` dict. Rules engine (5 tools: rules_lookup, keyword_explain, rules_interaction, rules_scenario, combat_calculator). Additional workflow tools: deck_validate, suggest_mana_base, price_comparison. Scryfall whats_new + set_info tools. 7 new bulk tools. 5 new prompts. 40 tools total.
 - **Branch B** (Format Workflows): Complete — 11 new workflow tools across 4 domains: Deck Building (theme_search, build_around, complete_deck), Commander Depth (commander_comparison, tribal_staples, precon_upgrade, color_identity_staples), Limited (sealed_pool_build, draft_signal_read, draft_log_review), Constructed (rotation_check). 8 new prompts. 51 tools, 17 prompts, 18 resource templates. 989 tests, 88% coverage.
+- **Spicerack** (Tournament Results): Complete — SpicerackClient service with get_tournaments() (TTLCache 4h). 3 tools (recent_tournaments, tournament_results, format_decklists), 1 resource template. 56 tools total.
 
 ## Environment
 

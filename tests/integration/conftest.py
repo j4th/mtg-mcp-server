@@ -22,6 +22,8 @@ SCRYFALL_FIXTURES = FIXTURES / "scryfall"
 SPELLBOOK_FIXTURES = FIXTURES / "spellbook"
 SEVENTEEN_LANDS_FIXTURES = FIXTURES / "seventeen_lands"
 EDHREC_FIXTURES = FIXTURES / "edhrec"
+MOXFIELD_FIXTURES = FIXTURES / "moxfield"
+SPICERACK_FIXTURES = FIXTURES / "spicerack"
 SCRYFALL_BULK_FIXTURES = FIXTURES / "scryfall_bulk"
 
 RULES_FIXTURES = FIXTURES / "rules"
@@ -30,6 +32,8 @@ SCRYFALL_BASE = "https://api.scryfall.com"
 SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
 EDHREC_BASE = "https://json.edhrec.com"
+MOXFIELD_BASE = "https://api2.moxfield.com"
+SPICERACK_BASE = "https://api.spicerack.gg"
 RULES_URL = "https://media.wizards.com/2025/downloads/MagicCompRules%2020250404.txt"
 
 
@@ -147,6 +151,20 @@ async def mcp_client():
         respx.get(_bulk_download_url()).mock(
             return_value=httpx.Response(
                 200, content=_load_oracle_cards_bytes(), headers={"ETag": '"integration-test"'}
+            )
+        )
+
+        # --- Moxfield routes ---
+        respx.get(url__regex=re.escape(MOXFIELD_BASE) + r"/v3/decks/.+").mock(
+            return_value=httpx.Response(
+                200, json=_load_json(MOXFIELD_FIXTURES / "deck_commander.json")
+            )
+        )
+
+        # --- Spicerack routes ---
+        respx.get(f"{SPICERACK_BASE}/api/export-decklists/").mock(
+            return_value=httpx.Response(
+                200, json=_load_json(SPICERACK_FIXTURES / "tournaments_legacy.json")
             )
         )
 

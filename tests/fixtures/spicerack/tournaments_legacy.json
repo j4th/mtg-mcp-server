@@ -1,0 +1,170 @@
+[
+  {
+    "TID": "3135276",
+    "tournamentName": "ETB x LOTN 3k-5k Jim Monolith 40th B-Day Bash - Enter the Battlefield - Newmarket",
+    "format": "Legacy",
+    "bracketUrl": "https://www.spicerack.gg/events/3135276/tournament",
+    "players": 79,
+    "startDate": 1774710000,
+    "swissRounds": 5,
+    "topCut": 8,
+    "standings": [
+      {
+        "name": "Chris Switalski",
+        "decklist": "https://www.moxfield.com/decks/Etg7q115Q0itX7k4vktGMQ",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 3,
+        "lossesBracket": 0
+      },
+      {
+        "name": "Benjamin Dunk Kostecki",
+        "decklist": "https://www.moxfield.com/decks/n9AoC_lxakauwOZno84rqg",
+        "winsSwiss": 5,
+        "lossesSwiss": 0,
+        "draws": 2,
+        "winsBracket": 2,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Justin Lam",
+        "decklist": "https://www.moxfield.com/decks/KZZIicivm0mzYZ4RdhKy9A",
+        "winsSwiss": 6,
+        "lossesSwiss": 1,
+        "draws": 0,
+        "winsBracket": 1,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Justin Glanzer",
+        "decklist": "https://www.moxfield.com/decks/9t0seICsm0a_tqt6CIEWXw",
+        "winsSwiss": 5,
+        "lossesSwiss": 0,
+        "draws": 2,
+        "winsBracket": 1,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Jim Monolith?",
+        "decklist": "https://www.moxfield.com/decks/80R1ccaShUOmAcNjSxvQrw",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Emilio Hong",
+        "decklist": "https://www.moxfield.com/decks/YP40CA6aAEe4Locr050rmA",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Andrew DiFruscia",
+        "decklist": "https://www.moxfield.com/decks/5aAzMwMLWEq3KDQ5-Pg-yQ",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Reeves Schraner",
+        "decklist": "https://www.moxfield.com/decks/2B-KIdRxXUORo1ygT1oIdw",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      }
+    ]
+  },
+  {
+    "TID": "2919004",
+    "tournamentName": "$2.5k Legacy Trial - NRG Series",
+    "format": "Legacy",
+    "bracketUrl": "https://www.spicerack.gg/events/2919004/tournament",
+    "players": 66,
+    "startDate": 1773585000,
+    "swissRounds": 5,
+    "topCut": 8,
+    "standings": [
+      {
+        "name": "Oliver Voegeli",
+        "decklist": "https://www.moxfield.com/decks/BunttXaMW0GuvAVsVTtf9g",
+        "winsSwiss": 5,
+        "lossesSwiss": 0,
+        "draws": 2,
+        "winsBracket": 3,
+        "lossesBracket": 0
+      },
+      {
+        "name": "Marco Ordonez",
+        "decklist": "https://www.moxfield.com/decks/58F9h1kkt0-f1fYCgz8Q0Q",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 2,
+        "lossesBracket": 1
+      },
+      {
+        "name": "russell wilson",
+        "decklist": "https://www.moxfield.com/decks/DkBjB6UrA0KygCiApa3yyg",
+        "winsSwiss": 5,
+        "lossesSwiss": 0,
+        "draws": 2,
+        "winsBracket": 1,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Lucas Birch",
+        "decklist": "https://www.moxfield.com/decks/G3MOiiK19Eye9Zpl6M_nKQ",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 1,
+        "lossesBracket": 1
+      },
+      {
+        "name": "ashe :3",
+        "decklist": "https://www.moxfield.com/decks/chMsqFlTLEusgapN3zJIyA",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      },
+      {
+        "name": "John Wager",
+        "decklist": "https://www.moxfield.com/decks/EsEanMGvh0m88QHOUma7lg",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Luke Vankleek",
+        "decklist": "https://www.moxfield.com/decks/NRuzeH1gDEiXm4HCD81c-w",
+        "winsSwiss": 5,
+        "lossesSwiss": 1,
+        "draws": 1,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      },
+      {
+        "name": "Davis Merced",
+        "decklist": "https://www.moxfield.com/decks/WV7CX0nLB0OZP8n2Sh3KIA",
+        "winsSwiss": 5,
+        "lossesSwiss": 2,
+        "draws": 0,
+        "winsBracket": 0,
+        "lossesBracket": 1
+      }
+    ]
+  }
+]

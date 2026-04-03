@@ -53,21 +53,36 @@ These provide critical data but lack official public APIs. Access is through und
 | **Key metrics / data** | GIH WR (Games In Hand Win Rate) is the primary card quality metric. IWD (Improvement When Drawn) shows how much drawing a card helps. ALSA (Average Last Seen At) shows how late a card wheels. 17Lands user base skews above average — baseline WR is ~56%, not 50%. | Synergy score (+/- percentage vs average deck), inclusion rate (% of decks running the card), number of decks analyzed, card categories (creatures, enchantments, etc.), salt scores. | Deck lists with card counts, categories, tags. Collection with conditions, languages, foil status. Price tracking via TCGPlayer/Cardmarket. |
 | **Our priority** | Complete (Phase 2). Critical for draft/sealed analytics. | Complete (Phase 2). Critical for Commander upgrade recommendations. Behind feature flag due to fragility. | Complete. Public decklist fetching (2 tools). Behind feature flag due to fragility. |
 
+### Spicerack (Documented Public API)
+
+| | |
+|---|---|
+| **URL** | `https://api.spicerack.gg` |
+| **What it has** | Tournament results database: decklists, standings, Swiss/bracket records, format metadata, Moxfield decklist URLs. Covers competitive paper events across participating stores. Formats include Modern, Legacy, Pauper, Pioneer, Standard, Premodern, Commander, and more. |
+| **Auth** | None required for public endpoint. Optional `X-API-Key` header for higher rate limits. |
+| **Access method** | REST API: `GET /api/export-decklists/?num_days={N}&event_format={FORMAT}`. Returns JSON array of tournaments with embedded standings. |
+| **Rate limit** | Undocumented. 1 req/sec recommended. |
+| **Caching** | 4h TTL. Tournament results are stable once posted. |
+| **Docs** | `https://docs.spicerack.gg/api-reference/public-decklist-database` |
+| **Fragility** | Low. Documented public API with stable endpoint. |
+| **Key data** | Tournament name, format, date, player count, Swiss rounds, top cut, standings with player name, Swiss record (W-L-D), bracket record, Moxfield decklist URLs. Format names are title-case (e.g. "Modern", "Legacy", "Pauper"). |
+| **Our priority** | Complete. 3 tools (recent_tournaments, tournament_results, format_decklists). Fills the competitive constructed metagame gap. |
+
 ---
 
 ## Tier 3: Supplementary / Niche
 
 Useful for specific use cases but not core to the initial build.
 
-| | Spicerack | Archidekt |
-|---|---|---|
-| **URL** | `https://docs.spicerack.gg/api-reference/public-decklist-database` | `https://archidekt.com` |
-| **What it has** | Tournament results database: decklists, standings, Swiss/bracket records, format metadata, Moxfield decklist URLs. Covers competitive paper events across participating stores. | Deck building platform. Public deck data including card lists, categories, stats. EDHREC pulls data from Archidekt (along with Moxfield and Scryfall). |
-| **Auth** | None for public endpoint. | None for public decks. Archidekt's position: "reverse-engineer our network requests if you want, but if heavy usage causes problems we'll lock it down." |
-| **Access method** | REST API with documented endpoints. Returns JSON with tournament metadata, player standings, and decklist links. | Undocumented REST API. Community `archidekt` npm package wraps some endpoints. Network inspection to discover endpoints. |
-| **Rate limit** | Undocumented. Respectful use expected. | No official limits. Risk of lockdown if abused. |
-| **Use case** | Relevant if tracking competitive paper results at Taps or analyzing tournament meta. Not needed for core Commander/draft functionality. | Deck data. Less relevant since EDHREC already aggregates from Archidekt. Could be useful for fetching specific public decklists by URL. |
-| **Our priority** | Deferred. Potentially useful for Phase 6+ if competitive paper tracking becomes a goal. | Deferred. EDHREC covers the same data in aggregated form. |
+| | Archidekt |
+|---|---|
+| **URL** | `https://archidekt.com` |
+| **What it has** | Deck building platform. Public deck data including card lists, categories, stats. EDHREC pulls data from Archidekt (along with Moxfield and Scryfall). |
+| **Auth** | None for public decks. Archidekt's position: "reverse-engineer our network requests if you want, but if heavy usage causes problems we'll lock it down." |
+| **Access method** | Undocumented REST API. Community `archidekt` npm package wraps some endpoints. Network inspection to discover endpoints. |
+| **Rate limit** | No official limits. Risk of lockdown if abused. |
+| **Use case** | Deck data. Less relevant since EDHREC already aggregates from Archidekt. Could be useful for fetching specific public decklists by URL. |
+| **Our priority** | Deferred. EDHREC covers the same data in aggregated form. |
 
 ---
 
@@ -82,5 +97,5 @@ Useful for specific use cases but not core to the initial build.
 | EDHREC | None | Reverse-engineered JSON | Fragile — feature flag | Complete |
 | Comprehensive Rules | None | File download | Stable (Wizards-hosted) | Complete |
 | Moxfield | User-Agent header | Reverse-engineered REST | Fragile — feature flag | Complete |
-| Spicerack | None | Documented REST API | Solid | Deferred |
+| Spicerack | None (optional API key) | Documented REST API | Solid | Complete |
 | Archidekt | None | Reverse-engineered REST | Fragile | Deferred |

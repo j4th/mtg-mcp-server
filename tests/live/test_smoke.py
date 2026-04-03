@@ -22,15 +22,26 @@ class TestServerHealth:
     async def test_all_tools_registered(self, live_client):
         tools = await live_client.list_tools()
         tool_names = {t.name for t in tools}
-        # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 moxfield + 9 bulk + 22 workflows + 5 rules = 53
-        assert len(tool_names) == 53, (
-            f"Expected 53 tools, got {len(tool_names)}: {sorted(tool_names)}"
+        # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 moxfield + 3 spicerack + 9 bulk + 22 workflows + 5 rules = 56
+        assert len(tool_names) == 56, (
+            f"Expected 56 tools, got {len(tool_names)}: {sorted(tool_names)}"
         )
 
     async def test_no_mtgjson_tools(self, live_client):
         tools = await live_client.list_tools()
         mtgjson_tools = [t.name for t in tools if "mtgjson" in t.name]
         assert mtgjson_tools == [], f"Unexpected MTGJSON tools: {mtgjson_tools}"
+
+
+class TestSpicerackLive:
+    """Hit the real Spicerack API."""
+
+    async def test_recent_tournaments(self, live_client):
+        result = await live_client.call_tool(
+            "spicerack_recent_tournaments", {"format": "Legacy", "num_days": 30}
+        )
+        text = result.content[0].text
+        assert "Legacy" in text
 
 
 class TestBulkDataLive:

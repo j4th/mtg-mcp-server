@@ -11,6 +11,7 @@ from mtg_mcp_server.services.moxfield import MoxfieldClient
 from mtg_mcp_server.services.scryfall import ScryfallClient
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
 from mtg_mcp_server.services.spellbook import SpellbookClient
+from mtg_mcp_server.services.spicerack import SpicerackClient
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +36,7 @@ def _clear_caches():
     EDHRECClient._commander_cache.clear()
     EDHRECClient._synergy_cache.clear()
     MoxfieldClient._deck_cache.clear()
+    SpicerackClient._tournaments_cache.clear()
 
 
 @pytest.fixture
