@@ -264,16 +264,16 @@ async def deck_price(
         raise ToolError(f"MTGGoldfish error: {exc}") from exc
 
     archetype_name = price_data.get("archetype", archetype)
-    estimated_price = price_data.get("estimated_price", 0)
-    card_count = price_data.get("card_count", 0)
+    price_paper = price_data.get("price_paper", 0)
+    card_count = price_data.get("mainboard_count", 0) + price_data.get("sideboard_count", 0)
 
     lines: list[str] = [f"## {archetype_name} — Price Estimate\n"]
 
     if response_format == "concise":
-        lines.append(f"**${estimated_price:,}** ({card_count} cards)")
+        lines.append(f"**${price_paper:,}** ({card_count} cards)")
     else:
         lines.append(f"**Archetype:** {archetype_name}")
-        lines.append(f"**Estimated Price:** ${estimated_price:,}")
+        lines.append(f"**Estimated Price:** ${price_paper:,}")
         if card_count > 0:
             lines.append(f"**Card Count:** {card_count}")
 

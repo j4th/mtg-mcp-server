@@ -23,14 +23,11 @@ from mtg_mcp_server.types import (
     GoldfishFormatStaple,
     GoldfishMetaSnapshot,
 )
+from mtg_mcp_server.utils.formatters import slugify
 
 log = structlog.get_logger(service="mtggoldfish")
 
-# Pre-compiled regexes for slug generation and HTML parsing.
-_RE_SPECIAL_CHARS = re.compile(r"[,.'\"!?:;()]+")
-_RE_WHITESPACE = re.compile(r"\s+")
-_RE_MULTI_HYPHEN = re.compile(r"-+")
-
+# Pre-compiled regexes for HTML parsing.
 # Match deck_id from initializeDeckComponents JS call.
 # Pattern: initializeDeckComponents('guid', 'DECK_ID', ...)
 _RE_DECK_ID = re.compile(r"initializeDeckComponents\(\s*'[^']*'\s*,\s*'(\d+)'")
@@ -101,18 +98,6 @@ class MTGGoldfishClient(BaseClient):
             user_agent=_BROWSER_UA,
         )
 
-    def _slugify(self, name: str) -> str:
-        """Convert an archetype name to a URL slug.
-
-        Lowercase, replace spaces with hyphens, remove special characters,
-        collapse multiple hyphens.
-        """
-        slug = name.lower()
-        slug = _RE_SPECIAL_CHARS.sub("", slug)
-        slug = _RE_WHITESPACE.sub("-", slug)
-        slug = _RE_MULTI_HYPHEN.sub("-", slug)
-        return slug.strip("-")
-
     @async_cached(_metagame_cache, key=_method_key)
     async def get_metagame(self, format: str) -> GoldfishMetaSnapshot:
         """Get metagame breakdown for a format.
@@ -167,7 +152,7 @@ class MTGGoldfishClient(BaseClient):
             ArchetypeNotFoundError: If the archetype page returns 404.
             MTGGoldfishError: On other HTTP errors.
         """
-        slug = self._slugify(archetype)
+        slug = slugify(archetype)
         url_slug = f"{format}-{slug}"
         log.debug("get_archetype", format=format, archetype=archetype, slug=url_slug)
 

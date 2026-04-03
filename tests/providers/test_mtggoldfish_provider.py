@@ -151,7 +151,12 @@ def mock_client():
     client.get_archetype = AsyncMock(return_value=_make_archetype_detail())
     client.get_format_staples = AsyncMock(return_value=_make_format_staples())
     client.get_deck_price = AsyncMock(
-        return_value={"archetype": "Boros Energy", "estimated_price": 450, "card_count": 75}
+        return_value={
+            "archetype": "Boros Energy",
+            "price_paper": 450,
+            "mainboard_count": 60,
+            "sideboard_count": 15,
+        }
     )
     return client
 
@@ -398,8 +403,9 @@ class TestDeckPrice:
 
         assert sc is not None
         assert sc["archetype"] == "Boros Energy"
-        assert sc["estimated_price"] == 450
-        assert sc["card_count"] == 75
+        assert sc["price_paper"] == 450
+        assert sc["mainboard_count"] == 60
+        assert sc["sideboard_count"] == 15
 
     async def test_not_found_returns_error(self):
         """deck_price returns ToolError for unknown archetype."""

@@ -41,42 +41,49 @@ def _load_fixture(name: str) -> str:
 
 
 class TestSlugify:
-    """Test the name-to-slug conversion for MTGGoldfish archetype URLs."""
+    """Test the shared slugify function used by MTGGoldfish for archetype URLs."""
 
     def test_basic_name(self):
         """Simple two-word name converts to lowercase hyphenated slug."""
-        client = MTGGoldfishClient.__new__(MTGGoldfishClient)
-        assert client._slugify("Boros Energy") == "boros-energy"
+        from mtg_mcp_server.utils.formatters import slugify
+
+        assert slugify("Boros Energy") == "boros-energy"
 
     def test_comma_removed(self):
         """Commas are stripped from the slug."""
-        client = MTGGoldfishClient.__new__(MTGGoldfishClient)
-        assert client._slugify("Azorius Control, Revised") == "azorius-control-revised"
+        from mtg_mcp_server.utils.formatters import slugify
+
+        assert slugify("Azorius Control, Revised") == "azorius-control-revised"
 
     def test_apostrophe_removed(self):
         """Apostrophes are stripped from the slug."""
-        client = MTGGoldfishClient.__new__(MTGGoldfishClient)
-        assert client._slugify("Izzet Delver's Choice") == "izzet-delvers-choice"
+        from mtg_mcp_server.utils.formatters import slugify
+
+        assert slugify("Izzet Delver's Choice") == "izzet-delvers-choice"
 
     def test_multiple_spaces_collapsed(self):
         """Consecutive spaces are collapsed into a single hyphen."""
-        client = MTGGoldfishClient.__new__(MTGGoldfishClient)
-        assert client._slugify("The  Big   Deck") == "the-big-deck"
+        from mtg_mcp_server.utils.formatters import slugify
+
+        assert slugify("The  Big   Deck") == "the-big-deck"
 
     def test_period_removed(self):
         """Periods are stripped from the slug."""
-        client = MTGGoldfishClient.__new__(MTGGoldfishClient)
-        assert client._slugify("U.W. Control") == "uw-control"
+        from mtg_mcp_server.utils.formatters import slugify
+
+        assert slugify("U.W. Control") == "uw-control"
 
     def test_already_slug(self):
         """Already-slugified name passes through unchanged."""
-        client = MTGGoldfishClient.__new__(MTGGoldfishClient)
-        assert client._slugify("boros-energy") == "boros-energy"
+        from mtg_mcp_server.utils.formatters import slugify
+
+        assert slugify("boros-energy") == "boros-energy"
 
     def test_leading_trailing_hyphens_stripped(self):
         """Leading/trailing hyphens from special chars are removed."""
-        client = MTGGoldfishClient.__new__(MTGGoldfishClient)
-        assert client._slugify("'Hello World'") == "hello-world"
+        from mtg_mcp_server.utils.formatters import slugify
+
+        assert slugify("'Hello World'") == "hello-world"
 
 
 class TestGetMetagame:
