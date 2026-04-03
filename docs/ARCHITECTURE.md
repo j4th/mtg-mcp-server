@@ -81,7 +81,7 @@ Claude Code / claude.ai / any MCP client
 | Task runner | mise | latest | Installs Python, uv, ruff, ty. Runs all dev tasks. |
 | Language | Python | 3.12+ | Modern typing features |
 | Package mgmt | uv | latest | Astral. Lockfiles, virtualenvs, fast resolution |
-| MCP framework | fastmcp | 3.1.x | PrefectHQ/fastmcp. Provider/Transform architecture |
+| MCP framework | fastmcp | 3.2.x | PrefectHQ/fastmcp. Provider/Transform architecture |
 | Type checking | ty | 0.0.24+ (beta) | Astral. 10-60x faster than mypy/pyright |
 | Linting/format | ruff | latest | Astral. Replaces black/isort/flake8/pylint |
 | HTTP client | httpx | 0.28+ | Async HTTP. Used by all service clients |
@@ -310,7 +310,7 @@ lifespan to create them once at startup. Store in a module-level variable and ac
 
 > **Note:** `Depends()` / `ctx.lifespan_context` does NOT work when sub-servers are mounted on
 > a parent — the lifespan context doesn't propagate through `mount()`. This is a known
-> limitation of FastMCP 3.1.x. The module-level client pattern is the established workaround.
+> limitation of FastMCP 3.2.x. The module-level client pattern is the established workaround.
 
 ```python
 # src/mtg_mcp_server/providers/scryfall.py
@@ -639,7 +639,7 @@ mise run check    # Runs lint + typecheck + test — all must pass
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Framework | FastMCP 3.1.x | Native composition, provider arch, OTEL, annotations, DI |
+| Framework | FastMCP 3.2.x | Native composition, provider arch, OTEL, annotations, DI |
 | Architecture | Single server, mounted sub-servers | Independent testability + single deployment |
 | Transport | stdio default, HTTP optional | stdio for Claude Code/Desktop; HTTP for remote use |
 | Type checker | ty (beta) | Astral stack, speed, FastMCP validates against it |

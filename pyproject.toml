@@ -1,6 +1,6 @@
 [project]
 name = "mtg-mcp-server"
-version = "2.1.0"
+version = "2.1.1"
 description = "Magic: The Gathering card search, combo lookup, draft analytics, and Commander tools."
 readme = "README.md"
 license = "MIT"
@@ -36,7 +36,7 @@ classifiers = [
 ]
 dependencies = [
     "cachetools>=6.0",
-    "fastmcp>=3.1.0",
+    "fastmcp>=3.2.0",
     "httpx>=0.28",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
@@ -46,7 +46,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-code-mode = ["fastmcp[code-mode]>=3.1.0"]
+code-mode = ["fastmcp[code-mode]>=3.2.0"]
 
 [project.urls]
 Homepage = "https://github.com/j4th/mtg-mcp-server"
