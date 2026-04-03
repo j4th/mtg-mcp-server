@@ -7,7 +7,6 @@ endpoints that may break without notice. All access is behind a feature flag
 
 from __future__ import annotations
 
-import re
 import unicodedata
 from typing import TYPE_CHECKING
 
@@ -16,12 +15,7 @@ from cachetools import TTLCache
 from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, BaseClient, ServiceError
 from mtg_mcp_server.services.cache import _method_key, async_cached
 from mtg_mcp_server.types import EDHRECCard, EDHRECCardList, EDHRECCommanderData
-
-# Pre-compiled regexes for URL slug generation (_slugify).
-# EDHREC slugs are lowercase-hyphenated with no punctuation.
-_RE_SPECIAL_CHARS = re.compile(r"[,.'\"!?:;()]+")
-_RE_WHITESPACE = re.compile(r"\s+")
-_RE_MULTI_HYPHEN = re.compile(r"-+")
+from mtg_mcp_server.utils.formatters import slugify
 
 
 def _normalize_name(name: str) -> str:
@@ -76,17 +70,10 @@ class EDHRECClient(BaseClient):
             user_agent=user_agent,
         )
 
-    def _slugify(self, name: str) -> str:
-        """Convert a card name to an EDHREC URL slug.
-
-        Lowercase, replace spaces with hyphens, remove commas, apostrophes,
-        periods, and other special characters. Collapse multiple hyphens.
-        """
-        slug = name.lower()
-        slug = _RE_SPECIAL_CHARS.sub("", slug)
-        slug = _RE_WHITESPACE.sub("-", slug)
-        slug = _RE_MULTI_HYPHEN.sub("-", slug)
-        return slug.strip("-")
+    @staticmethod
+    def _slugify(name: str) -> str:
+        """Convert a card name to an EDHREC URL slug."""
+        return slugify(name)
 
     @async_cached(_commander_cache, key=_method_key)
     async def commander_top_cards(

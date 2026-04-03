@@ -547,3 +547,88 @@ Key fields:
 ### Feature Flag
 
 Behind `MTG_MCP_ENABLE_SPICERACK` (default `true`). Documented public API — low risk of breakage.
+
+---
+
+## MTGGoldfish
+
+**Status:** No official API. All data scraped from HTML pages. Blocks non-browser User-Agents.
+
+### Connection Details
+
+| Field | Value |
+|-------|-------|
+| Base URL | `https://www.mtggoldfish.com` |
+| Auth | None. Requires browser-like `User-Agent` header (blocks bot UAs with 403). |
+| Rate limit | Self-imposed: 0.5 req/sec. No documented limits. |
+| Documentation | None. Reverse-engineered from HTML structure. |
+
+### Key Endpoints
+
+**GET `/metagame/{format}/full`** — Full metagame breakdown
+```
+/metagame/modern/full
+```
+Format slugs: lowercase (`modern`, `pioneer`, `standard`, `legacy`, `vintage`, `pauper`).
+Returns: HTML with `.archetype-tile` divs containing archetype name, slug, meta share %, deck count, estimated paper price, colors (mana symbol CSS classes), and key cards.
+
+**GET `/archetype/{format}-{slug}`** — Archetype detail page
+```
+/archetype/modern-boros-energy
+```
+Returns: HTML with deck metadata (author, event, result, date) and JavaScript containing `initializeDeckComponents('guid', '{deck_id}', ...)` for the deck download ID.
+
+**GET `/deck/download/{deck_id}`** — Plaintext decklist download
+```
+/deck/download/6789012
+```
+Returns: **Plain text** (not HTML) in `4 Card Name\n` format. Mainboard and sideboard separated by a blank line. This is the cleanest endpoint — no HTML parsing needed.
+
+**GET `/format-staples/{format}`** — Most-played cards in a format
+```
+/format-staples/modern
+```
+Returns: HTML with `table` rows containing rank, card name, % of decks, and average copies per deck.
+
+### Response Shapes
+
+All endpoints return HTML (except `/deck/download/` which returns plaintext). Parsed with `selectolax` CSS selectors.
+
+**Metagame page** — `.archetype-tile` divs:
+- Archetype name from `.archetype-tile-title a` text
+- Slug from the `<a>` href (`/archetype/{format}-{slug}`)
+- Meta share from `.archetype-tile-statistic-value` text (e.g., "20.3%")
+- Deck count from second `.archetype-tile-statistic-value`
+- Price from `.price-tag-paper-price` text (e.g., "$348")
+- Colors from `.mana-icon` CSS classes (`ms-w`, `ms-u`, `ms-b`, `ms-r`, `ms-g`)
+
+**Archetype detail page:**
+- Deck metadata from `.deck-container-information` elements
+- Deck download ID extracted via regex from `initializeDeckComponents` JS call
+
+**Format staples page:**
+- Table rows with: rank (first `td`), card name (`td a` text), % of decks, avg copies
+
+### Fragility Warning
+
+These are HTML scraping targets with no API stability guarantees. MTGGoldfish can change their HTML structure at any time. Design mirrors the EDHREC fragile-source pattern:
+1. Cache aggressively (6-24h TTL depending on data type)
+2. Fail gracefully — MTGGoldfish being down should never crash the orchestrator
+3. Fixture-based tests with captured HTML pages
+4. Defensive parsing with `contextlib.suppress` and structlog warnings
+5. Behind `MTG_MCP_ENABLE_MTGGOLDFISH` feature flag
+
+### Service Architecture
+
+`MTGGoldfishClient` extends `BaseClient` with:
+- `rate_limit_rps=0.5` (conservative — matches EDHREC pattern)
+- Browser-like User-Agent: `"Mozilla/5.0 ... Chrome/131.0.0.0"`
+- Error hierarchy: `MTGGoldfishError` → `FormatNotFoundError`, `ArchetypeNotFoundError`
+- 4 class-level TTLCaches: `_metagame_cache` (6h/50), `_archetype_cache` (12h/100), `_staples_cache` (12h/50), `_price_cache` (24h/100)
+- 4 methods: `get_metagame(format)`, `get_archetype(format, archetype)`, `get_format_staples(format, limit)`, `get_deck_price(format, archetype)`
+- Pre-compiled regexes for slug generation, deck ID extraction, meta% parsing, price parsing
+- Mana color map: `ms-w`→W, `ms-u`→U, `ms-b`→B, `ms-r`→R, `ms-g`→G
+
+### Feature Flag
+
+Behind `MTG_MCP_ENABLE_MTGGOLDFISH` (default `true`). High fragility — HTML scraping with no API guarantees.

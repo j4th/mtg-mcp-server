@@ -51,6 +51,10 @@ Our server runs a single asyncio event loop — no thread contention on dict acc
 | EDHREC | `card_synergy` | 24h | 200 | Same aggregation cycle |
 | Moxfield | `get_deck` | 4h | 100 | Decklists change infrequently during a session; tournament-winning lists are typically stable |
 | Spicerack | `get_tournaments` | 4h | 50 | Tournament data changes infrequently during a session; events added daily but results are stable |
+| MTGGoldfish | `get_metagame` | 6h | 50 | Metagame shares shift slowly; 6h balances freshness vs. scraping load |
+| MTGGoldfish | `get_archetype` | 12h | 100 | Sample decklists are stable once posted |
+| MTGGoldfish | `get_format_staples` | 12h | 50 | Staple rankings shift slowly |
+| MTGGoldfish | `get_deck_price` | 24h | 100 | Prices update daily on MTGGoldfish |
 
 **Note on Moxfield cache keys:** The `get_deck` cache uses a custom key function that normalizes Moxfield URLs to raw deck IDs before hashing. This means `get_deck("https://moxfield.com/decks/abc123")` and `get_deck("abc123")` share the same cache entry. The `get_deck_info` method delegates to `get_deck` and benefits from the same cache.
 

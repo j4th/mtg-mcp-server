@@ -85,24 +85,33 @@ If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_se
 | `color_identity_staples(color_identity="simic")` | Cards in UG color identity |
 | `rotation_check()` | Standard-legal sets listed with release dates |
 
-### 9. Spicerack (sequential — need tournament ID from first call)
+### 9. MTGGoldfish (sequential — need archetype from metagame)
+
+1. `goldfish_metagame(format="Modern")` — expect archetypes with meta share %, deck count, prices
+2. `goldfish_format_staples(format="Modern", limit=5)` — expect card names with % of decks and avg copies
+3. `goldfish_archetype_list(format="Modern", archetype=<first archetype name from step 1>)` — expect mainboard card list
+4. `goldfish_deck_price(format="Modern", archetype=<same archetype>)` — expect price estimate
+
+MTGGoldfish scrapes HTML — SKIP on error, don't fail the overall test.
+
+### 10. Spicerack (sequential — need tournament ID from first call)
 
 1. `spicerack_recent_tournaments(format="Legacy", num_days=30)` — expect at least one tournament, format = "Legacy"
 2. `spicerack_tournament_results(tournament_id=<first ID from above>)` — expect standings with player names and records
 3. `spicerack_format_decklists(format="Legacy", num_days=30, limit=5)` — expect decklists with card text or Moxfield URLs
 
-### 10. Moxfield (may fail — reverse-engineered API)
+### 11. Moxfield (may fail — reverse-engineered API)
 
-`moxfield_decklist(deck_id="LDBm1gOVD0W8OMPgoYQJnw")` — expect deck name, commander board, mainboard with card names and quantities. Moxfield uses undocumented v3 endpoints; SKIP on error, don't fail the overall test.
+`moxfield_decklist(deck_id="DuXYtaJFEkScp1U1dxvAmw")` — expect deck name, commander board, mainboard with card names and quantities. Moxfield uses undocumented v3 endpoints; SKIP on error, don't fail the overall test.
 
-### 11. Commander Depth Workflows (parallel batch)
+### 12. Commander Depth Workflows (parallel batch)
 
 | Call | Validate |
 |------|----------|
 | `commander_comparison(commanders=["Muldrotha, the Gravetide", "Meren of Clan Nel Toth"])` | Both commanders compared, color identity shown |
 | `color_identity_staples(color_identity="sultai", category="creatures")` | Creature cards in BUG identity |
 
-### 12. Cross-Tool Consistency
+### 13. Cross-Tool Consistency
 
 Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`bulk_card_lookup("Sol Ring")`):
 - Names match
@@ -126,11 +135,12 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 | Rules | 5 | | | |
 | Core Workflows | 4 | | | |
 | Deck Building | 4 | | | |
+| MTGGoldfish | 4 | | | |
 | Spicerack | 3 | | | |
 | Moxfield | 1 | | | |
 | Commander Depth | 2 | | | |
 | Consistency | 1 | | | |
-| **Total** | **32** | | | |
+| **Total** | **36** | | | |
 
 ### Failures
 [Details for each FAIL — what was expected vs actual]

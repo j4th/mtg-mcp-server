@@ -223,6 +223,54 @@ Get top-finishing decklists across recent tournaments for a format.
 
 ---
 
+## MTGGoldfish Backend (namespace: `goldfish`)
+
+### `goldfish_metagame`
+Get the current metagame breakdown for a competitive format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str` (e.g. "Modern", "Legacy", "Pioneer", "Pauper"), `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Table of archetypes with: rank, name, meta share %, deck count, estimated paper price. Structured content uses slim archetype fields. |
+| Backend | `MTGGoldfishClient.get_metagame()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
+### `goldfish_archetype_list`
+Get a sample decklist for an archetype in a format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `archetype: str` (e.g. "Boros Energy", "Azorius Control"), `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Deck metadata (author, event, result, date) and full mainboard + sideboard card list. Structured content includes full archetype detail. |
+| Backend | `MTGGoldfishClient.get_archetype()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
+### `goldfish_format_staples`
+Get the most-played cards in a format with deck inclusion percentages.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `limit: int = 20`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Table of most-played cards with: rank, name, % of decks, average copies per deck. Structured content uses slim format staple fields. |
+| Backend | `MTGGoldfishClient.get_format_staples()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
+### `goldfish_deck_price`
+Get the estimated paper price for an archetype deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `archetype: str`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Archetype name, estimated total price, card count. |
+| Backend | `MTGGoldfishClient.get_deck_price()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
+---
+
 ## Scryfall Bulk Data Backend (namespace: `bulk`)
 
 ### `bulk_card_lookup`
@@ -810,6 +858,12 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 | URI | Description |
 |-----|-------------|
 | `mtg://tournament/{event_format}/recent` | Recent tournaments for a format as JSON |
+
+### MTGGoldfish Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://metagame/{format}` | Metagame breakdown for a format as JSON |
 
 ### Scryfall Bulk Data Resources
 

@@ -68,6 +68,21 @@ These provide critical data but lack official public APIs. Access is through und
 | **Key data** | Tournament name, format, date, player count, Swiss rounds, top cut, standings with player name, Swiss record (W-L-D), bracket record, Moxfield decklist URLs. Format names are title-case (e.g. "Modern", "Legacy", "Pauper"). |
 | **Our priority** | Complete. 3 tools (recent_tournaments, tournament_results, format_decklists). Fills the competitive constructed metagame gap. |
 
+### MTGGoldfish (HTML Scraping)
+
+| | |
+|---|---|
+| **URL** | `https://www.mtggoldfish.com` |
+| **What it has** | Constructed metagame data: archetype meta shares, sample decklists, format staples (most-played cards with deck inclusion %), deck price estimates. Covers Modern, Legacy, Pioneer, Pauper, Standard, Vintage. |
+| **Auth** | None. Requires browser-like User-Agent (blocks bot UAs). |
+| **Access method** | HTML scraping with selectolax. No JSON API (returns HTTP 406). Endpoints: `/metagame/{format}/full`, `/archetype/{format}-{slug}`, `/deck/download/{deck_id}` (plaintext), `/format-staples/{format}`. |
+| **Rate limit** | Self-imposed: 0.5 req/sec (conservative — no documented limits). |
+| **Caching** | Metagame 6h, archetype 12h, staples 12h, price 24h. |
+| **Docs** | None. Reverse-engineered from HTML structure. Community confirms no secret API. |
+| **Fragility** | High. HTML scraping — structure changes break selectors. Behind feature flag. |
+| **Key data** | Archetype name, meta share %, deck count, estimated paper price, archetype colors, key cards. Format staples: card name, % of decks, avg copies played, rank. Decklists: mainboard + sideboard in plaintext `4 Card Name` format. |
+| **Our priority** | Complete. 4 tools (metagame, archetype_list, format_staples, deck_price), 1 resource. Fills the constructed metagame gap alongside Spicerack tournament data. |
+
 ---
 
 ## Tier 3: Supplementary / Niche
@@ -98,4 +113,5 @@ Useful for specific use cases but not core to the initial build.
 | Comprehensive Rules | None | File download | Stable (Wizards-hosted) | Complete |
 | Moxfield | User-Agent header | Reverse-engineered REST | Fragile — feature flag | Complete |
 | Spicerack | None (optional API key) | Documented REST API | Solid | Complete |
+| MTGGoldfish | None (browser UA required) | HTML scraping | Fragile — feature flag | Complete |
 | Archidekt | None | Reverse-engineered REST | Fragile | Deferred |

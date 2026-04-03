@@ -25,7 +25,7 @@ Claude Code / claude.ai / any MCP client
               │ stdio (default) or streamable HTTP
               │
     ┌─────────▼──────────┐
-    │   MTG Orchestrator  │  ← FastMCP("MTG"), 56 tools, 17 prompts, 19 resources
+    │   MTG Orchestrator  │  ← FastMCP("MTG"), 60 tools, 17 prompts, 20 resources
     │                     │
     │  Workflow Tools:     │  ← Compose across backends (no namespace)
     │  Commander:          │  Draft/Limited:
@@ -77,6 +77,10 @@ Claude Code / claude.ai / any MCP client
     │  │  Spicerack   │────┼──► api.spicerack.gg
     │  │  ns=spicerack│    │    Tournament results, standings
     │  └─────────────┘    │
+    │  ┌─────────────┐    │
+    │  │  MTGGoldfish │────┼──► mtggoldfish.com (HTML scraping)
+    │  │  ns=goldfish │    │    Metagame, archetypes, staples, prices
+    │  └─────────────┘    │
     └─────────────────────┘
 ```
 
@@ -97,6 +101,7 @@ Claude Code / claude.ai / any MCP client
 | Settings | pydantic-settings | 2.x | Config from env vars |
 | Retry logic | tenacity | 9.x+ | Exponential backoff, rate limit handling |
 | Logging | structlog | 24.x+ | JSON structured logging, context-bound loggers |
+| HTML parsing | selectolax | 0.3.x | Fast HTML parsing for MTGGoldfish scraping (10-50x faster than BeautifulSoup) |
 | Testing | pytest | 8.x | With pytest-asyncio, respx (httpx mocking), pytest-cov |
 | Observability | OpenTelemetry | via FastMCP 3 | Native instrumentation — every tool call traced |
 
@@ -154,6 +159,7 @@ mtg-mcp/
 │       │   ├── edhrec.py           # EDHRECClient
 │       │   ├── moxfield.py         # MoxfieldClient
 │       │   ├── spicerack.py        # SpicerackClient
+│       │   ├── mtggoldfish.py      # MTGGoldfishClient (HTML scraping with selectolax)
 │       │   ├── scryfall_bulk.py    # ScryfallBulkClient (file-based, not BaseClient)
 │       │   ├── rules.py            # RulesService (local Comprehensive Rules parser)
 │       │   └── cache.py            # async_cached decorator, TTLCache helpers
@@ -166,6 +172,7 @@ mtg-mcp/
 │       │   ├── edhrec.py           # edhrec_mcp = FastMCP("EDHREC")
 │       │   ├── moxfield.py         # moxfield_mcp = FastMCP("Moxfield")
 │       │   ├── spicerack.py        # spicerack_mcp = FastMCP("Spicerack")
+│       │   ├── mtggoldfish.py      # mtggoldfish_mcp = FastMCP("MTGGoldfish")
 │       │   └── scryfall_bulk.py    # scryfall_bulk_mcp = FastMCP("Scryfall Bulk")
 │       │
 │       ├── utils/                  # Shared utilities (no MCP awareness)
@@ -211,7 +218,8 @@ mtg-mcp/
 │   │   ├── test_edhrec.py          # EDHREC scraping client
 │   │   ├── test_rules.py           # Rules parser service
 │   │   ├── test_moxfield.py        # Moxfield client
-│   │   └── test_spicerack.py       # Spicerack client
+│   │   ├── test_spicerack.py       # Spicerack client
+│   │   └── test_mtggoldfish.py     # MTGGoldfish scraping client
 │   ├── providers/
 │   │   ├── test_scryfall_provider.py
 │   │   ├── test_scryfall_resources.py
@@ -223,7 +231,8 @@ mtg-mcp/
 │   │   ├── test_edhrec_provider.py
 │   │   ├── test_edhrec_resources.py
 │   │   ├── test_moxfield_provider.py
-│   │   └── test_spicerack_provider.py
+│   │   ├── test_spicerack_provider.py
+│   │   └── test_mtggoldfish_provider.py
 │   ├── workflows/
 │   │   ├── test_commander.py       # commander_overview, evaluate_upgrade
 │   │   ├── test_commander_new.py   # card_comparison, budget_upgrade
@@ -265,6 +274,7 @@ mtg-mcp/
 │       ├── edhrec/                 # Commander pages, card synergy
 │       ├── moxfield/               # Deck data
 │       ├── spicerack/              # Tournament results, standings
+│       ├── mtggoldfish/            # Metagame HTML, archetype HTML, staples HTML, deck download
 │       └── rules/                  # Comprehensive Rules text sample
 │
 ├── scripts/
@@ -502,7 +512,7 @@ if __name__ == "__main__":
 
 ### Testing
 
-Four test tiers (973 tests total, 89% coverage), each with a specific purpose. CI runs all tiers on PRs to main.
+Four test tiers (1183 tests total), each with a specific purpose. CI runs all tiers on PRs to main.
 
 **Unit tests** (`tests/services/`, `tests/providers/`, `tests/utils/`, `tests/workflows/`): Test individual services, providers, utilities, and workflow functions in isolation. HTTP mocked via respx with fixture data. FastMCP servers tested using `fastmcp.Client` with the server instance as transport (in-memory, no network). Workflow tests use `AsyncMock` (not respx) since they test pure functions. `~2.5min`
 
@@ -558,6 +568,7 @@ All API clients inherit from BaseClient:
 | EDHREC | 0.5 req/sec | Cache 24hr, behind feature flag |
 | Moxfield | 1 req/sec | Cache 4hr, behind feature flag |
 | Spicerack | 1 req/sec | Cache 4hr, documented public API |
+| MTGGoldfish | 0.5 req/sec | Cache 6-24hr, HTML scraping, behind feature flag |
 
 ### Error Handling
 
@@ -669,7 +680,7 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Transport | stdio default, HTTP optional | stdio for Claude Code/Desktop; HTTP for remote use |
 | Type checker | ty (beta) | Astral stack, speed, FastMCP validates against it |
 | HTTP mocking | respx | Decorator-based, clean API for async httpx mocking |
-| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `moxfield_`, `bulk_`, `spicerack_` | FastMCP mount namespacing |
+| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `moxfield_`, `bulk_`, `spicerack_`, `goldfish_` | FastMCP mount namespacing |
 | Workflow tools | No namespace prefix | Clean names: `commander_overview`, `evaluate_upgrade` |
 | Client lifecycle | Lifespan + module-level `_client` | `Depends()`/`lifespan_context` breaks through `mount()` — module-level is the workaround |
 | Settings wiring | `Settings()` in each lifespan | Base URLs are configurable via `MTG_MCP_*` env vars, not hardcoded |
@@ -691,7 +702,7 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Progress reporting | `ctx.report_progress()` via callback | Workflow pure functions accept `on_progress` callback; `server.py` bridges to MCP `Context.report_progress()` |
 | Tool tags | Tag constants in `providers/__init__.py` | Categorize tools by domain (commander, draft, pricing, beta). Shared constants avoid duplication |
 | Prompts | Registered on workflow server | Guide multi-step analysis workflows. No namespace — clean invocation names |
-| Resources | Registered on provider sub-servers + workflow server | `mtg://` URI templates for cached JSON data access. 18 templates across providers and workflow server |
+| Resources | Registered on provider sub-servers + workflow server | `mtg://` URI templates for cached JSON data access. 20 templates across providers and workflow server |
 | Structured output | `ToolResult` with `structured_content` | All tools return both markdown and a structured `data` dict for programmatic consumption |
 | Response format | `response_format` parameter on all workflow tools | "detailed" (default) or "concise" — controls output verbosity without separate tools |
 | Rules engine | Local file-based service (not BaseClient) | Downloads Comprehensive Rules text, parses into searchable indexes. Behind `MTG_MCP_ENABLE_RULES` flag |
@@ -705,6 +716,8 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Smithery adapter | `smithery.py` | Smithery deployment support via adapter module |
 | Moxfield provider | Behind feature flag, `ns=moxfield` | Reverse-engineered API — fragile, can break without notice |
 | Spicerack provider | Behind feature flag, `ns=spicerack` | Documented public REST API for tournament results. Lowest-risk new data source. Optional `X-API-Key` for higher rate limits |
+| MTGGoldfish provider | Behind feature flag, `ns=goldfish` | HTML scraping (no API) with selectolax. Browser-like UA required. Follows EDHREC fragile-source pattern: feature flag, TAGS_BETA, aggressive caching, ToolError on failure |
+| HTML parsing dependency | selectolax | 10-50x faster than BeautifulSoup, tiny footprint. Added for MTGGoldfish HTML scraping. Only used in `services/mtggoldfish.py` |
 
 ---
 

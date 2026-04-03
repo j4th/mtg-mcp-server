@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from mtg_mcp_server.types import Card
 
 ResponseFormat = Literal["detailed", "concise"]
+
+_RE_SLUG_SPECIAL = re.compile(r"[,.'\"!?:;()]+")
+_RE_SLUG_WHITESPACE = re.compile(r"\s+")
+_RE_SLUG_MULTI_HYPHEN = re.compile(r"-+")
+
+
+def slugify(name: str) -> str:
+    """Convert a name to a URL slug.
+
+    Lowercase, replace spaces with hyphens, strip special characters,
+    collapse multiple hyphens. Used by EDHREC and MTGGoldfish services.
+    """
+    slug = name.lower()
+    slug = _RE_SLUG_SPECIAL.sub("", slug)
+    slug = _RE_SLUG_WHITESPACE.sub("-", slug)
+    slug = _RE_SLUG_MULTI_HYPHEN.sub("-", slug)
+    return slug.strip("-")
 
 
 def format_card_line(card: Card, *, response_format: ResponseFormat = "detailed") -> str:

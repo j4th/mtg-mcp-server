@@ -5,8 +5,8 @@ with a namespace prefix (e.g. ``scryfall_``, ``draft_``). The workflow server is
 mounted **without** a namespace so its tools have clean names like
 ``commander_overview`` rather than ``workflow_commander_overview``.
 
-Feature-flagged backends (17Lands, EDHREC, Moxfield, Spicerack, Scryfall bulk data) are
-conditionally mounted based on ``Settings`` values loaded from ``MTG_MCP_*`` env vars.
+Feature-flagged backends (17Lands, EDHREC, Moxfield, Spicerack, MTGGoldfish, Scryfall bulk
+data) are conditionally mounted based on ``Settings`` values loaded from ``MTG_MCP_*`` env vars.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from mtg_mcp_server.config import Settings
 from mtg_mcp_server.logging import configure_logging
 from mtg_mcp_server.providers.edhrec import edhrec_mcp
 from mtg_mcp_server.providers.moxfield import moxfield_mcp
+from mtg_mcp_server.providers.mtggoldfish import mtggoldfish_mcp
 from mtg_mcp_server.providers.scryfall import scryfall_mcp
 from mtg_mcp_server.providers.scryfall_bulk import scryfall_bulk_mcp
 from mtg_mcp_server.providers.seventeen_lands import draft_mcp
@@ -52,7 +53,8 @@ mcp = FastMCP(
         "- edhrec_*: Commander staples and synergy scores (EDHREC, beta)\n"
         "- moxfield_*: Public decklist fetching (Moxfield, beta)\n"
         "- bulk_*: Rate-limit-free card lookup and search (Scryfall bulk data)\n"
-        "- spicerack_*: Tournament results and metagame data (Spicerack)\n\n"
+        "- spicerack_*: Tournament results and metagame data (Spicerack)\n"
+        "- goldfish_*: Constructed metagame data (MTGGoldfish, beta)\n\n"
         "Workflow tools (no prefix):\n"
         "- commander_overview: Full commander profile from all sources\n"
         "- evaluate_upgrade: Assess a card for a commander deck\n"
@@ -109,6 +111,8 @@ if _settings.enable_bulk_data:
     mcp.mount(scryfall_bulk_mcp, namespace="bulk")
 if _settings.enable_spicerack:
     mcp.mount(spicerack_mcp, namespace="spicerack")
+if _settings.enable_mtggoldfish:
+    mcp.mount(mtggoldfish_mcp, namespace="goldfish")
 
 # Workflow tools mounted without namespace for clean names.
 mcp.mount(workflow_mcp)

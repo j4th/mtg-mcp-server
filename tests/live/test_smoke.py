@@ -22,9 +22,9 @@ class TestServerHealth:
     async def test_all_tools_registered(self, live_client):
         tools = await live_client.list_tools()
         tool_names = {t.name for t in tools}
-        # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 moxfield + 3 spicerack + 9 bulk + 22 workflows + 5 rules = 56
-        assert len(tool_names) == 56, (
-            f"Expected 56 tools, got {len(tool_names)}: {sorted(tool_names)}"
+        # 1 ping + 6 scryfall + 4 spellbook + 2 draft + 2 edhrec + 2 moxfield + 3 spicerack + 4 goldfish + 9 bulk + 22 workflows + 5 rules = 60
+        assert len(tool_names) == 60, (
+            f"Expected 60 tools, got {len(tool_names)}: {sorted(tool_names)}"
         )
 
     async def test_no_mtgjson_tools(self, live_client):
