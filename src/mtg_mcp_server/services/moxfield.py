@@ -126,9 +126,7 @@ class MoxfieldClient(BaseClient):
         try:
             data = response.json()
         except (ValueError, UnicodeDecodeError) as exc:
-            raise MoxfieldError(
-                f"Moxfield returned invalid JSON for deck '{deck_id}'", status_code=200
-            ) from exc
+            raise MoxfieldError(f"Moxfield returned invalid JSON for deck '{deck_id}'") from exc
         return self._parse_deck(data)
 
     async def get_deck_info(self, deck_id_or_url: str) -> MoxfieldDeck:
@@ -240,8 +238,8 @@ class MoxfieldClient(BaseClient):
                 continue
 
             quantity = entry.get("quantity")
-            if not isinstance(quantity, int):
-                log.debug("parse_board.skip_no_quantity", card_id=card_id)
+            if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity < 1:
+                log.debug("parse_board.skip_bad_quantity", card_id=card_id, quantity=quantity)
                 continue
 
             card_obj = entry.get("card")

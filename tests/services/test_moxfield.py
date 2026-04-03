@@ -203,6 +203,34 @@ class TestGetDeck:
         assert result.mainboard[0].name == "Sol Ring"
 
     @respx.mock
+    async def test_defensive_zero_and_bool_quantity_skipped(self):
+        """Entries with quantity=0, quantity=False, or negative quantity are skipped."""
+        fixture = {
+            "id": "test",
+            "name": "Bad quantities",
+            "format": "commander",
+            "boards": {
+                "mainboard": {
+                    "count": 4,
+                    "cards": {
+                        "good": {"quantity": 1, "card": {"name": "Sol Ring"}},
+                        "zero-qty": {"quantity": 0, "card": {"name": "Bad Zero"}},
+                        "bool-qty": {"quantity": False, "card": {"name": "Bad Bool"}},
+                        "neg-qty": {"quantity": -1, "card": {"name": "Bad Neg"}},
+                    },
+                }
+            },
+        }
+        respx.get(f"{BASE_URL}/v3/decks/all/test-id").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.get_deck("test-id")
+
+        assert len(result.mainboard) == 1
+        assert result.mainboard[0].name == "Sol Ring"
+
+    @respx.mock
     async def test_mainboard_cards_sorted_alphabetically(self):
         """Cards within a board are sorted alphabetically by name."""
         fixture = _load_fixture("deck_commander.json")
