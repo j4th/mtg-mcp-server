@@ -110,6 +110,32 @@ When PR review comments come in:
 6. Commit referencing the PR, push
 7. Resolve threads via GraphQL `resolveReviewThread` mutation (get thread IDs from `repository.pullRequest.reviewThreads`)
 
+## PR Review Checklist
+
+When reviewing PRs (automated CI or manual), verify these project-specific completeness checks:
+
+**New provider/backend added:**
+- [ ] `docs/TOOL_DESIGN.md` — tool specs, resource templates
+- [ ] `docs/ARCHITECTURE.md` — system diagram, project structure, tool/resource counts, decisions log
+- [ ] `docs/SERVICE_CONTRACTS.md` — endpoint, response shape, rate limits, caching, feature flag
+- [ ] `docs/CACHING_DESIGN.md` — TTL table entry for new service methods
+- [ ] `.claude/skills/smoke-test/SKILL.md` — new test steps, updated totals
+- [ ] `tests/integration/conftest.py` — respx mocks for new HTTP backends
+- [ ] `tests/integration/test_orchestrator_e2e.py` — tool count assertion updated
+- [ ] `tests/test_parameter_descriptions.py` — new provider in parametrize list
+- [ ] `server.py` — mount statement, instructions string with new tool category
+
+**Error handling in changed code:**
+- [ ] Service exceptions caught → `ToolError` raised with `from exc` (never bare `raise ToolError(...)`)
+- [ ] No broad `except Exception` hiding specific service errors — catch typed exceptions
+- [ ] Workflows handle partial failures — return available data if one backend is down
+- [ ] No silent fallback to defaults without logging (structlog with bound context)
+
+**Data integrity:**
+- [ ] Optional numeric fields use `is not None`, never truthiness (`0` and `0.0` are valid)
+- [ ] New caches: `@async_cached` with class-level `TTLCache`, clearing added to `tests/conftest.py`
+- [ ] Pydantic v2: `.model_validate()` not `.parse_obj()`
+
 ## Gotchas
 
 - FastMCP 3.x import: `from fastmcp import FastMCP` (NOT `from mcp.server.fastmcp`).

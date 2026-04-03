@@ -22,7 +22,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code Review
         id: claude-review
@@ -32,22 +32,90 @@ jobs:
           track_progress: true
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR: #${{ github.event.pull_request.number }}
 
-            Read CLAUDE.md first — it defines the project conventions.
+            You are reviewing a pull request for the MTG MCP server.
+            CLAUDE.md is loaded automatically — it defines all project conventions and
+            includes a PR Review Checklist for completeness verification.
 
-            Review this PR for:
-            1. Correctness — logic errors, edge cases, wrong exception types
-            2. Error handling — missing `from exc` on raises, swallowed exceptions
-            3. Data bugs — optional numeric fields checked with truthiness instead of `is not None`
-            4. Architecture — service/provider/workflow layer boundary violations
-            5. Security — secrets in code, unsanitized input
+            ## Review Process
 
-            Do NOT flag style, formatting, naming, or missing docstrings on unchanged code.
+            Run `gh pr diff ${{ github.event.pull_request.number }}` to get the full diff.
+            Read changed files in full when surrounding context is needed to assess correctness.
+            The PR branch is already checked out — read files directly, don't re-checkout.
 
-            Use inline comments for specific issues with severity (critical/warning/suggestion).
-            Post a summary comment with verdict and issue counts.
+            ## Review Passes
+
+            ### Pass 1: Correctness & Convention Compliance
+            - Logic errors, edge cases, off-by-one, wrong exception types
+            - FastMCP pattern violations (module-level `_client` not `Depends()`, `ToolError` not manual `is_error`)
+            - Typing violations (`list[str]` not `List[str]`, `str | None` not `Optional[str]`, no `Any`)
+            - Layer boundary violations (services must not import MCP; workflow function modules must not import MCP)
+            - Security: secrets in code, unsanitized input
+
+            ### Pass 2: Silent Failure Hunting
+            For every try/except block and fallback path in changed code:
+            - Is `from exc` used on every `raise ToolError(...)` in except blocks? (B904)
+            - Does the except catch only expected exception types, or could it hide unrelated errors?
+            - Are errors logged with context via structlog (not print/bare logging)?
+            - Could any fallback mask a real problem the caller should know about?
+            - Do workflows degrade gracefully (return partial data) vs silently dropping sections?
+            - Are there empty except blocks or catch-log-continue patterns that swallow errors?
+
+            ### Pass 3: Test Coverage Gaps
+            For new or modified functionality:
+            - New service → `tests/services/test_*.py` with respx mocks?
+            - New provider → `tests/providers/test_*_provider.py` with `Client(transport=)` tests?
+            - New workflow → `tests/workflows/test_*.py` with AsyncMock tests?
+            - Error paths tested? (`raise_on_error=False`, check `.is_error`)
+            - New service cache → cache clearing in `tests/conftest.py`?
+            - Edge cases: empty results, missing fields, HTTP errors
+
+            ### Pass 4: Documentation & Infrastructure Completeness
+            Check every item in the "PR Review Checklist" section of CLAUDE.md.
+            For PRs adding tools/providers/services, verify ALL listed files are updated.
+
+            ## Confidence Scoring
+
+            Rate each issue 0-100. Only report issues scoring >= 80.
+            - 90-100: Critical — bugs, security vulnerabilities, explicit CLAUDE.md violations
+            - 80-89: Important — software quality issues, defensive coding gaps, test gaps, doc omissions
+
+            Flag issues backed by: CLAUDE.md rules, concrete bugs, general software quality
+            and best practices, defensive coding, security principles, or error handling quality.
+
+            Only suppress (score < 80): pure cosmetic preferences on unchanged code, naming
+            bikeshedding, or missing docstrings on code not touched by this PR.
+
+            ## Output
+
+            Post inline review comments (with `confirmed: true`) on specific lines for
+            issues scoring >= 80. Each comment: severity, confidence score, what's wrong,
+            concrete fix.
+
+            Post a single summary comment:
+
+            ## PR Review Summary
+
+            **Verdict:** APPROVE / REQUEST_CHANGES / COMMENT
+
+            ### Critical Issues (must fix)
+            - [file:line] Description (confidence: N)
+
+            ### Important Issues (should fix)
+            - [file:line] Description (confidence: N)
+
+            ### Completeness
+            - Docs: ✅/❌ (missing updates)
+            - Tests: ✅/❌ (coverage gaps)
+            - Integration: ✅/❌ (conftest mocks, tool counts)
+
+            ### What's Good
+            - Brief notes on well-done aspects
+
+            If no issues scoring >= 80 exist, post a short approval summary.
           claude_args: >-
             --allowedTools
-            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
-          show_full_output: true
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(git diff:*),Bash(git log:*)"
+            --max-turns
+            "30"
