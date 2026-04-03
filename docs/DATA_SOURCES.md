@@ -51,7 +51,7 @@ These provide critical data but lack official public APIs. Access is through und
 | **Docs** | No official API docs. Community blog posts and tools document the endpoints. Joel Nitta's R tutorial covers public datasets well. | No docs. `pyedhrec` library source code is the best reference. EDHREC FAQ describes data sourcing. | No docs. Community reverse-engineering via network inspection. |
 | **Fragility** | Medium. The card_ratings endpoint has been stable for years and is used by multiple community tools. Could break or get locked down. | High. Scraping undocumented JSON endpoints. EDHREC can change internal structure at any time. Must be behind a feature flag. | High. No official API commitment. Could change or add auth requirements. |
 | **Key metrics / data** | GIH WR (Games In Hand Win Rate) is the primary card quality metric. IWD (Improvement When Drawn) shows how much drawing a card helps. ALSA (Average Last Seen At) shows how late a card wheels. 17Lands user base skews above average — baseline WR is ~56%, not 50%. | Synergy score (+/- percentage vs average deck), inclusion rate (% of decks running the card), number of decks analyzed, card categories (creatures, enchantments, etc.), salt scores. | Deck lists with card counts, categories, tags. Collection with conditions, languages, foil status. Price tracking via TCGPlayer/Cardmarket. |
-| **Our priority** | Complete (Phase 2). Critical for draft/sealed analytics. | Complete (Phase 2). Critical for Commander upgrade recommendations. Behind feature flag due to fragility. | Deferred. Would enable cross-referencing owned collection against upgrade suggestions, but access is unreliable. |
+| **Our priority** | Complete (Phase 2). Critical for draft/sealed analytics. | Complete (Phase 2). Critical for Commander upgrade recommendations. Behind feature flag due to fragility. | Complete. Public decklist fetching (2 tools). Behind feature flag due to fragility. |
 
 ---
 
@@ -81,6 +81,6 @@ Useful for specific use cases but not core to the initial build.
 | 17Lands | None | Undocumented REST + bulk CSV | Stable but unofficial | Complete |
 | EDHREC | None | Reverse-engineered JSON | Fragile — feature flag | Complete |
 | Comprehensive Rules | None | File download | Stable (Wizards-hosted) | Complete |
-| Moxfield | User-Agent header | Reverse-engineered REST | Fragile | Deferred |
+| Moxfield | User-Agent header | Reverse-engineered REST | Fragile — feature flag | Complete |
 | Spicerack | None | Documented REST API | Solid | Deferred |
 | Archidekt | None | Reverse-engineered REST | Fragile | Deferred |

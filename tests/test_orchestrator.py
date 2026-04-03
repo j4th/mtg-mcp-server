@@ -18,11 +18,13 @@ SCRYFALL_FIXTURES = Path(__file__).parent / "fixtures" / "scryfall"
 SPELLBOOK_FIXTURES = Path(__file__).parent / "fixtures" / "spellbook"
 SEVENTEEN_LANDS_FIXTURES = Path(__file__).parent / "fixtures" / "seventeen_lands"
 EDHREC_FIXTURES = Path(__file__).parent / "fixtures" / "edhrec"
+MOXFIELD_FIXTURES = Path(__file__).parent / "fixtures" / "moxfield"
 SCRYFALL_BULK_FIXTURES = Path(__file__).parent / "fixtures" / "scryfall_bulk"
 SCRYFALL_BASE = "https://api.scryfall.com"
 SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
 EDHREC_BASE = "https://json.edhrec.com"
+MOXFIELD_BASE = "https://api2.moxfield.com"
 
 
 def _load_scryfall_fixture(name: str) -> dict:
@@ -43,6 +45,11 @@ def _load_seventeen_lands_fixture(name: str) -> list[dict]:
 def _load_edhrec_fixture(name: str) -> dict:
     """Load an EDHREC JSON fixture by filename."""
     return json.loads((EDHREC_FIXTURES / name).read_text())
+
+
+def _load_moxfield_fixture(name: str) -> dict:
+    """Load a Moxfield JSON fixture by filename."""
+    return json.loads((MOXFIELD_FIXTURES / name).read_text())
 
 
 class TestScryfallMounted:
@@ -171,6 +178,30 @@ class TestEdhrecMounted:
         assert "Muldrotha, the Gravetide" in text
 
 
+class TestMoxfieldMounted:
+    """Verify Moxfield tools appear with moxfield_ namespace on the orchestrator."""
+
+    async def test_namespaced_tools_appear(self, mcp_client: Client):
+        """Both Moxfield tools are listed with the moxfield_ namespace prefix."""
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        assert "moxfield_decklist" in tool_names
+        assert "moxfield_deck_info" in tool_names
+
+    @respx.mock
+    async def test_end_to_end_decklist(self, mcp_client: Client):
+        """Calling moxfield_decklist through the orchestrator returns deck data."""
+        fixture = _load_moxfield_fixture("deck_commander.json")
+        respx.get(f"{MOXFIELD_BASE}/v3/decks/all/abc123").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result = await mcp_client.call_tool("moxfield_decklist", {"deck_id": "abc123"})
+        text = result.content[0].text
+        assert "Muldrotha Self-Mill" in text
+        assert "Sol Ring" in text
+
+
 class TestScryfallBulkMounted:
     """Verify Scryfall bulk data tools appear with bulk_ namespace on the orchestrator."""
 
@@ -244,6 +275,7 @@ class TestServerMetadata:
         assert "spellbook_*" in server.instructions
         assert "draft_*" in server.instructions
         assert "edhrec_*" in server.instructions
+        assert "moxfield_*" in server.instructions
         assert "bulk_*" in server.instructions
         assert "Workflow" in server.instructions
 
@@ -328,7 +360,7 @@ class TestToolSchemaCompleteness:
         """Server exposes the expected number of tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
-        assert len(tools) == 51, f"Expected 51 tools, got {len(tools)}.\nTools: {tool_names}"
+        assert len(tools) == 53, f"Expected 53 tools, got {len(tools)}.\nTools: {tool_names}"
 
     async def test_no_context_parameter_exposed(self, mcp_client: Client):
         """No tool should expose 'ctx' (Context) as a user-visible parameter."""
@@ -388,6 +420,7 @@ class TestResourcePropagation:
             "theme/{theme}",  # Theme search
             "tribe/{tribe}",  # Tribal staples
             "signals",  # Draft signals
+            "moxfield/",  # Moxfield deck
             # rules/keywords and rules/sections are static (no URI params)
             # so they appear in list_resources(), not list_resource_templates()
         ]
@@ -398,10 +431,10 @@ class TestResourcePropagation:
             )
 
     async def test_resource_template_count(self, mcp_client: Client):
-        """At least 16 resource templates are registered (18 total minus 2 static)."""
+        """At least 17 resource templates are registered (19 total minus 2 static)."""
         templates = await mcp_client.list_resource_templates()
-        assert len(templates) >= 16, (
-            f"Expected >= 16 resource templates, got {len(templates)}.\n"
+        assert len(templates) >= 17, (
+            f"Expected >= 17 resource templates, got {len(templates)}.\n"
             f"Templates: {[t.uriTemplate for t in templates]}"
         )
 
@@ -472,6 +505,7 @@ class TestToolNamingConventions:
             "spellbook_": ["spellbook_find_combos", "spellbook_combo_details"],
             "draft_": ["draft_card_ratings", "draft_archetype_stats"],
             "edhrec_": ["edhrec_commander_staples", "edhrec_card_synergy"],
+            "moxfield_": ["moxfield_decklist", "moxfield_deck_info"],
             "bulk_": ["bulk_card_lookup", "bulk_card_search"],
         }
         for prefix, expected_tools in backend_prefixes.items():
