@@ -29,15 +29,15 @@ For each call: note PASS / FAIL (with detail) / SKIP (tool unavailable or featur
 | Call | Validate |
 |------|----------|
 | `ping()` | Returns "pong" |
-| `scryfall_card_details(name="Sol Ring")` | Artifact, mana cost `{1}`, prices present, commander legal |
+| `scryfall_card_details(name="Sol Ring")` | Artifact, mana cost `{1}`, commander legal |
 | `scryfall_search_cards(query="t:creature id:sultai cmc<=3")` | Multiple creature results |
-| `scryfall_card_rulings(name="Sol Ring")` | At least one ruling |
+| `scryfall_card_rulings(name="Muldrotha, the Gravetide")` | At least one ruling (Sol Ring has 0 rulings; Muldrotha reliably has 8+) |
 
 ### 2. Bulk Data (parallel batch)
 
 | Call | Validate |
 |------|----------|
-| `bulk_card_lookup(name="Sol Ring")` | **Regression check:** type_line = "Artifact" (NOT "Card // Card"), set NOT "acmm", commander "legal" (NOT "not_legal"), EDHREC rank present, prices present |
+| `bulk_card_lookup(name="Sol Ring")` | **Regression check:** type_line = "Artifact" (NOT "Card // Card"), set NOT "acmm", commander "legal" (NOT "not_legal"), EDHREC rank present. Note: Oracle Cards printing (SOC) may lack USD prices — this is expected, not a failure |
 | `bulk_card_lookup(name="Delver of Secrets")` | DFC lookup works, oracle text present |
 | `bulk_card_search(query="Lightning", search_field="name")` | Lightning Bolt in results |
 | `bulk_card_search(query="Creature", search_field="type", limit=3)` | Creature type lines |
@@ -73,7 +73,7 @@ If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_se
 |------|----------|
 | `commander_overview(commander_name="Muldrotha, the Gravetide")` | Card header + combos section + data sources |
 | `evaluate_upgrade(card_name="Spore Frog", commander_name="Muldrotha, the Gravetide")` | Card details + synergy data |
-| `price_comparison(cards=["Sol Ring", "Lightning Bolt"])` | USD prices for both cards |
+| `price_comparison(cards=["Lightning Bolt", "Counterspell"])` | USD prices for both cards (avoid Sol Ring — Oracle Cards printing lacks prices) |
 | `deck_validate(decklist=["4 Lightning Bolt", "4 Sol Ring", "52 Island"], format="modern")` | INVALID — Sol Ring not modern-legal |
 
 ### 8. Deck Building Workflows (parallel batch)
@@ -98,7 +98,7 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 - Names match
 - Type lines match
 - Both show commander: legal
-- Both have USD prices (values may differ slightly)
+- Scryfall API returns prices (latest printing); bulk data may lack prices (Oracle Cards printing may be a set without retail pricing like SOC)
 
 ## Report Format
 

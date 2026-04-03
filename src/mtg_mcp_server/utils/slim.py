@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mtg_mcp_server.types import Card, Combo, DraftCardRating, EDHRECCard
+    from mtg_mcp_server.types import Card, Combo, DraftCardRating, EDHRECCard, Rule
 
 
 def slim_card(card: Card) -> dict:
@@ -55,4 +55,12 @@ def slim_combo(combo: Combo) -> dict:
         "cards": [c.name for c in combo.cards],
         "results": [r.feature_name for r in combo.produces],
         "color_identity": combo.identity,
+    }
+
+
+def slim_rule(rule: Rule) -> dict:
+    """Essential rule fields (number + text, no recursive subrules)."""
+    return {
+        "number": rule.number,
+        "text": rule.text,
     }

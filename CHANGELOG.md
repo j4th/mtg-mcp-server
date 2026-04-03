@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `slim_rating()`: name, color, rarity, gih_wr, alsa, iwd, game_count
   - `slim_edhrec_card()`: name, synergy, inclusion, num_decks
   - `slim_combo()`: id, card names, result feature_names, color_identity
+  - `slim_rule()`: number, text (drops recursive subrules)
+- All 5 rules workflow tools (`rules_lookup`, `keyword_explain`, `rules_interaction`, `rules_scenario`, `combat_calculator`) use `slim_rule()` in structured_content
 - Response middleware tightened: per-tool 30KB limit on 3 heaviest tools + global 100KB safety net (was 500KB global)
 - Input validation: `sort_by` raises `ToolError` on invalid values, `limit` raises on negative values
 

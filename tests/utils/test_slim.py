@@ -16,8 +16,15 @@ from mtg_mcp_server.types import (
     ComboResult,
     DraftCardRating,
     EDHRECCard,
+    Rule,
 )
-from mtg_mcp_server.utils.slim import slim_card, slim_combo, slim_edhrec_card, slim_rating
+from mtg_mcp_server.utils.slim import (
+    slim_card,
+    slim_combo,
+    slim_edhrec_card,
+    slim_rating,
+    slim_rule,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -263,3 +270,49 @@ class TestSlimCombo:
     def test_field_count(self, sample_combo: Combo) -> None:
         result = slim_combo(sample_combo)
         assert len(result) == 4
+
+
+# ---------------------------------------------------------------------------
+# slim_rule
+# ---------------------------------------------------------------------------
+
+
+class TestSlimRule:
+    @pytest.fixture
+    def sample_rule(self) -> Rule:
+        return Rule(
+            number="702.2b",
+            text="A creature with toughness greater than 0 that's been dealt damage by a source with deathtouch since the last time state-based actions were checked is destroyed as a state-based action.",
+            subrules=[
+                Rule(number="702.2c", text="Subrule text here."),
+            ],
+        )
+
+    def test_includes_essential_fields(self, sample_rule: Rule) -> None:
+        result = slim_rule(sample_rule)
+        assert result["number"] == "702.2b"
+        assert "deathtouch" in result["text"]
+
+    def test_excludes_subrules(self, sample_rule: Rule) -> None:
+        result = slim_rule(sample_rule)
+        assert "subrules" not in result
+
+    def test_field_count(self, sample_rule: Rule) -> None:
+        result = slim_rule(sample_rule)
+        assert len(result) == 2
+
+    def test_no_recursive_bloat(self) -> None:
+        """Deeply nested subrules should not appear in slim output."""
+        deep = Rule(
+            number="100.1",
+            text="Top level",
+            subrules=[
+                Rule(
+                    number="100.1a",
+                    text="Level 1",
+                    subrules=[Rule(number="100.1a-i", text="Level 2")],
+                ),
+            ],
+        )
+        result = slim_rule(deep)
+        assert result == {"number": "100.1", "text": "Top level"}

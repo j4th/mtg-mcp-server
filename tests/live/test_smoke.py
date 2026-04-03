@@ -40,12 +40,10 @@ class TestBulkDataLive:
         result = await live_client.call_tool("bulk_card_lookup", {"name": "Sol Ring"})
         assert "Artifact" in result.content[0].text
 
-    async def test_sol_ring_has_prices(self, live_client):
-        result = await live_client.call_tool("bulk_card_lookup", {"name": "Sol Ring"})
+    async def test_lightning_bolt_has_prices(self, live_client):
+        result = await live_client.call_tool("bulk_card_lookup", {"name": "Lightning Bolt"})
         text = result.content[0].text
-        # Sol Ring's Oracle Cards printing (SOC) may lack USD price;
-        # accept either a price or a successful lookup without prices.
-        assert "Sol Ring" in text
+        assert "$" in text
 
     async def test_sol_ring_has_legalities(self, live_client):
         result = await live_client.call_tool("bulk_card_lookup", {"name": "Sol Ring"})
