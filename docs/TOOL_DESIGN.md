@@ -11,8 +11,8 @@ Search for cards using Scryfall's full search syntax.
 
 | Field | Detail |
 |-------|--------|
-| Input | `query: str` (Scryfall syntax, e.g. `"f:commander id:sultai t:creature cmc<=3"`), `page: int = 1` |
-| Output | Formatted list of matching cards with name, type, mana cost, price. Pagination info. |
+| Input | `query: str` (Scryfall syntax, e.g. `"f:commander id:sultai t:creature cmc<=3"`), `page: int = 1`, `limit: int = 30` (0 for all), `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Formatted list of matching cards with name, type, mana cost, price. Pagination info. Structured content uses slim card fields. |
 | Backend | `ScryfallClient.search_cards()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -119,8 +119,8 @@ Get win rate and draft data for cards in a set.
 
 | Field | Detail |
 |-------|--------|
-| Input | `set_code: str` (e.g. "LCI", "MKM", "OTJ"), `event_type: str = "PremierDraft"` |
-| Output | Per-card: name, color, rarity, GIH WR, ALSA, IWD, games played |
+| Input | `set_code: str` (e.g. "LCI", "MKM", "OTJ"), `event_type: str = "PremierDraft"`, `limit: int = 50` (0 for all), `sort_by: str = "gih_wr"` (also: "alsa", "iwd", "name"), `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Per-card: name, color, rarity, GIH WR, ALSA, IWD, games played. Structured content uses slim rating fields. |
 | Backend | `SeventeenLandsClient.card_ratings()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -143,8 +143,8 @@ Get the most-played cards for a commander, with synergy scores and inclusion rat
 
 | Field | Detail |
 |-------|--------|
-| Input | `commander_name: str`, `category: str | None = None` (e.g. "creatures", "enchantments", "lands") |
-| Output | Top cards with: name, synergy score, inclusion %, total decks analyzed |
+| Input | `commander_name: str`, `category: str | None = None` (e.g. "creatures", "enchantments", "lands"), `limit: int = 10` per category (0 for all), `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Top cards with: name, synergy score, inclusion %, total decks analyzed. Structured content uses slim EDHREC card fields. |
 | Backend | `EDHRECClient.commander_top_cards()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 

@@ -163,7 +163,8 @@ mtg-mcp/
 │       │   ├── format_rules.py     # Format-specific rules (deck sizes, copy limits)
 │       │   ├── formatters.py       # Shared formatting helpers (ResponseFormat, markdown)
 │       │   ├── mana.py             # Mana cost parsing utilities
-│       │   └── query_parser.py     # Search query parsing for bulk data
+│       │   ├── query_parser.py     # Search query parsing for bulk data
+│       │   └── slim.py             # Slim dict builders for structured_content response sizes
 │       │
 │       └── workflows/              # Composed tools (registered on orchestrator, no namespace)
 │           ├── __init__.py
@@ -231,7 +232,8 @@ mtg-mcp/
 │   │   ├── test_decklist.py        # Decklist parsing
 │   │   ├── test_format_rules.py    # Format rule validation
 │   │   ├── test_mana.py            # Mana cost parsing
-│   │   └── test_query_parser.py    # Search query parsing
+│   │   ├── test_query_parser.py    # Search query parsing
+│   │   └── test_slim.py            # Slim dict builder tests
 │   ├── integration/                # Fixture-mocked cross-component E2E tests
 │   │   ├── conftest.py             # Bulk client + orchestrator fixtures (respx-mocked)
 │   │   ├── test_bulk_data_e2e.py   # Bulk data pipeline: lookup, search, resources
@@ -671,7 +673,8 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Rules integration | RulesService in workflow lifespan | Rules tools are workflow tools (not a separate provider) since they compose with bulk data for card examples |
 | Utilities package | `utils/` directory | Shared helpers (color identity, decklist parsing, format rules, mana parsing, query parsing) extracted from workflows for reuse and testability |
 | Attribution lines | Constants in `providers/__init__.py` | `ATTRIBUTION_*` strings appended to tool outputs for data source compliance |
-| Response limiting | `ResponseLimitingMiddleware(max_size=500_000)` | Prevents edge-case payloads from overwhelming LLM context windows |
+| Response limiting | Per-tool `ResponseLimitingMiddleware(max_size=30_000)` for heavy tools + global `100_000` safety net | Primary size control via slim field sets and limit params; middleware is a safety net |
+| Slim structured output | `utils/slim.py` dict builders | `slim_card()`, `slim_rating()`, `slim_edhrec_card()`, `slim_combo()` — essential fields only for `structured_content`, full data via resource URIs |
 | CodeMode transform | Experimental, behind `enable_code_mode` flag | FastMCP CodeMode replaces individual tools with meta-tools for discovery and code execution at 40+ tools |
 | MTGJSON replacement | Scryfall Oracle Cards bulk data | Scryfall bulk data includes prices, legalities, images, EDHREC rank — everything MTGJSON lacked |
 | Smithery adapter | `smithery.py` | Smithery deployment support via adapter module |

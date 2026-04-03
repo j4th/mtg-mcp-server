@@ -18,6 +18,8 @@ from pydantic import Field
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import ATTRIBUTION_EDHREC, TAGS_BETA, TOOL_ANNOTATIONS
 from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient, EDHRECError
+from mtg_mcp_server.utils.formatters import ResponseFormat  # noqa: TC001 — runtime for FastMCP
+from mtg_mcp_server.utils.slim import slim_edhrec_card
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
 _client: EDHRECClient | None = None
@@ -58,16 +60,22 @@ async def commander_staples(
             description="Filter by card type: 'creatures', 'enchantments', 'artifacts', 'instants', 'sorceries', 'lands', 'planeswalkers'"
         ),
     ] = None,
+    limit: Annotated[
+        int,
+        Field(description="Max cards per category (default 10, 0 for all)"),
+    ] = 10,
+    response_format: Annotated[
+        ResponseFormat,
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> ToolResult:
     """Get the most-played cards for a commander with synergy scores and inclusion rates.
 
     Shows which cards are most commonly played with this commander and how
     synergistic they are (vs. generic popularity).
-
-    Args:
-        commander_name: Full commander name (e.g. "Muldrotha, the Gravetide").
-        category: Optional filter by card type (e.g. "creatures", "enchantments", "lands").
     """
+    if limit < 0:
+        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
     client = _get_client()
     try:
         data = await client.commander_top_cards(commander_name, category=category)
@@ -85,21 +93,37 @@ async def commander_staples(
         lines.append("No card data available.")
         return ToolResult(
             content="\n".join(lines) + ATTRIBUTION_EDHREC,
-            structured_content=data.model_dump(mode="json"),
+            structured_content={
+                "commander_name": data.commander_name,
+                "total_decks": data.total_decks,
+                "categories": [],
+            },
         )
 
+    categories = []
     for cardlist in data.cardlists:
+        cards = cardlist.cardviews if limit == 0 else cardlist.cardviews[:limit]
         lines.append(f"\n### {cardlist.header}")
-        for card in cardlist.cardviews:
+        for card in cards:
             pct = _inclusion_pct(card.num_decks, data.total_decks)
             synergy_str = f"+{card.synergy:.0%}" if card.synergy >= 0 else f"{card.synergy:.0%}"
-            lines.append(
-                f"  {card.name} — synergy: {synergy_str}, in {pct}% of decks ({card.num_decks})"
-            )
+            if response_format == "concise":
+                lines.append(f"  {card.name} — synergy: {synergy_str}")
+            else:
+                lines.append(
+                    f"  {card.name} — synergy: {synergy_str}, in {pct}% of decks ({card.num_decks})"
+                )
+        categories.append(
+            {"header": cardlist.header, "cards": [slim_edhrec_card(c) for c in cards]}
+        )
 
     return ToolResult(
         content="\n".join(lines) + ATTRIBUTION_EDHREC,
-        structured_content=data.model_dump(mode="json"),
+        structured_content={
+            "commander_name": data.commander_name,
+            "total_decks": data.total_decks,
+            "categories": categories,
+        },
     )
 
 

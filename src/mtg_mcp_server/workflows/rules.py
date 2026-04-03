@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from mtg_mcp_server.utils.slim import slim_rule
 from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
@@ -289,7 +290,7 @@ async def rules_lookup(
     data = {
         "query": query,
         "section": section,
-        "rules": [r.model_dump(mode="json") for r in found_rules],
+        "rules": [slim_rule(r) for r in found_rules],
     }
 
     log.info("rules_lookup.complete", query=query, count=len(found_rules))
@@ -376,7 +377,7 @@ async def keyword_explain(
     data: dict[str, object] = {
         "keyword": keyword,
         "glossary": glossary.model_dump(mode="json") if glossary else None,
-        "rules": [r.model_dump(mode="json") for r in related_rules],
+        "rules": [slim_rule(r) for r in related_rules],
         "interactions": [{"keyword": kw, "note": note} for kw, note in interactions],
         "example_cards": [c.name for c in example_cards],
     }
@@ -498,12 +499,12 @@ async def rules_interaction(
         "mechanic_a": {
             "name": mechanic_a,
             "glossary": glossary_a.model_dump(mode="json") if glossary_a else None,
-            "rules": [r.model_dump(mode="json") for r in rules_a],
+            "rules": [slim_rule(r) for r in rules_a],
         },
         "mechanic_b": {
             "name": mechanic_b,
             "glossary": glossary_b.model_dump(mode="json") if glossary_b else None,
-            "rules": [r.model_dump(mode="json") for r in rules_b],
+            "rules": [slim_rule(r) for r in rules_b],
         },
         "interaction": interaction_note,
     }
@@ -605,7 +606,7 @@ async def rules_scenario(
     data = {
         "scenario": scenario,
         "keywords_extracted": list(all_rules.keys()),
-        "rules": [r.model_dump(mode="json") for r in unique_rules],
+        "rules": [slim_rule(r) for r in unique_rules],
     }
 
     log.info("rules_scenario.complete", keywords=len(all_rules), rules=len(unique_rules))
@@ -773,10 +774,9 @@ async def combat_calculator(
             for name in blockers
         ],
         "has_first_strike": has_first_strike,
-        "combat_rules": [r.model_dump(mode="json") for r in combat_rules],
+        "combat_rules": [slim_rule(r) for r in combat_rules],
         "keyword_rules": {
-            kw: [r.model_dump(mode="json") for r in kw_rules]
-            for kw, kw_rules in keyword_rules.items()
+            kw: [slim_rule(r) for r in kw_rules] for kw, kw_rules in keyword_rules.items()
         },
     }
 

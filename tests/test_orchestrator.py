@@ -342,6 +342,23 @@ class TestToolSchemaCompleteness:
 
 
 # ---------------------------------------------------------------------------
+# Middleware configuration tests
+# ---------------------------------------------------------------------------
+
+
+class TestMiddlewareConfig:
+    """Verify response-limiting middleware targets real tool names."""
+
+    async def test_per_tool_middleware_targets_exist(self, mcp_client: Client):
+        """Per-tool middleware tool names must match registered tools."""
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        heavy_tools = {"scryfall_search_cards", "draft_card_ratings", "edhrec_commander_staples"}
+        missing = heavy_tools - tool_names
+        assert not missing, f"Middleware targets not registered as tools: {missing}"
+
+
+# ---------------------------------------------------------------------------
 # Resource propagation tests
 # ---------------------------------------------------------------------------
 

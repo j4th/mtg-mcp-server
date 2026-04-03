@@ -30,6 +30,7 @@ from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient, ScryfallBu
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
 from mtg_mcp_server.utils.formatters import ResponseFormat, format_card_detail
 from mtg_mcp_server.utils.query_parser import parse_query
+from mtg_mcp_server.utils.slim import slim_card
 
 # Lightweight format alias map — maps common abbreviations to Scryfall legality
 # keys. Unlike utils.format_rules.normalize_format, this does NOT reject unknown
@@ -224,7 +225,7 @@ async def card_search(
             "query": query,
             "search_field": search_field,
             "total_results": len(results),
-            "cards": [card.model_dump(mode="json") for card in results],
+            "cards": [slim_card(card) for card in results],
         },
     )
 
@@ -449,7 +450,7 @@ async def format_search(
             "query": query,
             "color_identity": color_identity,
             "total_results": len(matches),
-            "cards": [card.model_dump(mode="json") for card in matches],
+            "cards": [slim_card(card) for card in matches],
         },
     )
 
@@ -535,7 +536,7 @@ async def format_staples(
             "color": color,
             "card_type": card_type,
             "total_results": len(matches),
-            "cards": [card.model_dump(mode="json") for card in matches],
+            "cards": [slim_card(card) for card in matches],
         },
     )
 
@@ -625,10 +626,7 @@ async def similar_cards(
         structured_content={
             "source_card": source.name,
             "total_results": len(top),
-            "similar": [
-                {"name": card.name, "score": score, **card.model_dump(mode="json")}
-                for score, card in top
-            ],
+            "similar": [{"score": score, **slim_card(card)} for score, card in top],
         },
     )
 

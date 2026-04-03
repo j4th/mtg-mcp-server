@@ -53,6 +53,46 @@ class TestSearchCards:
         assert sc["query"] == "f:commander id:sultai t:creature"
         assert sc["total_cards"] == 9273
         assert isinstance(sc["cards"], list)
+        assert sc["showing"] == len(sc["cards"])
+        assert sc["card_detail_uri_template"] == "mtg://card/{name}"
+        # Cards use slim fields, not full model_dump
+        card = sc["cards"][0]
+        assert "name" in card
+        assert "mana_cost" in card
+        assert "type_line" in card
+        assert "rarity" in card
+        assert "price_usd" in card
+        assert "edhrec_rank" in card
+        # Bloat fields excluded
+        assert "legalities" not in card
+        assert "image_uris" not in card
+        assert "oracle_text" not in card
+        assert "id" not in card
+
+    @respx.mock
+    async def test_limit_truncates_results(self, client: Client):
+        """search_cards respects limit parameter to cap returned cards."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "search_cards", {"query": "f:commander id:sultai t:creature", "limit": 1}
+        )
+        sc = result.structured_content
+        assert sc["showing"] == 1
+        assert len(sc["cards"]) == 1
+
+    @respx.mock
+    async def test_limit_zero_returns_all(self, client: Client):
+        """search_cards with limit=0 returns all cards on the page."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "search_cards", {"query": "f:commander id:sultai t:creature", "limit": 0}
+        )
+        sc = result.structured_content
+        assert sc["showing"] == len(fixture["data"])
 
 
 class TestSearchCardsConcise:
@@ -272,6 +312,29 @@ class TestWhatsNew:
         assert isinstance(sc, dict)
         assert sc["total_cards"] == 9273
         assert isinstance(sc["cards"], list)
+        assert len(sc["cards"]) > 0
+        # Slim card fields
+        card = sc["cards"][0]
+        assert "name" in card
+        assert "mana_cost" in card
+        assert "type_line" in card
+        assert "rarity" in card
+        # Bloat fields excluded
+        assert "oracle_text" not in card
+        assert "legalities" not in card
+        assert "image_uris" not in card
+
+    @respx.mock
+    async def test_negative_limit_raises_error(self, client: Client):
+        """search_cards raises ToolError for negative limit."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "search_cards", {"query": "t:creature", "limit": -1}, raise_on_error=False
+        )
+        assert result.is_error
+        assert "limit must be >= 0" in result.content[0].text
 
     @respx.mock
     async def test_with_set_and_format_filters(self, client: Client):

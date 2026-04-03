@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-04-02
+
+### Added
+- `limit` parameter on `scryfall_search_cards` (default 30), `draft_card_ratings` (default 50), and `edhrec_commander_staples` (default 10 per category) — pass `limit=0` for all results
+- `sort_by` parameter on `draft_card_ratings` — sort by `gih_wr` (default), `alsa`, `iwd`, or `name`
+- `response_format` parameter on `draft_card_ratings` and `edhrec_commander_staples` — `"concise"` mode for shorter output
+- Resource URI hints in structured_content: `full_data_uri` on `draft_card_ratings`, `card_detail_uri_template` on `scryfall_search_cards`
+- `showing` count in structured_content for tools with limit parameters
+- Middleware tool name verification test in orchestrator
+
+### Changed
+- Structured_content uses slim field sets instead of full `model_dump()` — 83-97% size reduction on heavy tools
+  - `slim_card()`: name, mana_cost, type_line, rarity, price_usd, edhrec_rank
+  - `slim_rating()`: name, color, rarity, gih_wr, alsa, iwd, game_count
+  - `slim_edhrec_card()`: name, synergy, inclusion, num_decks
+  - `slim_combo()`: id, card names, result feature_names, color_identity
+  - `slim_rule()`: number, text (drops recursive subrules)
+- All 5 rules workflow tools (`rules_lookup`, `keyword_explain`, `rules_interaction`, `rules_scenario`, `combat_calculator`) use `slim_rule()` in structured_content
+- Response middleware tightened: per-tool 30KB limit on 3 heaviest tools + global 100KB safety net (was 500KB global)
+- Input validation: `sort_by` raises `ToolError` on invalid values, `limit` raises on negative values
+
+### Fixed
+- `test_sol_ring_has_prices` live test no longer fails when Oracle Cards printing lacks USD price
+
+[2.1.0]: https://github.com/j4th/mtg-mcp-server/compare/v2.0.0...v2.1.0
+
 ## [2.0.0] - 2026-03-29
 
 v2.0.0 marks the feature-complete milestone for the MTG MCP server. This is not a

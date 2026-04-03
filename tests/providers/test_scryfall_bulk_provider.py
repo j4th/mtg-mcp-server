@@ -246,6 +246,18 @@ class TestCardSearch:
         assert isinstance(sc, dict)
         assert sc["query"] == "Sol"
         assert isinstance(sc["cards"], list)
+        assert len(sc["cards"]) > 0
+        # Slim card fields
+        card = sc["cards"][0]
+        assert "name" in card
+        assert "mana_cost" in card
+        assert "type_line" in card
+        assert "rarity" in card
+        # Bloat fields excluded
+        assert "oracle_text" not in card
+        assert "legalities" not in card
+        assert "image_uris" not in card
+        assert "id" not in card
 
     async def test_search_by_type(self, client_with_data: Client):
         """card_search finds cards by type line when search_field is 'type'."""

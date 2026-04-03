@@ -209,6 +209,39 @@ class TestCommanderOverview:
         # Structured data check
         assert isinstance(result.data, dict)
 
+        # Slim commander fields
+        commander = result.data["commander"]
+        assert commander["name"] == "Muldrotha, the Gravetide"
+        assert commander["mana_cost"] == "{3}{B}{G}{U}"
+        assert "type_line" in commander
+        assert "rarity" in commander
+        # Bloat fields excluded
+        assert "oracle_text" not in commander
+        assert "legalities" not in commander
+        assert "id" not in commander
+
+        # Slim combo fields
+        assert isinstance(result.data["combos"], list)
+        assert len(result.data["combos"]) == 2
+        combo = result.data["combos"][0]
+        assert "id" in combo
+        assert "cards" in combo
+        assert "results" in combo
+        assert "color_identity" in combo
+        # Bloat fields excluded
+        assert "description" not in combo
+        assert "popularity" not in combo
+
+        # Slim EDHREC fields
+        edhrec_data_out = result.data["edhrec"]
+        assert edhrec_data_out is not None
+        assert edhrec_data_out["commander_name"] == "Muldrotha, the Gravetide"
+        assert isinstance(edhrec_data_out["categories"], list)
+        ecard = edhrec_data_out["categories"][0]["cards"][0]
+        assert "name" in ecard
+        assert "synergy" in ecard
+        assert "sanitized" not in ecard
+
         # Card header section
         assert "Muldrotha, the Gravetide" in result.markdown
         assert "{3}{B}{G}{U}" in result.markdown
@@ -465,6 +498,33 @@ class TestEvaluateUpgrade:
 
         # Structured data check
         assert isinstance(result.data, dict)
+
+        # Slim card fields
+        card_out = result.data["card"]
+        assert card_out["name"] == "Spore Frog"
+        assert card_out["mana_cost"] == "{G}"
+        assert "type_line" in card_out
+        assert "rarity" in card_out
+        # Bloat fields excluded
+        assert "oracle_text" not in card_out
+        assert "legalities" not in card_out
+        assert "id" not in card_out
+
+        # Slim combo fields
+        assert isinstance(result.data["combos"], list)
+        combo = result.data["combos"][0]
+        assert "id" in combo
+        assert "cards" in combo
+        assert "results" in combo
+        assert "description" not in combo
+
+        # Slim synergy fields
+        synergy_out = result.data["synergy"]
+        assert synergy_out is not None
+        assert synergy_out["name"] == "Spore Frog"
+        assert synergy_out["synergy"] == 0.61
+        assert "sanitized" not in synergy_out
+        assert "label" not in synergy_out
 
         # Card details
         assert "Spore Frog" in result.markdown

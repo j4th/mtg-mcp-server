@@ -54,8 +54,18 @@ class TestCommanderStaples:
         assert sc is not None
         assert sc["commander_name"] == "Muldrotha, the Gravetide"
         assert sc["total_decks"] == 22329
-        assert isinstance(sc["cardlists"], list)
-        assert len(sc["cardlists"]) > 0
+        assert isinstance(sc["categories"], list)
+        assert len(sc["categories"]) > 0
+        # Slim fields only
+        card = sc["categories"][0]["cards"][0]
+        assert "name" in card
+        assert "synergy" in card
+        assert "inclusion" in card
+        assert "num_decks" in card
+        # Bloat fields excluded
+        assert "sanitized" not in card
+        assert "potential_decks" not in card
+        assert "label" not in card
 
     @respx.mock
     async def test_category_filter(self, client: Client):
@@ -78,8 +88,52 @@ class TestCommanderStaples:
         # Structured output respects filter
         sc = result.structured_content
         assert sc is not None
-        assert len(sc["cardlists"]) == 1
-        assert sc["cardlists"][0]["header"] == "Creatures"
+        assert len(sc["categories"]) == 1
+        assert sc["categories"][0]["header"] == "Creatures"
+
+    @respx.mock
+    async def test_limit_caps_per_category(self, client: Client):
+        """commander_staples respects limit parameter per category."""
+        fixture = _load_fixture("commander_muldrotha.json")
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result = await client.call_tool(
+            "commander_staples",
+            {"commander_name": "Muldrotha, the Gravetide", "limit": 2},
+        )
+        sc = result.structured_content
+        for cat in sc["categories"]:
+            assert len(cat["cards"]) <= 2
+
+    @respx.mock
+    async def test_negative_limit_raises_error(self, client: Client):
+        """commander_staples raises ToolError for negative limit."""
+        result = await client.call_tool(
+            "commander_staples",
+            {"commander_name": "Muldrotha, the Gravetide", "limit": -1},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "limit must be >= 0" in result.content[0].text
+
+    @respx.mock
+    async def test_concise_format(self, client: Client):
+        """commander_staples concise format shows only name and synergy."""
+        fixture = _load_fixture("commander_muldrotha.json")
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result = await client.call_tool(
+            "commander_staples",
+            {"commander_name": "Muldrotha, the Gravetide", "response_format": "concise"},
+        )
+        text = result.content[0].text
+        assert "synergy:" in text
+        # Concise omits inclusion % and deck counts
+        assert "% of decks" not in text
 
     @respx.mock
     async def test_not_found_returns_error(self, client: Client):
