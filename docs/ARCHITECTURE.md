@@ -25,7 +25,7 @@ Claude Code / claude.ai / any MCP client
               │ stdio (default) or streamable HTTP
               │
     ┌─────────▼──────────┐
-    │   MTG Orchestrator  │  ← FastMCP("MTG"), 51 tools, 17 prompts, 18 resources
+    │   MTG Orchestrator  │  ← FastMCP("MTG"), 56 tools, 17 prompts, 19 resources
     │                     │
     │  Workflow Tools:     │  ← Compose across backends (no namespace)
     │  Commander:          │  Draft/Limited:
@@ -68,6 +68,14 @@ Claude Code / claude.ai / any MCP client
     │  ┌─────────────┐    │
     │  │  Scryfall    │────┼──► api.scryfall.com (bulk data)
     │  │  Bulk ns=bulk│    │    Rate-limit-free card lookup and search
+    │  └─────────────┘    │
+    │  ┌─────────────┐    │
+    │  │  Moxfield    │────┼──► moxfield.com (reverse-engineered)
+    │  │  ns=moxfield │    │    Public decklist fetching
+    │  └─────────────┘    │
+    │  ┌─────────────┐    │
+    │  │  Spicerack   │────┼──► api.spicerack.gg
+    │  │  ns=spicerack│    │    Tournament results, standings
     │  └─────────────┘    │
     └─────────────────────┘
 ```
@@ -144,6 +152,8 @@ mtg-mcp/
 │       │   ├── spellbook.py        # SpellbookClient
 │       │   ├── seventeen_lands.py  # SeventeenLandsClient
 │       │   ├── edhrec.py           # EDHRECClient
+│       │   ├── moxfield.py         # MoxfieldClient
+│       │   ├── spicerack.py        # SpicerackClient
 │       │   ├── scryfall_bulk.py    # ScryfallBulkClient (file-based, not BaseClient)
 │       │   ├── rules.py            # RulesService (local Comprehensive Rules parser)
 │       │   └── cache.py            # async_cached decorator, TTLCache helpers
@@ -154,6 +164,8 @@ mtg-mcp/
 │       │   ├── spellbook.py        # spellbook_mcp = FastMCP("Spellbook")
 │       │   ├── seventeen_lands.py  # draft_mcp = FastMCP("17Lands")
 │       │   ├── edhrec.py           # edhrec_mcp = FastMCP("EDHREC")
+│       │   ├── moxfield.py         # moxfield_mcp = FastMCP("Moxfield")
+│       │   ├── spicerack.py        # spicerack_mcp = FastMCP("Spicerack")
 │       │   └── scryfall_bulk.py    # scryfall_bulk_mcp = FastMCP("Scryfall Bulk")
 │       │
 │       ├── utils/                  # Shared utilities (no MCP awareness)
@@ -197,7 +209,9 @@ mtg-mcp/
 │   │   ├── test_spellbook.py       # Spellbook API client
 │   │   ├── test_seventeen_lands.py # 17Lands API client
 │   │   ├── test_edhrec.py          # EDHREC scraping client
-│   │   └── test_rules.py           # Rules parser service
+│   │   ├── test_rules.py           # Rules parser service
+│   │   ├── test_moxfield.py        # Moxfield client
+│   │   └── test_spicerack.py       # Spicerack client
 │   ├── providers/
 │   │   ├── test_scryfall_provider.py
 │   │   ├── test_scryfall_resources.py
@@ -207,7 +221,9 @@ mtg-mcp/
 │   │   ├── test_seventeen_lands_provider.py
 │   │   ├── test_seventeen_lands_resources.py
 │   │   ├── test_edhrec_provider.py
-│   │   └── test_edhrec_resources.py
+│   │   ├── test_edhrec_resources.py
+│   │   ├── test_moxfield_provider.py
+│   │   └── test_spicerack_provider.py
 │   ├── workflows/
 │   │   ├── test_commander.py       # commander_overview, evaluate_upgrade
 │   │   ├── test_commander_new.py   # card_comparison, budget_upgrade
@@ -247,6 +263,8 @@ mtg-mcp/
 │       ├── spellbook/              # Combos, bracket estimates, decklist combos
 │       ├── seventeen_lands/        # Card ratings, color ratings
 │       ├── edhrec/                 # Commander pages, card synergy
+│       ├── moxfield/               # Deck data
+│       ├── spicerack/              # Tournament results, standings
 │       └── rules/                  # Comprehensive Rules text sample
 │
 ├── scripts/
@@ -441,7 +459,7 @@ Each provider imports and uses this constant rather than defining its own.
 
 ### Resources
 
-Resources use `mtg://` URI templates, registered on both provider sub-servers and the workflow server (18 templates total):
+Resources use `mtg://` URI templates, registered on both provider sub-servers and the workflow server (19 templates total):
 
 ```python
 @scryfall_mcp.resource("mtg://card/{name}")
@@ -538,6 +556,8 @@ All API clients inherit from BaseClient:
 | Commander Spellbook | ~3 req/sec | Backoff on 429 |
 | 17Lands | 1 req/sec | Cache 1-6hr, exponential backoff |
 | EDHREC | 0.5 req/sec | Cache 24hr, behind feature flag |
+| Moxfield | 1 req/sec | Cache 4hr, behind feature flag |
+| Spicerack | 1 req/sec | Cache 4hr, documented public API |
 
 ### Error Handling
 
@@ -595,9 +615,14 @@ class Settings(BaseSettings):
     spellbook_base_url: str = "https://backend.commanderspellbook.com"
     seventeen_lands_base_url: str = "https://www.17lands.com"
     edhrec_base_url: str = "https://json.edhrec.com"
+    moxfield_base_url: str = "https://api2.moxfield.com"
+    spicerack_base_url: str = "https://api.spicerack.gg"
+    spicerack_api_key: str = ""  # Optional — sent as X-API-Key if non-empty
 
     enable_17lands: bool = True
     enable_edhrec: bool = True  # Behind flag — scrapes undocumented endpoints
+    enable_moxfield: bool = True  # Behind flag — reverse-engineered API
+    enable_spicerack: bool = True  # Documented public API
     enable_bulk_data: bool = True  # Scryfall Oracle Cards bulk download (~30MB)
     disable_cache: bool = False
 
@@ -644,7 +669,7 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | Transport | stdio default, HTTP optional | stdio for Claude Code/Desktop; HTTP for remote use |
 | Type checker | ty (beta) | Astral stack, speed, FastMCP validates against it |
 | HTTP mocking | respx | Decorator-based, clean API for async httpx mocking |
-| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `bulk_` | FastMCP mount namespacing |
+| Namespace convention | `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `moxfield_`, `bulk_`, `spicerack_` | FastMCP mount namespacing |
 | Workflow tools | No namespace prefix | Clean names: `commander_overview`, `evaluate_upgrade` |
 | Client lifecycle | Lifespan + module-level `_client` | `Depends()`/`lifespan_context` breaks through `mount()` — module-level is the workaround |
 | Settings wiring | `Settings()` in each lifespan | Base URLs are configurable via `MTG_MCP_*` env vars, not hardcoded |
@@ -678,6 +703,8 @@ mise run check    # Runs lint + typecheck + test — all must pass
 | CodeMode transform | Experimental, behind `enable_code_mode` flag | FastMCP CodeMode replaces individual tools with meta-tools for discovery and code execution at 40+ tools |
 | MTGJSON replacement | Scryfall Oracle Cards bulk data | Scryfall bulk data includes prices, legalities, images, EDHREC rank — everything MTGJSON lacked |
 | Smithery adapter | `smithery.py` | Smithery deployment support via adapter module |
+| Moxfield provider | Behind feature flag, `ns=moxfield` | Reverse-engineered API — fragile, can break without notice |
+| Spicerack provider | Behind feature flag, `ns=spicerack` | Documented public REST API for tournament results. Lowest-risk new data source. Optional `X-API-Key` for higher rate limits |
 
 ---
 

@@ -186,6 +186,43 @@ Get metadata for a Moxfield deck (name, format, author, dates).
 
 ---
 
+## Spicerack Backend (namespace: `spicerack`)
+
+### `spicerack_recent_tournaments`
+List recent tournaments for a competitive format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str` (title-case: "Modern", "Legacy", "Pauper", "Pioneer", "Standard"), `num_days: int = 14`, `limit: int = 10`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Table of tournaments with: name, date, format, player count, tournament ID. Structured content uses slim tournament fields. |
+| Backend | `SpicerackClient.get_tournaments()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | constructed |
+
+### `spicerack_tournament_results`
+Get full standings for a specific tournament by ID.
+
+| Field | Detail |
+|-------|--------|
+| Input | `tournament_id: str`, `top_n: int = 8`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Tournament metadata + standings table with: rank, player name, Swiss record (W-L-D), bracket record, decklist URL. Structured content uses slim standing fields. |
+| Backend | `SpicerackClient.get_tournaments()` (filtered by ID) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | constructed |
+
+### `spicerack_format_decklists`
+Get top-finishing decklists across recent tournaments for a format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `num_days: int = 14`, `limit: int = 10`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Top-finishing decklists with: player name, tournament name, standing, decklist text or Moxfield URL. Structured content uses slim standing + tournament fields. |
+| Backend | `SpicerackClient.get_tournaments()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | constructed |
+
+---
+
 ## Scryfall Bulk Data Backend (namespace: `bulk`)
 
 ### `bulk_card_lookup`
@@ -767,6 +804,12 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 | URI | Description |
 |-----|-------------|
 | `mtg://moxfield/{deck_id}` | Moxfield deck data as JSON by deck ID |
+
+### Spicerack Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://tournament/{event_format}/recent` | Recent tournaments for a format as JSON |
 
 ### Scryfall Bulk Data Resources
 

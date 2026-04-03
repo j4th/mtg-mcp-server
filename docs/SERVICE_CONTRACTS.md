@@ -467,3 +467,82 @@ Plain-text file containing the full Comprehensive Rules of Magic: The Gathering.
 Behind `MTG_MCP_ENABLE_RULES` (default `true`). When disabled:
 - Rules tools return a ToolError indicating the feature is disabled
 - No downloads are attempted
+
+---
+
+## Spicerack
+
+**Status:** Documented public REST API. Returns tournament results, standings, and Moxfield decklist URLs for competitive paper events.
+
+### Connection Details
+
+| Field | Value |
+|-------|-------|
+| Base URL | `https://api.spicerack.gg` |
+| Auth | None required. Optional `X-API-Key` header for higher rate limits. |
+| Rate limit | Undocumented. 1 req/sec recommended. |
+| Documentation | https://docs.spicerack.gg/api-reference/public-decklist-database |
+
+### Key Endpoints
+
+**GET `/api/export-decklists/`** — Tournament results with standings and decklists
+```
+?num_days=14&event_format=Legacy&decklist_as_text=true
+```
+Parameters:
+- `num_days` (int): Number of days to look back (default 14)
+- `event_format` (str, optional): Filter by format (title-case: "Modern", "Legacy", "Pauper", "Pioneer", "Standard")
+- `organization_id` (str, optional): Filter by organizing store
+- `decklist_as_text` (bool): Include card lists as text in standings
+
+Returns: JSON array of tournament objects with embedded standings.
+
+### Response Shape (Tournament)
+
+```json
+[
+  {
+    "TID": "3135276",
+    "tournament_name": "ETB x LOTN 3k-5k Legacy Monthly (February)",
+    "event_format": "Legacy",
+    "start_date": "2026-03-22",
+    "player_count": 32,
+    "rounds_swiss": 5,
+    "rounds_top": 3,
+    "bracket_url": "https://melee.gg/Tournament/View/3135276",
+    "standings": [
+      {
+        "standing": 1,
+        "player_name": "Chris Switalski",
+        "wins": 5,
+        "losses": 0,
+        "draws": 0,
+        "wins_bracket": 3,
+        "losses_bracket": 0,
+        "decklist_url": "https://www.moxfield.com/decks/...",
+        "decklist_text": "4 Brainstorm\n4 Force of Will\n..."
+      }
+    ]
+  }
+]
+```
+
+Key fields:
+- **`TID`**: Tournament ID (string). Used for `tournament_results` lookups.
+- **`event_format`**: Title-case format name.
+- **`standing`**: 1-indexed rank. May have gaps (e.g. 1, 2, 3, 4, 5, 5, 5, 5 for tied 5th-8th).
+- **`decklist_url`**: Moxfield URL. May be empty if player didn't submit a list.
+- **`decklist_text`**: Only present when `decklist_as_text=true`. Newline-separated card list.
+
+### Service Architecture
+
+`SpicerackClient` extends `BaseClient` with:
+- `rate_limit_rps=1.0` (conservative — undocumented limits)
+- Optional `X-API-Key` header when `api_key` is non-empty
+- Single method: `get_tournaments(num_days, event_format)` returning `list[SpicerackTournament]`
+- Defensive parsing: `isinstance()` checks, `.get()` chains for missing fields
+- TTLCache: maxsize=50, ttl=14400 (4h)
+
+### Feature Flag
+
+Behind `MTG_MCP_ENABLE_SPICERACK` (default `true`). Documented public API — low risk of breakage.

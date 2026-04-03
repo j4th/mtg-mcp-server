@@ -60,7 +60,7 @@ See @docs/ARCHITECTURE.md for full details.
 - **`src/mtg_mcp_server/services/`** — Pure async API clients. No MCP awareness. Return Pydantic models.
 - **`src/mtg_mcp_server/providers/`** — FastMCP sub-servers. Each independently runnable. Register tools that call services.
 - **`src/mtg_mcp_server/workflows/`** — Composed tools calling multiple services. Mounted without namespace.
-- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `bulk_`.
+- **`src/mtg_mcp_server/server.py`** — Orchestrator. Mounts providers with namespaces: `scryfall_`, `spellbook_`, `draft_`, `edhrec_`, `moxfield_`, `bulk_`, `spicerack_`.
 
 ## Conventions
 
@@ -141,6 +141,7 @@ When PR review comments come in:
 - **Phase 5** (Analysis + Comparison workflows): Complete — 4 new workflow tools (card_comparison, budget_upgrade, deck_analysis, set_overview), 4 prompts, 6 resources. Card resolver utility for bulk-data-first lookups with Scryfall fallback. Tool tagging via `tags` parameter.
 - **Branch A** (Structured Output + Rules): Complete — All tools return `ToolResult` with structured `data` dict. Rules engine (5 tools: rules_lookup, keyword_explain, rules_interaction, rules_scenario, combat_calculator). Additional workflow tools: deck_validate, suggest_mana_base, price_comparison. Scryfall whats_new + set_info tools. 7 new bulk tools. 5 new prompts. 40 tools total.
 - **Branch B** (Format Workflows): Complete — 11 new workflow tools across 4 domains: Deck Building (theme_search, build_around, complete_deck), Commander Depth (commander_comparison, tribal_staples, precon_upgrade, color_identity_staples), Limited (sealed_pool_build, draft_signal_read, draft_log_review), Constructed (rotation_check). 8 new prompts. 51 tools, 17 prompts, 18 resource templates. 989 tests, 88% coverage.
+- **Spicerack** (Tournament Results): Complete — SpicerackClient service with get_tournaments() (TTLCache 4h). 3 tools (recent_tournaments, tournament_results, format_decklists), 1 resource template. 56 tools total.
 
 ## Environment
 
