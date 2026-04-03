@@ -24,6 +24,7 @@ SEVENTEEN_LANDS_FIXTURES = FIXTURES / "seventeen_lands"
 EDHREC_FIXTURES = FIXTURES / "edhrec"
 MOXFIELD_FIXTURES = FIXTURES / "moxfield"
 SPICERACK_FIXTURES = FIXTURES / "spicerack"
+MTGGOLDFISH_FIXTURES = FIXTURES / "mtggoldfish"
 SCRYFALL_BULK_FIXTURES = FIXTURES / "scryfall_bulk"
 
 RULES_FIXTURES = FIXTURES / "rules"
@@ -34,6 +35,7 @@ SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
 EDHREC_BASE = "https://json.edhrec.com"
 MOXFIELD_BASE = "https://api2.moxfield.com"
 SPICERACK_BASE = "https://api.spicerack.gg"
+MTGGOLDFISH_BASE = "https://www.mtggoldfish.com"
 RULES_URL = "https://media.wizards.com/2025/downloads/MagicCompRules%2020250404.txt"
 
 
@@ -165,6 +167,36 @@ async def mcp_client():
         respx.get(f"{SPICERACK_BASE}/api/export-decklists/").mock(
             return_value=httpx.Response(
                 200, json=_load_json(SPICERACK_FIXTURES / "tournaments_legacy.json")
+            )
+        )
+
+        # --- MTGGoldfish routes ---
+        respx.get(url__regex=re.escape(MTGGOLDFISH_BASE) + r"/metagame/\w+/full").mock(
+            return_value=httpx.Response(
+                200,
+                content=(MTGGOLDFISH_FIXTURES / "metagame_modern.html").read_bytes(),
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            )
+        )
+        respx.get(url__regex=re.escape(MTGGOLDFISH_BASE) + r"/archetype/.+").mock(
+            return_value=httpx.Response(
+                200,
+                content=(MTGGOLDFISH_FIXTURES / "archetype_boros_energy.html").read_bytes(),
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            )
+        )
+        respx.get(url__regex=re.escape(MTGGOLDFISH_BASE) + r"/format-staples/\w+").mock(
+            return_value=httpx.Response(
+                200,
+                content=(MTGGOLDFISH_FIXTURES / "format_staples_modern.html").read_bytes(),
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            )
+        )
+        respx.get(url__regex=re.escape(MTGGOLDFISH_BASE) + r"/deck/download/\d+").mock(
+            return_value=httpx.Response(
+                200,
+                content=(MTGGOLDFISH_FIXTURES / "deck_download.txt").read_bytes(),
+                headers={"Content-Type": "text/plain"},
             )
         )
 

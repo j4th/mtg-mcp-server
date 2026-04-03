@@ -400,6 +400,54 @@ class SpicerackTournament(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# MTGGoldfish
+# ---------------------------------------------------------------------------
+
+
+class GoldfishArchetype(BaseModel):
+    """An archetype from MTGGoldfish metagame breakdown."""
+
+    name: str = ""
+    slug: str = ""
+    meta_share: float = 0.0
+    deck_count: int = 0
+    price_paper: int = 0
+    colors: list[str] = Field(default_factory=list)
+    key_cards: list[str] = Field(default_factory=list)
+
+
+class GoldfishMetaSnapshot(BaseModel):
+    """A metagame snapshot for a format from MTGGoldfish."""
+
+    format: str = ""
+    archetypes: list[GoldfishArchetype] = Field(default_factory=list)
+    total_decks: int = 0
+
+
+class GoldfishFormatStaple(BaseModel):
+    """A commonly played card in a format from MTGGoldfish."""
+
+    rank: int = 0
+    name: str = ""
+    pct_of_decks: float = 0.0
+    copies_played: float = 0.0
+    category: str = ""
+
+
+class GoldfishArchetypeDetail(BaseModel):
+    """Archetype detail page with deck metadata and decklist."""
+
+    name: str = ""
+    author: str = ""
+    event: str = ""
+    result: str = ""
+    deck_id: str = ""
+    date: str = ""
+    mainboard: list[str] = Field(default_factory=list)
+    sideboard: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Moxfield
 # ---------------------------------------------------------------------------
 

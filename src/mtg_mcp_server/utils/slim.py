@@ -15,6 +15,8 @@ if TYPE_CHECKING:
         Combo,
         DraftCardRating,
         EDHRECCard,
+        GoldfishArchetype,
+        GoldfishFormatStaple,
         Rule,
         SpicerackStanding,
         SpicerackTournament,
@@ -76,6 +78,27 @@ def slim_rule(rule: Rule) -> dict:
         "number": rule.number,
         "text": rule.text,
         "subrule_count": len(rule.subrules),
+    }
+
+
+def slim_archetype(archetype: GoldfishArchetype) -> dict:
+    """Essential archetype fields for metagame lists."""
+    return {
+        "name": archetype.name,
+        "slug": archetype.slug,
+        "meta_share": archetype.meta_share,
+        "deck_count": archetype.deck_count,
+        "price_paper": archetype.price_paper,
+    }
+
+
+def slim_format_staple(staple: GoldfishFormatStaple) -> dict:
+    """Essential format staple fields."""
+    return {
+        "rank": staple.rank,
+        "name": staple.name,
+        "pct_of_decks": staple.pct_of_decks,
+        "copies_played": staple.copies_played,
     }
 
 

@@ -21,6 +21,7 @@ __all__ = [
     "ATTRIBUTION_17LANDS",
     "ATTRIBUTION_EDHREC",
     "ATTRIBUTION_MOXFIELD",
+    "ATTRIBUTION_MTGGOLDFISH",
     "ATTRIBUTION_SCRYFALL",
     "ATTRIBUTION_SCRYFALL_BULK",
     "ATTRIBUTION_SPELLBOOK",
@@ -73,6 +74,7 @@ ATTRIBUTION_SPELLBOOK = (
 )
 ATTRIBUTION_17LANDS = "\n\n*Data provided by [17Lands](https://www.17lands.com)*"
 ATTRIBUTION_EDHREC = "\n\n*Data provided by [EDHREC](https://edhrec.com)*"
+ATTRIBUTION_MTGGOLDFISH = "\n\n*Data provided by [MTGGoldfish](https://www.mtggoldfish.com)*"
 ATTRIBUTION_MOXFIELD = "\n\n*Data provided by [Moxfield](https://www.moxfield.com)*"
 ATTRIBUTION_SPICERACK = "\n\n*Data provided by [Spicerack](https://spicerack.gg)*"
 
