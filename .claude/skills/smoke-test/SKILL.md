@@ -102,7 +102,7 @@ MTGGoldfish scrapes HTML — SKIP on error, don't fail the overall test.
 
 ### 11. Moxfield (may fail — reverse-engineered API)
 
-`moxfield_decklist(deck_id="LDBm1gOVD0W8OMPgoYQJnw")` — expect deck name, commander board, mainboard with card names and quantities. Moxfield uses undocumented v3 endpoints; SKIP on error, don't fail the overall test.
+`moxfield_decklist(deck_id="DuXYtaJFEkScp1U1dxvAmw")` — expect deck name, commander board, mainboard with card names and quantities. Moxfield uses undocumented v3 endpoints; SKIP on error, don't fail the overall test.
 
 ### 12. Commander Depth Workflows (parallel batch)
 
