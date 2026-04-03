@@ -312,6 +312,29 @@ class TestWhatsNew:
         assert isinstance(sc, dict)
         assert sc["total_cards"] == 9273
         assert isinstance(sc["cards"], list)
+        assert len(sc["cards"]) > 0
+        # Slim card fields
+        card = sc["cards"][0]
+        assert "name" in card
+        assert "mana_cost" in card
+        assert "type_line" in card
+        assert "rarity" in card
+        # Bloat fields excluded
+        assert "oracle_text" not in card
+        assert "legalities" not in card
+        assert "image_uris" not in card
+
+    @respx.mock
+    async def test_negative_limit_raises_error(self, client: Client):
+        """search_cards raises ToolError for negative limit."""
+        fixture = _load_fixture("search_sultai_commander.json")
+        respx.get(f"{BASE_URL}/cards/search").mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "search_cards", {"query": "t:creature", "limit": -1}, raise_on_error=False
+        )
+        assert result.is_error
+        assert "limit must be >= 0" in result.content[0].text
 
     @respx.mock
     async def test_with_set_and_format_filters(self, client: Client):

@@ -108,6 +108,8 @@ mcp.mount(workflow_mcp)
 # Per-tool limits for known heavy tools — tighter than the global ceiling.
 # These are safety nets; slim field sets and limit params in the tools themselves
 # are the primary size control mechanism.
+# Tool names are {namespace}_{function}: scryfall.search_cards, draft.card_ratings,
+# edhrec.commander_staples. If a tool is renamed, update this list.
 mcp.add_middleware(
     ResponseLimitingMiddleware(
         max_size=30_000,

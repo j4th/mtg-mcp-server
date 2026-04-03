@@ -118,6 +118,87 @@ class TestCardRatings:
         assert names == sorted(names, key=str.lower)
 
     @respx.mock
+    async def test_sort_by_alsa(self, client: Client):
+        """card_ratings sorts by ALSA ascending (lowest first)."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "card_ratings", {"set_code": "LCI", "sort_by": "alsa", "limit": 0}
+        )
+        sc = result.structured_content
+        alsas = [c["alsa"] for c in sc["cards"]]
+        assert alsas == sorted(alsas)
+
+    @respx.mock
+    async def test_sort_by_iwd(self, client: Client):
+        """card_ratings sorts by IWD descending (highest first)."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "card_ratings", {"set_code": "LCI", "sort_by": "iwd", "limit": 0}
+        )
+        sc = result.structured_content
+        iwds = [c["iwd"] for c in sc["cards"]]
+        assert iwds == sorted(iwds, reverse=True)
+
+    @respx.mock
+    async def test_invalid_sort_by_raises_error(self, client: Client):
+        """card_ratings raises ToolError for invalid sort_by values."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "card_ratings", {"set_code": "LCI", "sort_by": "invalid"}, raise_on_error=False
+        )
+        assert result.is_error
+        assert "Invalid sort_by" in result.content[0].text
+
+    @respx.mock
+    async def test_negative_limit_raises_error(self, client: Client):
+        """card_ratings raises ToolError for negative limit."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "card_ratings", {"set_code": "LCI", "limit": -1}, raise_on_error=False
+        )
+        assert result.is_error
+        assert "limit must be >= 0" in result.content[0].text
+
+    @respx.mock
+    async def test_concise_format(self, client: Client):
+        """card_ratings concise format shows only name and GIH WR."""
+        fixture = _load_fixture("card_ratings_lci.json")
+        respx.get(
+            f"{BASE_URL}/card_ratings/data",
+            params={"expansion": "LCI", "event_type": "PremierDraft"},
+        ).mock(return_value=httpx.Response(200, json=fixture))
+
+        result = await client.call_tool(
+            "card_ratings", {"set_code": "LCI", "response_format": "concise"}
+        )
+        text = result.content[0].text
+        assert "GIH WR:" in text
+        # Concise omits ALSA, IWD, Games
+        assert "ALSA:" not in text
+        assert "IWD:" not in text
+        assert "Games:" not in text
+
+    @respx.mock
     async def test_empty_results(self, client: Client):
         """card_ratings returns a 'no data' message for unknown set codes."""
         respx.get(

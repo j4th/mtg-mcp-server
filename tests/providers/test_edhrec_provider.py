@@ -108,6 +108,34 @@ class TestCommanderStaples:
             assert len(cat["cards"]) <= 2
 
     @respx.mock
+    async def test_negative_limit_raises_error(self, client: Client):
+        """commander_staples raises ToolError for negative limit."""
+        result = await client.call_tool(
+            "commander_staples",
+            {"commander_name": "Muldrotha, the Gravetide", "limit": -1},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "limit must be >= 0" in result.content[0].text
+
+    @respx.mock
+    async def test_concise_format(self, client: Client):
+        """commander_staples concise format shows only name and synergy."""
+        fixture = _load_fixture("commander_muldrotha.json")
+        respx.get(f"{BASE_URL}/pages/commanders/muldrotha-the-gravetide.json").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result = await client.call_tool(
+            "commander_staples",
+            {"commander_name": "Muldrotha, the Gravetide", "response_format": "concise"},
+        )
+        text = result.content[0].text
+        assert "synergy:" in text
+        # Concise omits inclusion % and deck counts
+        assert "% of decks" not in text
+
+    @respx.mock
     async def test_not_found_returns_error(self, client: Client):
         """commander_staples returns an error response for nonexistent commanders."""
         respx.get(f"{BASE_URL}/pages/commanders/xyzzy-nonexistent.json").mock(

@@ -55,6 +55,19 @@ class TestFindCombos:
         assert isinstance(sc["combos"], list)
         assert len(sc["combos"]) == 5
         assert sc["combos"][0]["id"] == "1414-2730-5131-5256"
+        # Slim combo fields only
+        combo = sc["combos"][0]
+        assert "cards" in combo
+        assert "results" in combo
+        assert "color_identity" in combo
+        assert isinstance(combo["cards"], list)
+        assert isinstance(combo["results"], list)
+        # Bloat fields excluded
+        assert "description" not in combo
+        assert "popularity" not in combo
+        assert "legalities" not in combo
+        assert "prices" not in combo
+        assert "bracket_tag" not in combo
 
     @respx.mock
     async def test_no_combos_returns_message(self, client: Client):

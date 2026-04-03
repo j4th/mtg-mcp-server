@@ -90,6 +90,8 @@ async def search_cards(
     except ScryfallError as exc:
         raise ToolError(f"Scryfall API error: {exc}") from exc
 
+    if limit < 0:
+        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
     cards = result.data if limit == 0 else result.data[:limit]
     showing = len(cards)
     total = len(result.data)

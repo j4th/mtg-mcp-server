@@ -15,6 +15,7 @@ from pydantic import Field
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.providers import ATTRIBUTION_17LANDS, TAGS_DRAFT, TOOL_ANNOTATIONS
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient, SeventeenLandsError
+from mtg_mcp_server.utils.formatters import ResponseFormat  # noqa: TC001 — runtime for FastMCP
 from mtg_mcp_server.utils.slim import slim_rating
 
 # Module-level client set by the lifespan. See scryfall.py for pattern rationale.
@@ -57,6 +58,10 @@ async def card_ratings(
     sort_by: Annotated[
         str, Field(description="Sort order: 'gih_wr' (default), 'alsa', 'iwd', 'name'")
     ] = "gih_wr",
+    response_format: Annotated[
+        ResponseFormat,
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
 ) -> ToolResult:
     """Get win rate and draft performance data for cards in a set.
 
@@ -98,9 +103,15 @@ async def card_ratings(
         ),
         "name": (lambda c: c.name.lower(), False),
     }
-    key_fn, reverse = sort_configs.get(sort_by, sort_configs["gih_wr"])
+    if sort_by not in sort_configs:
+        raise ToolError(
+            f"Invalid sort_by: '{sort_by}'. Valid options: {', '.join(sorted(sort_configs))}"
+        )
+    key_fn, reverse = sort_configs[sort_by]
     sorted_ratings = sorted(ratings, key=key_fn, reverse=reverse)
 
+    if limit < 0:
+        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
     total = len(sorted_ratings)
     cards = sorted_ratings if limit == 0 else sorted_ratings[:limit]
     showing = len(cards)
@@ -121,10 +132,13 @@ async def card_ratings(
             else "N/A"
         )
         games = f"{card.game_count:,}"
-        lines.append(
-            f"  {card.name} ({card.color}, {card.rarity}) — "
-            f"GIH WR: {gih_wr}, ALSA: {alsa}, IWD: {iwd}, Games: {games}"
-        )
+        if response_format == "concise":
+            lines.append(f"  {card.name} — GIH WR: {gih_wr}")
+        else:
+            lines.append(
+                f"  {card.name} ({card.color}, {card.rarity}) — "
+                f"GIH WR: {gih_wr}, ALSA: {alsa}, IWD: {iwd}, Games: {games}"
+            )
     return ToolResult(
         content="\n".join(lines) + ATTRIBUTION_17LANDS,
         structured_content={
