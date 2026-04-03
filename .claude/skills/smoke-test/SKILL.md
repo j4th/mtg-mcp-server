@@ -85,14 +85,18 @@ If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_se
 | `color_identity_staples(color_identity="simic")` | Cards in UG color identity |
 | `rotation_check()` | Standard-legal sets listed with release dates |
 
-### 9. Commander Depth Workflows (parallel batch)
+### 9. Moxfield (may fail — reverse-engineered API)
+
+`moxfield_decklist(deck_id="LDBm1gOVD0W8OMPgoYQJnw")` — expect deck name, commander board, mainboard with card names and quantities. Moxfield uses undocumented v3 endpoints; SKIP on error, don't fail the overall test.
+
+### 10. Commander Depth Workflows (parallel batch)
 
 | Call | Validate |
 |------|----------|
 | `commander_comparison(commanders=["Muldrotha, the Gravetide", "Meren of Clan Nel Toth"])` | Both commanders compared, color identity shown |
 | `color_identity_staples(color_identity="sultai", category="creatures")` | Creature cards in BUG identity |
 
-### 10. Cross-Tool Consistency
+### 11. Cross-Tool Consistency
 
 Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`bulk_card_lookup("Sol Ring")`):
 - Names match
@@ -116,9 +120,10 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 | Rules | 5 | | | |
 | Core Workflows | 4 | | | |
 | Deck Building | 4 | | | |
+| Moxfield | 1 | | | |
 | Commander Depth | 2 | | | |
 | Consistency | 1 | | | |
-| **Total** | **28** | | | |
+| **Total** | **29** | | | |
 
 ### Failures
 [Details for each FAIL — what was expected vs actual]

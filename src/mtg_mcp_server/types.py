@@ -32,6 +32,9 @@ __all__ = [
     "EDHRECCardList",
     "EDHRECCommanderData",
     "GlossaryEntry",
+    "MoxfieldCard",
+    "MoxfieldDeck",
+    "MoxfieldDecklist",
     "Rule",
     "Ruling",
     "SetInfo",
@@ -345,6 +348,41 @@ class EDHRECCommanderData(BaseModel):
     commander_name: str
     cardlists: list[EDHRECCardList] = Field(default_factory=list)
     total_decks: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Moxfield
+# ---------------------------------------------------------------------------
+
+
+class MoxfieldCard(BaseModel):
+    """A card entry from a Moxfield decklist board section."""
+
+    name: str
+    quantity: int = Field(1, ge=1)
+
+
+class MoxfieldDeck(BaseModel):
+    """Metadata for a Moxfield deck."""
+
+    id: str = ""
+    name: str = ""
+    format: str = ""
+    description: str = ""
+    author: str = ""
+    public_url: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class MoxfieldDecklist(BaseModel):
+    """A fully resolved Moxfield decklist with board sections."""
+
+    deck: MoxfieldDeck = Field(default_factory=MoxfieldDeck)
+    commanders: list[MoxfieldCard] = Field(default_factory=list)
+    mainboard: list[MoxfieldCard] = Field(default_factory=list)
+    sideboard: list[MoxfieldCard] = Field(default_factory=list)
+    companions: list[MoxfieldCard] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

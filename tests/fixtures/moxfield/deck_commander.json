@@ -1,0 +1,81 @@
+{
+  "id": "abc123",
+  "name": "Muldrotha Self-Mill",
+  "format": "commander",
+  "description": "Self-mill value engine with Muldrotha as the commander.",
+  "visibility": "public",
+  "publicUrl": "https://www.moxfield.com/decks/abc123",
+  "createdByUser": {
+    "userName": "mtgplayer42",
+    "displayName": "MTG Player 42"
+  },
+  "createdAtUtc": "2025-01-15T10:30:00Z",
+  "lastUpdatedAtUtc": "2025-03-20T14:45:00Z",
+  "mainboardCount": 62,
+  "sideboardCount": 2,
+  "commandersCount": 1,
+  "companionsCount": 0,
+  "boards": {
+    "commanders": {
+      "count": 1,
+      "cards": {
+        "card-uuid-muldrotha": {
+          "quantity": 1,
+          "card": {
+            "name": "Muldrotha, the Gravetide",
+            "scryfall_id": "scry-uuid-muldrotha"
+          }
+        }
+      }
+    },
+    "mainboard": {
+      "count": 62,
+      "cards": {
+        "card-uuid-sol-ring": {
+          "quantity": 1,
+          "card": {
+            "name": "Sol Ring",
+            "scryfall_id": "scry-uuid-sol-ring"
+          }
+        },
+        "card-uuid-spore-frog": {
+          "quantity": 1,
+          "card": {
+            "name": "Spore Frog",
+            "scryfall_id": "scry-uuid-spore-frog"
+          }
+        },
+        "card-uuid-sakura": {
+          "quantity": 1,
+          "card": {
+            "name": "Sakura-Tribe Elder",
+            "scryfall_id": "scry-uuid-sakura"
+          }
+        }
+      }
+    },
+    "sideboard": {
+      "count": 2,
+      "cards": {
+        "card-uuid-strip-mine": {
+          "quantity": 1,
+          "card": {
+            "name": "Strip Mine",
+            "scryfall_id": "scry-uuid-strip-mine"
+          }
+        },
+        "card-uuid-island": {
+          "quantity": 1,
+          "card": {
+            "name": "Island",
+            "scryfall_id": "scry-uuid-island"
+          }
+        }
+      }
+    },
+    "companions": {
+      "count": 0,
+      "cards": {}
+    }
+  }
+}

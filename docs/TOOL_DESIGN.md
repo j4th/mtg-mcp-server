@@ -160,6 +160,32 @@ Get synergy data for a specific card with a specific commander.
 
 ---
 
+## Moxfield Backend (namespace: `moxfield`)
+
+### `moxfield_decklist`
+Fetch a full decklist from Moxfield by deck ID or URL.
+
+| Field | Detail |
+|-------|--------|
+| Input | `deck_id: str` (Moxfield deck ID or full URL, e.g. `"abc123"` or `"https://www.moxfield.com/decks/abc123"`) |
+| Output | Markdown decklist organized by board (commanders, mainboard, sideboard, companions) with card names and quantities. Structured content includes deck metadata and per-board card lists. |
+| Backend | `MoxfieldClient.get_deck()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
+### `moxfield_deck_info`
+Get metadata for a Moxfield deck (name, format, author, dates).
+
+| Field | Detail |
+|-------|--------|
+| Input | `deck_id: str` (Moxfield deck ID or full URL) |
+| Output | Deck metadata: name, format, author, description, created/updated dates, public URL, card counts per board. |
+| Backend | `MoxfieldClient.get_deck()` (metadata subset) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
+---
+
 ## Scryfall Bulk Data Backend (namespace: `bulk`)
 
 ### `bulk_card_lookup`
@@ -735,6 +761,12 @@ Resources provide cached data access via URI templates. Each returns JSON for pr
 | URI | Description |
 |-----|-------------|
 | `mtg://commander/{name}/staples` | Commander staples data as JSON |
+
+### Moxfield Resources
+
+| URI | Description |
+|-----|-------------|
+| `mtg://moxfield/{deck_id}` | Moxfield deck data as JSON by deck ID |
 
 ### Scryfall Bulk Data Resources
 

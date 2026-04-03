@@ -49,6 +49,9 @@ Our server runs a single asyncio event loop — no thread contention on dict acc
 | 17Lands | `color_ratings` | 4h | 20 | Same lifecycle |
 | EDHREC | `commander_top_cards` | 24h | 100 | EDHREC aggregates daily |
 | EDHREC | `card_synergy` | 24h | 200 | Same aggregation cycle |
+| Moxfield | `get_deck` | 4h | 100 | Decklists change infrequently during a session; tournament-winning lists are typically stable |
+
+**Note on Moxfield cache keys:** The `get_deck` cache uses a custom key function that normalizes Moxfield URLs to raw deck IDs before hashing. This means `get_deck("https://moxfield.com/decks/abc123")` and `get_deck("abc123")` share the same cache entry. The `get_deck_info` method delegates to `get_deck` and benefits from the same cache.
 
 **Note on `card_synergy`:** This method internally delegates to `commander_top_cards` and scans the result. Both are cached independently — this means a cache hit on `card_synergy` skips the scan too, but the two caches may briefly diverge if `commander_top_cards` refreshes first. This is acceptable: the data is from the same daily aggregation, and the worst case is returning slightly stale synergy data for up to 24h.
 

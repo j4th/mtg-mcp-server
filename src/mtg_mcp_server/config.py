@@ -40,11 +40,13 @@ class Settings(BaseSettings):
     spellbook_base_url: str = "https://backend.commanderspellbook.com"
     seventeen_lands_base_url: str = "https://www.17lands.com"
     edhrec_base_url: str = "https://json.edhrec.com"
+    moxfield_base_url: str = "https://api2.moxfield.com"
 
     # --- Feature flags ---
     # Optional backends can be disabled without code changes.
     enable_17lands: bool = True
     enable_edhrec: bool = True  # Behind flag — scrapes undocumented endpoints
+    enable_moxfield: bool = True  # Behind flag — reverse-engineered API
     enable_bulk_data: bool = True  # Scryfall Oracle Cards bulk download (~30MB)
 
     # --- Caching ---

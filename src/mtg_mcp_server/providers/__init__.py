@@ -20,6 +20,7 @@ from mcp.types import ToolAnnotations
 __all__ = [
     "ATTRIBUTION_17LANDS",
     "ATTRIBUTION_EDHREC",
+    "ATTRIBUTION_MOXFIELD",
     "ATTRIBUTION_SCRYFALL",
     "ATTRIBUTION_SCRYFALL_BULK",
     "ATTRIBUTION_SPELLBOOK",
@@ -71,6 +72,7 @@ ATTRIBUTION_SPELLBOOK = (
 )
 ATTRIBUTION_17LANDS = "\n\n*Data provided by [17Lands](https://www.17lands.com)*"
 ATTRIBUTION_EDHREC = "\n\n*Data provided by [EDHREC](https://edhrec.com)*"
+ATTRIBUTION_MOXFIELD = "\n\n*Data provided by [Moxfield](https://www.moxfield.com)*"
 
 
 def format_legalities(legalities: dict[str, str]) -> str:

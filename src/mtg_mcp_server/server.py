@@ -5,7 +5,7 @@ with a namespace prefix (e.g. ``scryfall_``, ``draft_``). The workflow server is
 mounted **without** a namespace so its tools have clean names like
 ``commander_overview`` rather than ``workflow_commander_overview``.
 
-Feature-flagged backends (17Lands, EDHREC, Scryfall bulk data) are conditionally
+Feature-flagged backends (17Lands, EDHREC, Moxfield, Scryfall bulk data) are conditionally
 mounted based on ``Settings`` values loaded from ``MTG_MCP_*`` env vars.
 """
 
@@ -22,6 +22,7 @@ from mtg_mcp_server import __version__
 from mtg_mcp_server.config import Settings
 from mtg_mcp_server.logging import configure_logging
 from mtg_mcp_server.providers.edhrec import edhrec_mcp
+from mtg_mcp_server.providers.moxfield import moxfield_mcp
 from mtg_mcp_server.providers.scryfall import scryfall_mcp
 from mtg_mcp_server.providers.scryfall_bulk import scryfall_bulk_mcp
 from mtg_mcp_server.providers.seventeen_lands import draft_mcp
@@ -48,6 +49,7 @@ mcp = FastMCP(
         "- spellbook_*: Combo search, decklist analysis, bracket estimation (Commander Spellbook)\n"
         "- draft_*: Draft card ratings and archetype stats (17Lands)\n"
         "- edhrec_*: Commander staples and synergy scores (EDHREC, beta)\n"
+        "- moxfield_*: Public decklist fetching (Moxfield, beta)\n"
         "- bulk_*: Rate-limit-free card lookup and search (Scryfall bulk data)\n\n"
         "Workflow tools (no prefix):\n"
         "- commander_overview: Full commander profile from all sources\n"
@@ -94,11 +96,13 @@ if _settings.disable_cache:
 
 # Feature-flagged backends: enabled by default but can be disabled via env vars.
 # 17Lands rate-limits aggressively; EDHREC scrapes undocumented endpoints;
-# Scryfall bulk data requires a ~30MB download on first access.
+# Moxfield uses reverse-engineered API; Scryfall bulk data requires a ~30MB download.
 if _settings.enable_17lands:
     mcp.mount(draft_mcp, namespace="draft")
 if _settings.enable_edhrec:
     mcp.mount(edhrec_mcp, namespace="edhrec")
+if _settings.enable_moxfield:
+    mcp.mount(moxfield_mcp, namespace="moxfield")
 if _settings.enable_bulk_data:
     mcp.mount(scryfall_bulk_mcp, namespace="bulk")
 
