@@ -5,7 +5,7 @@ with a namespace prefix (e.g. ``scryfall_``, ``draft_``). The workflow server is
 mounted **without** a namespace so its tools have clean names like
 ``commander_overview`` rather than ``workflow_commander_overview``.
 
-Feature-flagged backends (17Lands, EDHREC, Scryfall bulk data) are conditionally
+Feature-flagged backends (17Lands, EDHREC, Moxfield, Scryfall bulk data) are conditionally
 mounted based on ``Settings`` values loaded from ``MTG_MCP_*`` env vars.
 """
 
@@ -96,7 +96,7 @@ if _settings.disable_cache:
 
 # Feature-flagged backends: enabled by default but can be disabled via env vars.
 # 17Lands rate-limits aggressively; EDHREC scrapes undocumented endpoints;
-# Scryfall bulk data requires a ~30MB download on first access.
+# Moxfield uses reverse-engineered API; Scryfall bulk data requires a ~30MB download.
 if _settings.enable_17lands:
     mcp.mount(draft_mcp, namespace="draft")
 if _settings.enable_edhrec:

@@ -129,6 +129,21 @@ class TestMoxfieldDecklist:
         assert "not found" in result.content[0].text.lower()
 
     @respx.mock
+    async def test_server_error_returns_error(self, client: Client):
+        """decklist returns an error response for server errors (non-404)."""
+        respx.get(f"{BASE_URL}/v3/decks/all/abc123").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.call_tool(
+            "decklist",
+            {"deck_id": "abc123"},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "Moxfield API error" in result.content[0].text
+
+    @respx.mock
     async def test_accepts_full_url(self, client: Client):
         """decklist accepts a full Moxfield URL as input."""
         fixture = _load_fixture("deck_commander.json")
@@ -200,6 +215,21 @@ class TestMoxfieldDeckInfo:
         assert result.is_error
         assert "not found" in result.content[0].text.lower()
 
+    @respx.mock
+    async def test_server_error_returns_error(self, client: Client):
+        """deck_info returns an error response for server errors (non-404)."""
+        respx.get(f"{BASE_URL}/v3/decks/all/abc123").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.call_tool(
+            "deck_info",
+            {"deck_id": "abc123"},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "Moxfield API error" in result.content[0].text
+
 
 class TestToolRegistration:
     """Moxfield provider tool registration."""
@@ -248,6 +278,18 @@ class TestMoxfieldResource:
         data = json.loads(result[0].text)
         assert "error" in data
         assert "Deck not found" in data["error"]
+
+    @respx.mock
+    async def test_deck_resource_server_error_returns_error_json(self, client: Client):
+        """Resource returns error JSON for server errors."""
+        respx.get(f"{BASE_URL}/v3/decks/all/abc123").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.read_resource("mtg://moxfield/abc123")
+        data = json.loads(result[0].text)
+        assert "error" in data
+        assert "Moxfield error" in data["error"]
 
     async def test_resource_template_registered(self, client: Client):
         """Moxfield deck resource template is registered on the provider."""

@@ -121,6 +121,36 @@ class TestGetDeck:
                 await client.get_deck("some-deck")
 
     @respx.mock
+    async def test_403_raises_deck_not_found(self):
+        """403 response (private deck) raises DeckNotFoundError."""
+        respx.get(f"{BASE_URL}/v3/decks/all/private-deck").mock(
+            return_value=httpx.Response(403, text="Forbidden")
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            with pytest.raises(DeckNotFoundError, match="private-deck"):
+                await client.get_deck("private-deck")
+
+    @respx.mock
+    async def test_invalid_json_raises(self):
+        """200 with non-JSON body raises MoxfieldError."""
+        respx.get(f"{BASE_URL}/v3/decks/all/broken").mock(
+            return_value=httpx.Response(200, content=b"<html>Not JSON</html>")
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            with pytest.raises(MoxfieldError, match="invalid JSON"):
+                await client.get_deck("broken")
+
+    @respx.mock
+    async def test_non_dict_response_raises(self):
+        """200 with a JSON array instead of object raises MoxfieldError."""
+        respx.get(f"{BASE_URL}/v3/decks/all/weird").mock(
+            return_value=httpx.Response(200, json=["not", "a", "dict"])
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            with pytest.raises(MoxfieldError, match="unexpected data format"):
+                await client.get_deck("weird")
+
+    @respx.mock
     async def test_defensive_missing_boards(self):
         """Missing `boards` key results in empty card lists."""
         fixture = {"id": "test", "name": "No boards", "format": "commander"}
@@ -259,6 +289,19 @@ class TestCaching:
 
         assert route1.call_count == 1
         assert route2.call_count == 1
+
+    @respx.mock
+    async def test_url_and_raw_id_share_cache_entry(self):
+        """A URL and its extracted raw ID share the same cache entry."""
+        fixture = _load_fixture("deck_commander.json")
+        route = respx.get(f"{BASE_URL}/v3/decks/all/abc123").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            await client.get_deck("https://www.moxfield.com/decks/abc123")
+            await client.get_deck("abc123")
+
+        assert route.call_count == 1
 
 
 class TestDecklistFormatCompatibility:

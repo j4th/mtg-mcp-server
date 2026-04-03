@@ -14,7 +14,7 @@ import structlog
 from cachetools import TTLCache
 
 from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, BaseClient, ServiceError
-from mtg_mcp_server.services.cache import _method_key, async_cached
+from mtg_mcp_server.services.cache import async_cached
 from mtg_mcp_server.types import MoxfieldCard, MoxfieldDeck, MoxfieldDecklist
 
 if TYPE_CHECKING:
@@ -30,6 +30,20 @@ _RE_MOXFIELD_URL = re.compile(
 
 # Board keys in the v3 API response that we extract.
 _BOARD_KEYS = ("commanders", "mainboard", "sideboard", "companions")
+
+
+def _moxfield_deck_key(*args: object, **kwargs: object) -> object:
+    """Cache key that normalizes URLs to deck IDs before hashing.
+
+    Without this, ``get_deck("https://moxfield.com/decks/abc123")`` and
+    ``get_deck("abc123")`` would be separate cache entries for the same deck.
+    """
+    from cachetools import keys
+
+    # args[0] is self, args[1] is deck_id_or_url
+    raw = args[1] if len(args) > 1 else kwargs.get("deck_id_or_url", "")
+    normalized = MoxfieldClient.extract_deck_id(str(raw))
+    return keys.hashkey(normalized)
 
 
 class MoxfieldError(ServiceError):
@@ -83,7 +97,7 @@ class MoxfieldClient(BaseClient):
             return m.group(1)
         return deck_id_or_url
 
-    @async_cached(_deck_cache, key=_method_key)
+    @async_cached(_deck_cache, key=_moxfield_deck_key)
     async def get_deck(self, deck_id_or_url: str) -> MoxfieldDecklist:
         """Fetch a public Moxfield deck by ID or URL.
 
@@ -103,13 +117,18 @@ class MoxfieldClient(BaseClient):
         try:
             response = await self._get(f"/v3/decks/all/{deck_id}")
         except ServiceError as exc:
-            if exc.status_code == 404:
+            if exc.status_code in (403, 404):
                 raise DeckNotFoundError(
-                    f"Deck not found on Moxfield: '{deck_id}'", status_code=404
+                    f"Deck not found on Moxfield: '{deck_id}'", status_code=exc.status_code
                 ) from exc
             raise MoxfieldError(exc.message, status_code=exc.status_code) from exc
 
-        data = response.json()
+        try:
+            data = response.json()
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise MoxfieldError(
+                f"Moxfield returned invalid JSON for deck '{deck_id}'", status_code=200
+            ) from exc
         return self._parse_deck(data)
 
     async def get_deck_info(self, deck_id_or_url: str) -> MoxfieldDeck:
@@ -117,7 +136,9 @@ class MoxfieldClient(BaseClient):
 
         The full decklist is fetched and cached; this method returns only
         the :class:`MoxfieldDeck` metadata portion.  Subsequent calls for
-        the same deck ID benefit from the ``get_deck`` cache for free.
+        the same input benefit from the ``get_deck`` cache for free.  The
+        cache normalizes URLs to deck IDs, so URL and raw-ID lookups share
+        entries.
 
         Args:
             deck_id_or_url: Either a raw deck ID or a full Moxfield URL.
@@ -155,7 +176,9 @@ class MoxfieldClient(BaseClient):
         """
         if not isinstance(data, dict):
             log.warning("parse_deck.unexpected_type", data_type=type(data).__name__)
-            return MoxfieldDecklist()
+            raise MoxfieldError(
+                f"Moxfield returned unexpected data format (expected JSON object, got {type(data).__name__})"
+            )
 
         # --- Metadata ---
         created_by = data.get("createdByUser")

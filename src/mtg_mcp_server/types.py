@@ -359,7 +359,7 @@ class MoxfieldCard(BaseModel):
     """A card entry from a Moxfield decklist board section."""
 
     name: str
-    quantity: int = 1
+    quantity: int = Field(1, ge=1)
 
 
 class MoxfieldDeck(BaseModel):
