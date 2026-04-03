@@ -8,7 +8,6 @@ fragile scraping nature.
 
 from __future__ import annotations
 
-import contextlib
 import re
 from typing import Self
 
@@ -21,6 +20,7 @@ from mtg_mcp_server.services.cache import _method_key, async_cached
 from mtg_mcp_server.types import (
     GoldfishArchetype,
     GoldfishArchetypeDetail,
+    GoldfishDeckPrice,
     GoldfishFormatStaple,
     GoldfishMetaSnapshot,
 )
@@ -197,7 +197,17 @@ class MTGGoldfishClient(BaseClient):
                     "get_archetype.deck_download_failed",
                     deck_id=detail.deck_id,
                     archetype=archetype,
+                    exc_info=True,
                 )
+            except (ValueError, IndexError, TypeError):
+                log.warning(
+                    "get_archetype.deck_parse_failed",
+                    deck_id=detail.deck_id,
+                    archetype=archetype,
+                    exc_info=True,
+                )
+        else:
+            log.warning("get_archetype.no_deck_id_found", archetype=archetype)
 
         log.debug(
             "get_archetype.complete",
@@ -244,7 +254,7 @@ class MTGGoldfishClient(BaseClient):
         return staples
 
     @async_cached(_price_cache, key=_method_key)
-    async def get_deck_price(self, format: str, archetype: str) -> dict:
+    async def get_deck_price(self, format: str, archetype: str) -> GoldfishDeckPrice:
         """Get price metadata for an archetype.
 
         Uses get_metagame() to find the archetype's price from the metagame
@@ -255,7 +265,7 @@ class MTGGoldfishClient(BaseClient):
             archetype: Archetype name (e.g. "Boros Energy").
 
         Returns:
-            Dict with archetype name, paper price, and card counts.
+            GoldfishDeckPrice with archetype name, paper price, and card counts.
 
         Raises:
             ArchetypeNotFoundError: If the archetype is not found in the metagame.
@@ -279,16 +289,19 @@ class MTGGoldfishClient(BaseClient):
         # Get the decklist for card counts
         detail = await self.get_archetype(format, archetype)
 
-        return {
-            "archetype": archetype,
-            "price_paper": price_paper,
-            "mainboard_count": len(detail.mainboard),
-            "sideboard_count": len(detail.sideboard),
-        }
+        return GoldfishDeckPrice(
+            archetype=archetype,
+            price_paper=price_paper,
+            mainboard_count=len(detail.mainboard),
+            sideboard_count=len(detail.sideboard),
+        )
 
     # -----------------------------------------------------------------------
     # HTML parsing helpers (all defensive — wrap in try/except, log warnings)
     # -----------------------------------------------------------------------
+
+    # Expected exceptions from HTML parsing — anything else should propagate.
+    _PARSE_ERRORS = (AttributeError, ValueError, IndexError, TypeError)
 
     def _parse_metagame_html(self, html: str) -> list[GoldfishArchetype]:
         """Parse archetype tiles from a metagame page.
@@ -306,18 +319,25 @@ class MTGGoldfishClient(BaseClient):
         tiles = tree.css("div.archetype-tile")
         archetypes: list[GoldfishArchetype] = []
 
-        for tile in tiles:
+        for i, tile in enumerate(tiles):
             try:
                 arch = self._parse_single_tile(tile)
                 archetypes.append(arch)
-            except Exception:
-                log.warning("parse_metagame.tile_failed", exc_info=True)
+            except self._PARSE_ERRORS:
+                log.warning("parse_metagame.tile_failed", tile_index=i, exc_info=True)
                 continue
+
+        if tiles and not archetypes:
+            log.error("parse_metagame.all_tiles_failed", tile_count=len(tiles))
 
         return archetypes
 
     def _parse_single_tile(self, tile: Node) -> GoldfishArchetype:
-        """Parse a single archetype tile element."""
+        """Parse a single archetype tile element.
+
+        Raises ValueError if the tile has no name (nameless archetypes are
+        nonsensical data that would confuse users and break downstream lookups).
+        """
         # Name and slug from the paper price link
         name = ""
         slug = ""
@@ -328,6 +348,9 @@ class MTGGoldfishClient(BaseClient):
             # href is like "/archetype/modern-boros-energy#paper"
             slug = href.split("/archetype/")[-1].split("#")[0] if "/archetype/" in href else ""
 
+        if not name:
+            raise ValueError("Archetype tile has no name")
+
         # Meta share percentage
         meta_share = 0.0
         meta_div = tile.css_first("div.metagame-percentage .archetype-tile-statistic-value")
@@ -335,8 +358,14 @@ class MTGGoldfishClient(BaseClient):
             meta_text = meta_div.text(strip=True) or ""
             pct_match = _RE_META_PCT.search(meta_text)
             if pct_match:
-                with contextlib.suppress(ValueError):
+                try:
                     meta_share = float(pct_match.group(1))
+                except ValueError:
+                    log.warning(
+                        "parse_tile.meta_share_failed",
+                        raw_text=pct_match.group(1),
+                        archetype=name,
+                    )
 
         # Deck count from extra data span
         deck_count = 0
@@ -345,8 +374,14 @@ class MTGGoldfishClient(BaseClient):
             count_text = count_span.text(strip=True) or ""
             count_match = _RE_DECK_COUNT.search(count_text)
             if count_match:
-                with contextlib.suppress(ValueError):
+                try:
                     deck_count = int(count_match.group(1).replace(",", ""))
+                except ValueError:
+                    log.warning(
+                        "parse_tile.deck_count_failed",
+                        raw_text=count_match.group(1),
+                        archetype=name,
+                    )
 
         # Paper price from deck-price-paper statistic
         price_paper = 0
@@ -357,8 +392,14 @@ class MTGGoldfishClient(BaseClient):
             price_text = price_div.text(strip=True) or ""
             price_match = _RE_PRICE.search(price_text)
             if price_match:
-                with contextlib.suppress(ValueError):
+                try:
                     price_paper = int(price_match.group(1).replace(",", ""))
+                except ValueError:
+                    log.warning(
+                        "parse_tile.price_failed",
+                        raw_text=price_match.group(1),
+                        archetype=name,
+                    )
 
         # Colors from mana cost icons
         colors: list[str] = []
@@ -495,15 +536,17 @@ class MTGGoldfishClient(BaseClient):
         tree = HTMLParser(html)
         table = tree.css_first("table.table-staples")
         if table is None:
-            log.warning("parse_staples.no_table")
+            log.error("parse_staples.no_table")
             return []
 
         rows = table.css("tr")
         staples: list[GoldfishFormatStaple] = []
+        skipped_short = 0
 
         for row in rows:
             tds = row.css("td")
             if len(tds) < 5:
+                skipped_short += 1
                 continue  # Skip header row or malformed rows
 
             try:
@@ -515,6 +558,10 @@ class MTGGoldfishClient(BaseClient):
                 name_link = tds[1].css_first("a")
                 if name_link is not None:
                     name = (name_link.text(strip=True) or "").strip()
+
+                if not name:
+                    log.warning("parse_staples.empty_name", rank=rank)
+                    continue
 
                 pct_text = (tds[3].text(strip=True) or "").strip().rstrip("%")
                 pct_of_decks = float(pct_text) if pct_text else 0.0
@@ -533,5 +580,12 @@ class MTGGoldfishClient(BaseClient):
             except (ValueError, IndexError):
                 log.warning("parse_staples.row_failed", exc_info=True)
                 continue
+
+        if skipped_short > 1:
+            # >1 because the header row is always skipped
+            log.debug("parse_staples.short_rows_skipped", count=skipped_short)
+
+        if len(rows) > 1 and not staples:
+            log.error("parse_staples.all_rows_failed", row_count=len(rows))
 
         return staples

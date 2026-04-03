@@ -18,6 +18,7 @@ from mtg_mcp_server.services.mtggoldfish import (
 from mtg_mcp_server.types import (
     GoldfishArchetype,
     GoldfishArchetypeDetail,
+    GoldfishDeckPrice,
     GoldfishFormatStaple,
     GoldfishMetaSnapshot,
 )
@@ -464,8 +465,8 @@ class TestGetDeckPrice:
     """Tests for deck price retrieval."""
 
     @respx.mock
-    async def test_returns_price_dict(self):
-        """get_deck_price returns price metadata from metagame + archetype."""
+    async def test_returns_deck_price_model(self):
+        """get_deck_price returns GoldfishDeckPrice from metagame + archetype."""
         meta_html = _load_fixture("metagame_modern.html")
         arch_html = _load_fixture("archetype_boros_energy.html")
         deck_txt = _load_fixture("deck_download.txt")
@@ -487,11 +488,11 @@ class TestGetDeckPrice:
         async with MTGGoldfishClient(base_url=BASE_URL) as client:
             result = await client.get_deck_price("modern", "Boros Energy")
 
-        assert isinstance(result, dict)
-        assert result["archetype"] == "Boros Energy"
-        assert result["price_paper"] == 860
-        assert result["mainboard_count"] > 0
-        assert result["sideboard_count"] > 0
+        assert isinstance(result, GoldfishDeckPrice)
+        assert result.archetype == "Boros Energy"
+        assert result.price_paper == 860
+        assert result.mainboard_count > 0
+        assert result.sideboard_count > 0
 
     @respx.mock
     async def test_archetype_not_in_metagame(self):
@@ -618,3 +619,121 @@ class TestErrorHandling:
         assert "mtg-mcp-server" not in ua
         # Should look browser-like
         assert "Mozilla" in ua
+
+
+class TestDeckDownloadFailure:
+    """Tests for graceful degradation when deck download fails."""
+
+    @respx.mock
+    async def test_deck_download_500_returns_metadata_only(self):
+        """Deck download HTTP error still returns archetype metadata."""
+        arch_html = _load_fixture("archetype_boros_energy.html")
+        respx.get(f"{BASE_URL}/archetype/modern-boros-energy").mock(
+            return_value=httpx.Response(
+                200, content=arch_html.encode(), headers={"Content-Type": "text/html"}
+            )
+        )
+        respx.get(f"{BASE_URL}/deck/download/7708470").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+        async with MTGGoldfishClient(base_url=BASE_URL) as client:
+            result = await client.get_archetype("modern", "Boros Energy")
+
+        assert result.name == "Boros Energy"
+        assert result.author != ""  # Metadata still present
+        assert result.mainboard == []  # Decklist empty
+        assert result.sideboard == []
+
+    @respx.mock
+    async def test_archetype_without_deck_id(self):
+        """Archetype page without initializeDeckComponents skips deck download."""
+        # HTML without the JS deck init call
+        html = """<html><body>
+        <h1 class="title">Boros Energy</h1>
+        <p class="deck-container-information">Event: <a>Modern Challenge</a></p>
+        </body></html>"""
+        respx.get(f"{BASE_URL}/archetype/modern-boros-energy").mock(
+            return_value=httpx.Response(
+                200, content=html.encode(), headers={"Content-Type": "text/html"}
+            )
+        )
+        async with MTGGoldfishClient(base_url=BASE_URL) as client:
+            result = await client.get_archetype("modern", "Boros Energy")
+
+        assert result.deck_id == ""
+        assert result.mainboard == []
+        assert result.sideboard == []
+        # Only the archetype page was requested, no deck download
+        assert len(respx.calls) == 1
+
+
+class TestCaseInsensitiveMatching:
+    """Tests for case-insensitive archetype matching in get_deck_price."""
+
+    @respx.mock
+    async def test_lowercase_archetype_matches(self):
+        """Lowercase archetype name matches title-case in metagame snapshot."""
+        meta_html = _load_fixture("metagame_modern.html")
+        arch_html = _load_fixture("archetype_boros_energy.html")
+        deck_txt = _load_fixture("deck_download.txt")
+        respx.get(f"{BASE_URL}/metagame/modern/full").mock(
+            return_value=httpx.Response(
+                200, content=meta_html.encode(), headers={"Content-Type": "text/html"}
+            )
+        )
+        respx.get(f"{BASE_URL}/archetype/modern-boros-energy").mock(
+            return_value=httpx.Response(
+                200, content=arch_html.encode(), headers={"Content-Type": "text/html"}
+            )
+        )
+        respx.get(f"{BASE_URL}/deck/download/7708470").mock(
+            return_value=httpx.Response(
+                200, content=deck_txt.encode(), headers={"Content-Type": "text/plain"}
+            )
+        )
+        async with MTGGoldfishClient(base_url=BASE_URL) as client:
+            result = await client.get_deck_price("modern", "boros energy")
+
+        assert isinstance(result, GoldfishDeckPrice)
+        assert result.price_paper == 860
+
+
+class TestLimitZero:
+    """Tests for limit=0 (unlimited) parameter."""
+
+    @respx.mock
+    async def test_limit_zero_returns_all(self):
+        """limit=0 returns all parsed staples without truncation."""
+        html = _load_fixture("format_staples_modern.html")
+        respx.get(f"{BASE_URL}/format-staples/modern").mock(
+            return_value=httpx.Response(
+                200, content=html.encode(), headers={"Content-Type": "text/html"}
+            )
+        )
+        async with MTGGoldfishClient(base_url=BASE_URL) as client:
+            result = await client.get_format_staples("modern", limit=0)
+
+        assert len(result) == 10  # Fixture has 10 rows
+
+
+class TestNamelessSkipping:
+    """Tests for skipping archetypes and staples with empty names."""
+
+    def test_nameless_tile_skipped(self):
+        """Archetype tile with no name link is skipped during parsing."""
+        html = """<html><body>
+        <div class="archetype-tile">
+            <span class="deck-price-paper"></span>
+        </div>
+        <div class="archetype-tile">
+            <span class="deck-price-paper">
+                <a href="/archetype/modern-burn#paper">Burn</a>
+            </span>
+        </div>
+        </body></html>"""
+        client = MTGGoldfishClient(base_url=BASE_URL)
+        result = client._parse_metagame_html(html)
+
+        # Only the tile with a name should be returned
+        assert len(result) == 1
+        assert result[0].name == "Burn"

@@ -14,6 +14,7 @@ from mtg_mcp_server.providers.mtggoldfish import mtggoldfish_mcp
 from mtg_mcp_server.types import (
     GoldfishArchetype,
     GoldfishArchetypeDetail,
+    GoldfishDeckPrice,
     GoldfishFormatStaple,
     GoldfishMetaSnapshot,
 )
@@ -95,21 +96,18 @@ def _make_format_staples() -> list[GoldfishFormatStaple]:
             name="Lightning Bolt",
             pct_of_decks=42.5,
             copies_played=3.8,
-            category="Instants",
         ),
         GoldfishFormatStaple(
             rank=2,
             name="Fatal Push",
             pct_of_decks=35.2,
             copies_played=3.5,
-            category="Instants",
         ),
         GoldfishFormatStaple(
             rank=3,
             name="Orcish Bowmasters",
             pct_of_decks=28.9,
             copies_played=4.0,
-            category="Creatures",
         ),
     ]
 
@@ -151,12 +149,12 @@ def mock_client():
     client.get_archetype = AsyncMock(return_value=_make_archetype_detail())
     client.get_format_staples = AsyncMock(return_value=_make_format_staples())
     client.get_deck_price = AsyncMock(
-        return_value={
-            "archetype": "Boros Energy",
-            "price_paper": 450,
-            "mainboard_count": 60,
-            "sideboard_count": 15,
-        }
+        return_value=GoldfishDeckPrice(
+            archetype="Boros Energy",
+            price_paper=450,
+            mainboard_count=60,
+            sideboard_count=15,
+        )
     )
     return client
 
@@ -474,6 +472,29 @@ class TestResource:
         template_uris = {t.uriTemplate for t in templates}
         assert "mtg://metagame/{format}" in template_uris
 
+    async def test_resource_returns_valid_json(self, client: Client):
+        """Metagame resource returns parseable JSON with archetypes."""
+        import json
+
+        result = await client.read_resource("mtg://metagame/Modern")
+        data = json.loads(result[0].text)
+        assert "format" in data
+        assert "archetypes" in data
+        assert len(data["archetypes"]) == 3
+
+    async def test_resource_format_not_found(self):
+        """Resource returns error JSON for unknown format."""
+        import json
+
+        from mtg_mcp_server.services.mtggoldfish import FormatNotFoundError
+
+        mock = AsyncMock()
+        mock.get_metagame = AsyncMock(side_effect=FormatNotFoundError("BadFormat"))
+        async with _mcp_client(mock) as c:
+            result = await c.read_resource("mtg://metagame/BadFormat")
+            data = json.loads(result[0].text)
+            assert "error" in data
+
 
 # ---------------------------------------------------------------------------
 # Error handling
@@ -538,6 +559,21 @@ class TestErrorHandling:
             result = await c.call_tool(
                 "format_staples",
                 {"format": "BadFormat"},
+                raise_on_error=False,
+            )
+            assert result.is_error
+            assert "not found" in result.content[0].text.lower()
+
+    async def test_archetype_list_format_not_found(self):
+        """archetype_list handles FormatNotFoundError."""
+        from mtg_mcp_server.services.mtggoldfish import FormatNotFoundError
+
+        mock = AsyncMock()
+        mock.get_archetype = AsyncMock(side_effect=FormatNotFoundError("BadFormat"))
+        async with _mcp_client(mock) as c:
+            result = await c.call_tool(
+                "archetype_list",
+                {"format": "BadFormat", "archetype": "Boros Energy"},
                 raise_on_error=False,
             )
             assert result.is_error

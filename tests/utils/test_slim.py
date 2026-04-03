@@ -16,12 +16,16 @@ from mtg_mcp_server.types import (
     ComboResult,
     DraftCardRating,
     EDHRECCard,
+    GoldfishArchetype,
+    GoldfishFormatStaple,
     Rule,
 )
 from mtg_mcp_server.utils.slim import (
+    slim_archetype,
     slim_card,
     slim_combo,
     slim_edhrec_card,
+    slim_format_staple,
     slim_rating,
     slim_rule,
 )
@@ -322,3 +326,66 @@ class TestSlimRule:
         rule = Rule(number="100.1", text="Leaf rule")
         result = slim_rule(rule)
         assert result["subrule_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# slim_archetype
+# ---------------------------------------------------------------------------
+
+
+class TestSlimArchetype:
+    @pytest.fixture
+    def sample_archetype(self) -> GoldfishArchetype:
+        return GoldfishArchetype(
+            name="Boros Energy",
+            slug="modern-boros-energy",
+            meta_share=20.3,
+            deck_count=572,
+            price_paper=860,
+            colors=["W", "R"],
+            key_cards=["Galvanic Discharge", "Amped Raptor"],
+        )
+
+    def test_includes_essential_fields(self, sample_archetype: GoldfishArchetype) -> None:
+        result = slim_archetype(sample_archetype)
+        assert result["name"] == "Boros Energy"
+        assert result["slug"] == "modern-boros-energy"
+        assert result["meta_share"] == 20.3
+        assert result["deck_count"] == 572
+        assert result["price_paper"] == 860
+
+    def test_excludes_bloat_fields(self, sample_archetype: GoldfishArchetype) -> None:
+        result = slim_archetype(sample_archetype)
+        assert "colors" not in result
+        assert "key_cards" not in result
+
+    def test_field_count(self, sample_archetype: GoldfishArchetype) -> None:
+        result = slim_archetype(sample_archetype)
+        assert len(result) == 5
+
+
+# ---------------------------------------------------------------------------
+# slim_format_staple
+# ---------------------------------------------------------------------------
+
+
+class TestSlimFormatStaple:
+    @pytest.fixture
+    def sample_staple(self) -> GoldfishFormatStaple:
+        return GoldfishFormatStaple(
+            rank=1,
+            name="Lightning Bolt",
+            pct_of_decks=42.5,
+            copies_played=3.8,
+        )
+
+    def test_includes_essential_fields(self, sample_staple: GoldfishFormatStaple) -> None:
+        result = slim_format_staple(sample_staple)
+        assert result["rank"] == 1
+        assert result["name"] == "Lightning Bolt"
+        assert result["pct_of_decks"] == 42.5
+        assert result["copies_played"] == 3.8
+
+    def test_field_count(self, sample_staple: GoldfishFormatStaple) -> None:
+        result = slim_format_staple(sample_staple)
+        assert len(result) == 4
