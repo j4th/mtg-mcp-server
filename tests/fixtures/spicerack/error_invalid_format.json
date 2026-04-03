@@ -1,0 +1,4 @@
+{
+  "error": "Invalid format provided.",
+  "details": "The format 'INVALID' is not recognized. Valid formats are: Draft, Commander, Legacy, Modern, Multiplayer, Pauper, Sealed, Standard, Pioneer, Vintage, Team Trios, Oathbreaker, Premodern, Penny Dreadful, Historic, Timeless, Gladiator, Explorer, Standard Brawl, Alchemy, Pauper Commander, Duel Commander, Oldschool, PrEDH, Other"
+}

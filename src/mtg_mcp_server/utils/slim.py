@@ -10,7 +10,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mtg_mcp_server.types import Card, Combo, DraftCardRating, EDHRECCard, Rule
+    from mtg_mcp_server.types import (
+        Card,
+        Combo,
+        DraftCardRating,
+        EDHRECCard,
+        Rule,
+        SpicerackStanding,
+        SpicerackTournament,
+    )
 
 
 def slim_card(card: Card) -> dict:
@@ -68,4 +76,27 @@ def slim_rule(rule: Rule) -> dict:
         "number": rule.number,
         "text": rule.text,
         "subrule_count": len(rule.subrules),
+    }
+
+
+def slim_standing(standing: SpicerackStanding) -> dict:
+    """Essential standing fields for tournament results."""
+    d: dict = {
+        "rank": standing.rank,
+        "player_name": standing.player_name,
+        "record": f"{standing.wins}-{standing.losses}-{standing.draws}",
+    }
+    if standing.decklist_url:
+        d["decklist_url"] = standing.decklist_url
+    return d
+
+
+def slim_tournament(tournament: SpicerackTournament) -> dict:
+    """Essential tournament fields for list contexts."""
+    return {
+        "tournament_id": tournament.tournament_id,
+        "name": tournament.name,
+        "format": tournament.format,
+        "date": tournament.date,
+        "player_count": tournament.player_count,
     }

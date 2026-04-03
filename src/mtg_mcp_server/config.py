@@ -41,12 +41,15 @@ class Settings(BaseSettings):
     seventeen_lands_base_url: str = "https://www.17lands.com"
     edhrec_base_url: str = "https://json.edhrec.com"
     moxfield_base_url: str = "https://api2.moxfield.com"
+    spicerack_base_url: str = "https://api.spicerack.gg"
+    spicerack_api_key: str = ""  # Optional — sent as X-API-Key header if non-empty
 
     # --- Feature flags ---
     # Optional backends can be disabled without code changes.
     enable_17lands: bool = True
     enable_edhrec: bool = True  # Behind flag — scrapes undocumented endpoints
     enable_moxfield: bool = True  # Behind flag — reverse-engineered API
+    enable_spicerack: bool = True  # Documented public API
     enable_bulk_data: bool = True  # Scryfall Oracle Cards bulk download (~30MB)
 
     # --- Caching ---

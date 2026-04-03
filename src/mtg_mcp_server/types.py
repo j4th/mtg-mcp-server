@@ -10,6 +10,7 @@ Backends:
     Commander Spellbook — Combo, DecklistCombos, BracketEstimate
     17Lands — DraftCardRating, ArchetypeRating
     EDHREC — EDHRECCard, EDHRECCardList, EDHRECCommanderData
+    Spicerack — SpicerackStanding, SpicerackTournament
 """
 
 from __future__ import annotations
@@ -38,6 +39,8 @@ __all__ = [
     "Rule",
     "Ruling",
     "SetInfo",
+    "SpicerackStanding",
+    "SpicerackTournament",
 ]
 
 # ---------------------------------------------------------------------------
@@ -348,6 +351,52 @@ class EDHRECCommanderData(BaseModel):
     commander_name: str
     cardlists: list[EDHRECCardList] = Field(default_factory=list)
     total_decks: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Moxfield
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Spicerack
+# ---------------------------------------------------------------------------
+
+
+class SpicerackStanding(BaseModel):
+    """A player's result in a Spicerack tournament.
+
+    Standings are ordered by final placement — the API does not provide
+    an explicit rank field, so ``rank`` is assigned during parsing.
+    ``decklist_url`` is a Moxfield URL or empty string.
+    """
+
+    rank: int = 0
+    player_name: str = ""
+    wins: int = 0
+    losses: int = 0
+    draws: int = 0
+    bracket_wins: int = 0
+    bracket_losses: int = 0
+    decklist_url: str = ""
+
+
+class SpicerackTournament(BaseModel):
+    """Tournament metadata and standings from Spicerack.
+
+    ``tournament_id`` is a string (the API's ``TID`` field).
+    ``date`` is an ISO-8601 date string converted from the API's Unix timestamp.
+    """
+
+    tournament_id: str = ""
+    name: str = ""
+    format: str = ""
+    date: str = ""
+    player_count: int = 0
+    rounds_swiss: int = 0
+    top_cut: int = 0
+    bracket_url: str = ""
+    standings: list[SpicerackStanding] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
