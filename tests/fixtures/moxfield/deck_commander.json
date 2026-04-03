@@ -1,0 +1,334 @@
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "publicId": "rGOl_LYVa0KJ_K0vLUS83A",
+  "name": "Muldrotha Graveyard Value",
+  "format": "commander",
+  "description": "Graveyard-based value engine built around Muldrotha's ability to replay permanents.",
+  "visibility": "public",
+  "publicUrl": "https://www.moxfield.com/decks/rGOl_LYVa0KJ_K0vLUS83A",
+  "version": 3,
+  "createdByUser": {
+    "userName": "testplayer",
+    "displayName": "Test Player",
+    "profileImageUrl": null,
+    "badges": []
+  },
+  "authors": [],
+  "createdAtUtc": "2024-01-15T10:30:00Z",
+  "lastUpdatedAtUtc": "2024-03-20T14:00:00Z",
+  "likeCount": 42,
+  "viewCount": 1500,
+  "commentCount": 3,
+  "areCommentsEnabled": true,
+  "main": {
+    "id": "card-muldrotha",
+    "name": "Muldrotha, the Gravetide",
+    "scryfall_id": "c6820c76-ced0-475e-a2b4-db4c74f9db71",
+    "set": "dom",
+    "set_name": "Dominaria",
+    "type_line": "Legendary Creature \u2014 Elemental Avatar",
+    "mana_cost": "{3}{B}{G}{U}",
+    "cmc": 6.0,
+    "oracle_text": "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard. (If a card has multiple permanent types, choose one as you play it.)",
+    "colors": ["B", "G", "U"],
+    "color_identity": ["B", "G", "U"],
+    "power": "6",
+    "toughness": "6",
+    "rarity": "mythic"
+  },
+  "mainCardIdIsBackFace": false,
+  "colorIdentity": ["B", "G", "U"],
+  "boards": {
+    "commanders": {
+      "count": 1,
+      "cards": {
+        "card-muldrotha": {
+          "quantity": 1,
+          "boardType": "commanders",
+          "finish": "nonFoil",
+          "isFoil": false,
+          "isAlter": false,
+          "isProxy": false,
+          "card": {
+            "id": "card-muldrotha",
+            "uniqueCardId": "muldrotha-unique",
+            "scryfall_id": "c6820c76-ced0-475e-a2b4-db4c74f9db71",
+            "name": "Muldrotha, the Gravetide",
+            "cn": "199",
+            "set": "dom",
+            "set_name": "Dominaria",
+            "layout": "normal",
+            "mana_cost": "{3}{B}{G}{U}",
+            "cmc": 6.0,
+            "type": "Creature",
+            "type_line": "Legendary Creature \u2014 Elemental Avatar",
+            "oracle_text": "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard. (If a card has multiple permanent types, choose one as you play it.)",
+            "colors": ["B", "G", "U"],
+            "color_identity": ["B", "G", "U"],
+            "power": "6",
+            "toughness": "6",
+            "rarity": "mythic",
+            "edhrec_rank": 245,
+            "prices": {
+              "usd": 5.50,
+              "usd_foil": 12.00,
+              "eur": 4.80,
+              "tix": null,
+              "lastUpdatedAtUtc": "2024-03-20T00:00:00Z"
+            },
+            "legalities": {
+              "commander": "legal",
+              "standard": "not_legal",
+              "modern": "legal",
+              "legacy": "legal",
+              "vintage": "legal",
+              "pauper": "not_legal"
+            }
+          }
+        }
+      }
+    },
+    "mainboard": {
+      "count": 5,
+      "cards": {
+        "card-sol-ring": {
+          "quantity": 1,
+          "boardType": "mainboard",
+          "finish": "nonFoil",
+          "isFoil": false,
+          "isAlter": false,
+          "isProxy": false,
+          "card": {
+            "id": "card-sol-ring",
+            "uniqueCardId": "sol-ring-unique",
+            "scryfall_id": "4cbc6901-6a4a-4d0a-83ea-7eefa3b35021",
+            "name": "Sol Ring",
+            "cn": "225",
+            "set": "c21",
+            "set_name": "Commander 2021",
+            "layout": "normal",
+            "mana_cost": "{1}",
+            "cmc": 1.0,
+            "type": "Artifact",
+            "type_line": "Artifact",
+            "oracle_text": "{T}: Add {C}{C}.",
+            "colors": [],
+            "color_identity": [],
+            "rarity": "uncommon",
+            "edhrec_rank": 1,
+            "prices": {
+              "usd": 1.50,
+              "usd_foil": 5.00,
+              "eur": 1.20,
+              "tix": null,
+              "lastUpdatedAtUtc": "2024-03-20T00:00:00Z"
+            },
+            "legalities": {
+              "commander": "legal",
+              "standard": "not_legal",
+              "modern": "not_legal",
+              "legacy": "banned",
+              "vintage": "restricted"
+            }
+          }
+        },
+        "card-spore-frog": {
+          "quantity": 1,
+          "boardType": "mainboard",
+          "finish": "nonFoil",
+          "isFoil": false,
+          "isAlter": false,
+          "isProxy": false,
+          "card": {
+            "id": "card-spore-frog",
+            "uniqueCardId": "spore-frog-unique",
+            "scryfall_id": "6d42fd52-34ea-4d1b-80dc-58fb0593bb5b",
+            "name": "Spore Frog",
+            "cn": "180",
+            "set": "mh1",
+            "set_name": "Modern Horizons",
+            "layout": "normal",
+            "mana_cost": "{G}",
+            "cmc": 1.0,
+            "type": "Creature",
+            "type_line": "Creature \u2014 Frog",
+            "oracle_text": "Sacrifice Spore Frog: Prevent all combat damage that would be dealt this turn.",
+            "colors": ["G"],
+            "color_identity": ["G"],
+            "power": "1",
+            "toughness": "1",
+            "rarity": "common",
+            "edhrec_rank": 500,
+            "prices": {
+              "usd": 0.75,
+              "usd_foil": 3.00,
+              "eur": 0.60,
+              "tix": null,
+              "lastUpdatedAtUtc": "2024-03-20T00:00:00Z"
+            },
+            "legalities": {
+              "commander": "legal",
+              "standard": "not_legal",
+              "modern": "legal",
+              "legacy": "legal",
+              "vintage": "legal"
+            }
+          }
+        },
+        "card-animate-dead": {
+          "quantity": 1,
+          "boardType": "mainboard",
+          "finish": "nonFoil",
+          "isFoil": false,
+          "isAlter": false,
+          "isProxy": false,
+          "card": {
+            "id": "card-animate-dead",
+            "uniqueCardId": "animate-dead-unique",
+            "scryfall_id": "7b83536a-efa4-41f3-9424-75b0efc0edd5",
+            "name": "Animate Dead",
+            "cn": "122",
+            "set": "ema",
+            "set_name": "Eternal Masters",
+            "layout": "normal",
+            "mana_cost": "{1}{B}",
+            "cmc": 2.0,
+            "type": "Enchantment",
+            "type_line": "Enchantment \u2014 Aura",
+            "oracle_text": "Enchant creature card in a graveyard\nWhen Animate Dead enters, if it's on the battlefield, it loses \"enchant creature card in a graveyard\" and gains \"enchant creature put onto the battlefield with Animate Dead.\" Return enchanted creature card to the battlefield under your control.",
+            "colors": ["B"],
+            "color_identity": ["B"],
+            "rarity": "uncommon",
+            "edhrec_rank": 150,
+            "prices": {
+              "usd": 3.00,
+              "usd_foil": null,
+              "eur": 2.50,
+              "tix": null,
+              "lastUpdatedAtUtc": "2024-03-20T00:00:00Z"
+            },
+            "legalities": {
+              "commander": "legal",
+              "standard": "not_legal",
+              "modern": "not_legal",
+              "legacy": "legal",
+              "vintage": "legal"
+            }
+          }
+        },
+        "card-sakura-tribe-elder": {
+          "quantity": 1,
+          "boardType": "mainboard",
+          "finish": "nonFoil",
+          "isFoil": false,
+          "isAlter": false,
+          "isProxy": false,
+          "card": {
+            "id": "card-sakura-tribe-elder",
+            "uniqueCardId": "ste-unique",
+            "scryfall_id": "c83be2b7-0373-4389-9aa0-523db58f4d2a",
+            "name": "Sakura-Tribe Elder",
+            "cn": "144",
+            "set": "c19",
+            "set_name": "Commander 2019",
+            "layout": "normal",
+            "mana_cost": "{1}{G}",
+            "cmc": 2.0,
+            "type": "Creature",
+            "type_line": "Creature \u2014 Snake Shaman",
+            "oracle_text": "Sacrifice Sakura-Tribe Elder: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+            "colors": ["G"],
+            "color_identity": ["G"],
+            "power": "1",
+            "toughness": "1",
+            "rarity": "common",
+            "edhrec_rank": 25,
+            "prices": {
+              "usd": 0.25,
+              "usd_foil": 1.50,
+              "eur": 0.20,
+              "tix": null,
+              "lastUpdatedAtUtc": "2024-03-20T00:00:00Z"
+            },
+            "legalities": {
+              "commander": "legal",
+              "standard": "not_legal",
+              "modern": "legal",
+              "legacy": "legal",
+              "vintage": "legal"
+            }
+          }
+        },
+        "card-eternal-witness": {
+          "quantity": 1,
+          "boardType": "mainboard",
+          "finish": "foil",
+          "isFoil": true,
+          "isAlter": false,
+          "isProxy": false,
+          "card": {
+            "id": "card-eternal-witness",
+            "uniqueCardId": "ewitness-unique",
+            "scryfall_id": "d74e7ded-d063-4d90-a9ff-91c44a8098d7",
+            "name": "Eternal Witness",
+            "cn": "138",
+            "set": "uma",
+            "set_name": "Ultimate Masters",
+            "layout": "normal",
+            "mana_cost": "{1}{G}{G}",
+            "cmc": 3.0,
+            "type": "Creature",
+            "type_line": "Creature \u2014 Human Shaman",
+            "oracle_text": "When Eternal Witness enters, you may return target card from your graveyard to your hand.",
+            "colors": ["G"],
+            "color_identity": ["G"],
+            "power": "2",
+            "toughness": "1",
+            "rarity": "uncommon",
+            "edhrec_rank": 30,
+            "prices": {
+              "usd": 2.00,
+              "usd_foil": 8.00,
+              "eur": 1.80,
+              "tix": null,
+              "lastUpdatedAtUtc": "2024-03-20T00:00:00Z"
+            },
+            "legalities": {
+              "commander": "legal",
+              "standard": "not_legal",
+              "modern": "legal",
+              "legacy": "legal",
+              "vintage": "legal"
+            }
+          }
+        }
+      }
+    },
+    "sideboard": {
+      "count": 0,
+      "cards": {}
+    },
+    "companions": {
+      "count": 0,
+      "cards": {}
+    },
+    "maybeboard": {
+      "count": 0,
+      "cards": {}
+    }
+  },
+  "tokens": [],
+  "hubs": [
+    {
+      "name": "Graveyard",
+      "description": "Strategies that use the graveyard as a resource."
+    }
+  ],
+  "authorTags": {},
+  "bracket": 2,
+  "autoBracket": 2,
+  "includeBasicLandsInPrice": false,
+  "includeCommandersInPrice": true,
+  "enableMultiplePrintings": false,
+  "isTooBeaucoup": false
+}
