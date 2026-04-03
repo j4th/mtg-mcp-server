@@ -88,31 +88,19 @@ async def decklist(
     if result.deck.author:
         lines.append(f"Author: {result.deck.author}")
 
-    if result.commanders:
-        lines.append(f"\n### Commanders ({len(result.commanders)})")
-        for card in result.commanders:
-            lines.append(f"{card.quantity}x {card.name}")
-
-    if result.mainboard:
-        lines.append(f"\n### Mainboard ({len(result.mainboard)})")
-        for card in result.mainboard:
-            lines.append(f"{card.quantity}x {card.name}")
-
-    if result.sideboard:
-        lines.append(f"\n### Sideboard ({len(result.sideboard)})")
-        for card in result.sideboard:
-            lines.append(f"{card.quantity}x {card.name}")
-
-    if result.companions:
-        lines.append(f"\n### Companions ({len(result.companions)})")
-        for card in result.companions:
-            lines.append(f"{card.quantity}x {card.name}")
-
-    total_cards = sum(
-        c.quantity
-        for board in (result.commanders, result.mainboard, result.sideboard, result.companions)
-        for c in board
-    )
+    boards = [
+        ("Commanders", result.commanders),
+        ("Mainboard", result.mainboard),
+        ("Sideboard", result.sideboard),
+        ("Companions", result.companions),
+    ]
+    total_cards = 0
+    for section_name, cards in boards:
+        if cards:
+            lines.append(f"\n### {section_name} ({len(cards)})")
+            for card in cards:
+                lines.append(f"{card.quantity}x {card.name}")
+                total_cards += card.quantity
 
     # Build structured content
     structured = {
@@ -184,14 +172,14 @@ async def deck_info(
 
     # Card counts per board
     board_counts: dict[str, int] = {}
-    if result.commanders:
-        board_counts["commanders"] = sum(c.quantity for c in result.commanders)
-    if result.mainboard:
-        board_counts["mainboard"] = sum(c.quantity for c in result.mainboard)
-    if result.sideboard:
-        board_counts["sideboard"] = sum(c.quantity for c in result.sideboard)
-    if result.companions:
-        board_counts["companions"] = sum(c.quantity for c in result.companions)
+    for board_name, cards in [
+        ("commanders", result.commanders),
+        ("mainboard", result.mainboard),
+        ("sideboard", result.sideboard),
+        ("companions", result.companions),
+    ]:
+        if cards:
+            board_counts[board_name] = sum(c.quantity for c in cards)
 
     if board_counts:
         lines.append("\nCard counts:")
