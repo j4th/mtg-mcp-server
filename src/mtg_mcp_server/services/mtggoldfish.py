@@ -127,6 +127,7 @@ class MTGGoldfishClient(BaseClient):
             FormatNotFoundError: If the format page returns 404.
             MTGGoldfishError: On other HTTP errors.
         """
+        format = format.lower()
         log.debug("get_metagame", format=format)
         try:
             response = await self._get(f"/metagame/{format}/full")
@@ -167,6 +168,7 @@ class MTGGoldfishClient(BaseClient):
             ArchetypeNotFoundError: If the archetype page returns 404.
             MTGGoldfishError: On other HTTP errors.
         """
+        format = format.lower()
         slug = slugify(archetype)
         url_slug = f"{format}-{slug}"
         log.debug("get_archetype", format=format, archetype=archetype, slug=url_slug)
@@ -220,6 +222,7 @@ class MTGGoldfishClient(BaseClient):
             FormatNotFoundError: If the format page returns 404.
             MTGGoldfishError: On other HTTP errors.
         """
+        format = format.lower()
         log.debug("get_format_staples", format=format, limit=limit)
         try:
             response = await self._get(f"/format-staples/{format}")
@@ -258,6 +261,7 @@ class MTGGoldfishClient(BaseClient):
             ArchetypeNotFoundError: If the archetype is not found in the metagame.
             MTGGoldfishError: On other HTTP errors.
         """
+        format = format.lower()
         log.debug("get_deck_price", format=format, archetype=archetype)
 
         # Find archetype in metagame snapshot for price

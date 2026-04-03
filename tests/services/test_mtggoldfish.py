@@ -98,6 +98,25 @@ class TestAcceptHeader:
             assert "application/json" not in accept
 
 
+class TestFormatNormalization:
+    """Verify format names are lowercased before building URLs."""
+
+    @respx.mock
+    async def test_title_case_format_lowered(self):
+        """Title-case 'Modern' is normalized to 'modern' in the URL."""
+        html = _load_fixture("metagame_modern.html")
+        respx.get(f"{BASE_URL}/metagame/modern/full").mock(
+            return_value=httpx.Response(
+                200, content=html.encode(), headers={"Content-Type": "text/html"}
+            )
+        )
+        async with MTGGoldfishClient(base_url=BASE_URL) as client:
+            result = await client.get_metagame("Modern")
+
+        assert result.format == "modern"
+        assert len(result.archetypes) == 3
+
+
 class TestGetMetagame:
     """Tests for metagame page parsing."""
 
