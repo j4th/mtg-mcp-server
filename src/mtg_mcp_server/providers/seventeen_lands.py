@@ -71,23 +71,8 @@ async def card_ratings(
     Note: 17Lands data skews toward above-average players (~56% baseline WR).
     Cards with <500 games may not have reliable data.
     """
-    client = _get_client()
-    try:
-        ratings = await client.card_ratings(set_code, event_type=event_type)
-    except SeventeenLandsError as exc:
-        raise ToolError(f"17Lands API error: {exc}") from exc
-
-    if not ratings:
-        return ToolResult(
-            content=f"No card rating data available for {set_code} ({event_type})."
-            + ATTRIBUTION_17LANDS,
-            structured_content={
-                "set_code": set_code,
-                "event_type": event_type,
-                "total_cards": 0,
-                "cards": [],
-            },
-        )
+    if limit < 0:
+        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
 
     sort_configs = {
         "gih_wr": (
@@ -107,11 +92,28 @@ async def card_ratings(
         raise ToolError(
             f"Invalid sort_by: '{sort_by}'. Valid options: {', '.join(sorted(sort_configs))}"
         )
+
+    client = _get_client()
+    try:
+        ratings = await client.card_ratings(set_code, event_type=event_type)
+    except SeventeenLandsError as exc:
+        raise ToolError(f"17Lands API error: {exc}") from exc
+
+    if not ratings:
+        return ToolResult(
+            content=f"No card rating data available for {set_code} ({event_type})."
+            + ATTRIBUTION_17LANDS,
+            structured_content={
+                "set_code": set_code,
+                "event_type": event_type,
+                "total_cards": 0,
+                "cards": [],
+            },
+        )
+
     key_fn, reverse = sort_configs[sort_by]
     sorted_ratings = sorted(ratings, key=key_fn, reverse=reverse)
 
-    if limit < 0:
-        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
     total = len(sorted_ratings)
     cards = sorted_ratings if limit == 0 else sorted_ratings[:limit]
     showing = len(cards)

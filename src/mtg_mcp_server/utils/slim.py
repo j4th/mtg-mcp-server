@@ -59,8 +59,13 @@ def slim_combo(combo: Combo) -> dict:
 
 
 def slim_rule(rule: Rule) -> dict:
-    """Essential rule fields (number + text, no recursive subrules)."""
+    """Essential rule fields (number + text, no recursive subrules).
+
+    Includes ``subrule_count`` so consumers know when to do a more
+    specific lookup for child rules.
+    """
     return {
         "number": rule.number,
         "text": rule.text,
+        "subrule_count": len(rule.subrules),
     }

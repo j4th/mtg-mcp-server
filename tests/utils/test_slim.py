@@ -292,14 +292,15 @@ class TestSlimRule:
         result = slim_rule(sample_rule)
         assert result["number"] == "702.2b"
         assert "deathtouch" in result["text"]
+        assert result["subrule_count"] == 1
 
-    def test_excludes_subrules(self, sample_rule: Rule) -> None:
+    def test_excludes_recursive_subrules(self, sample_rule: Rule) -> None:
         result = slim_rule(sample_rule)
         assert "subrules" not in result
 
     def test_field_count(self, sample_rule: Rule) -> None:
         result = slim_rule(sample_rule)
-        assert len(result) == 2
+        assert len(result) == 3
 
     def test_no_recursive_bloat(self) -> None:
         """Deeply nested subrules should not appear in slim output."""
@@ -315,4 +316,9 @@ class TestSlimRule:
             ],
         )
         result = slim_rule(deep)
-        assert result == {"number": "100.1", "text": "Top level"}
+        assert result == {"number": "100.1", "text": "Top level", "subrule_count": 1}
+
+    def test_zero_subrules(self) -> None:
+        rule = Rule(number="100.1", text="Leaf rule")
+        result = slim_rule(rule)
+        assert result["subrule_count"] == 0

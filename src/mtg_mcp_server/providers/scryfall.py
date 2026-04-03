@@ -82,6 +82,9 @@ async def search_cards(
     Examples: "f:commander id:sultai t:creature", "o:destroy t:instant cmc<=3"
     See https://scryfall.com/docs/syntax for full syntax reference.
     """
+    if limit < 0:
+        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
+
     client = _get_client()
     try:
         result = await client.search_cards(query, page=page)
@@ -90,8 +93,6 @@ async def search_cards(
     except ScryfallError as exc:
         raise ToolError(f"Scryfall API error: {exc}") from exc
 
-    if limit < 0:
-        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
     cards = result.data if limit == 0 else result.data[:limit]
     showing = len(cards)
     total = len(result.data)
@@ -267,6 +268,10 @@ async def whats_new(
             description="Filter to cards legal in a format (e.g. 'standard', 'commander', 'modern')"
         ),
     ] = None,
+    limit: Annotated[
+        int,
+        Field(description="Max cards to return (default 30, 0 for all)"),
+    ] = 30,
     response_format: Annotated[
         ResponseFormat,
         Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
@@ -279,6 +284,8 @@ async def whats_new(
     """
     if days < 1:
         raise ToolError("days must be at least 1.")
+    if limit < 0:
+        raise ToolError(f"limit must be >= 0 (0 for all), got {limit}")
 
     date_str = (date.today() - timedelta(days=days)).isoformat()
     query_parts = [f"date>={date_str}"]
@@ -301,14 +308,20 @@ async def whats_new(
     except ScryfallError as exc:
         raise ToolError(f"Scryfall API error: {exc}") from exc
 
+    cards = result.data if limit == 0 else result.data[:limit]
+    showing = len(cards)
+    total = len(result.data)
+
     lines = [f"Found {result.total_cards} card(s) released in the last {days} day(s):"]
-    for card in result.data:
+    for card in cards:
         if response_format == "concise":
             set_label = card.set_code.upper() if card.set_code else ""
             lines.append(f"  {card.name} {card.mana_cost or ''} [{set_label}]")
         else:
             set_label = card.set_code.upper() if card.set_code else ""
             lines.append(f"  {card.name} {card.mana_cost or ''} — {card.type_line} [{set_label}]")
+    if showing < total:
+        lines.append(f"\n{total - showing} more on this page — increase limit to see them.")
     if result.has_more:
         lines.append(
             "\nMore results available — refine your search with set_code or format filters."
@@ -320,8 +333,9 @@ async def whats_new(
             "set_code": set_code,
             "format": format,
             "total_cards": result.total_cards,
+            "showing": showing,
             "has_more": result.has_more,
-            "cards": [slim_card(card) for card in result.data],
+            "cards": [slim_card(card) for card in cards],
         },
     )
 
