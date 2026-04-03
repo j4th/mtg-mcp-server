@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import re
+from typing import Self
 
 import structlog
 from cachetools import TTLCache
@@ -97,6 +98,20 @@ class MTGGoldfishClient(BaseClient):
             rate_limit_rps=rate_limit_rps,
             user_agent=_BROWSER_UA,
         )
+
+    async def __aenter__(self) -> Self:
+        """Override Accept header for HTML scraping.
+
+        BaseClient defaults to ``Accept: application/json`` which causes
+        MTGGoldfish to return HTTP 406 (Not Acceptable). This override
+        sets a browser-standard Accept header for HTML content.
+        """
+        await super().__aenter__()
+        if self._client is not None:
+            self._client.headers["accept"] = (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            )
+        return self
 
     @async_cached(_metagame_cache, key=_method_key)
     async def get_metagame(self, format: str) -> GoldfishMetaSnapshot:

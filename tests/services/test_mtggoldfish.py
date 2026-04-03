@@ -86,6 +86,18 @@ class TestSlugify:
         assert slugify("'Hello World'") == "hello-world"
 
 
+class TestAcceptHeader:
+    """Verify MTGGoldfishClient sets Accept: text/html (not application/json)."""
+
+    async def test_accept_header_is_html(self):
+        """Client must send Accept: text/html to avoid HTTP 406 from MTGGoldfish."""
+        client = MTGGoldfishClient(base_url=BASE_URL)
+        async with client:
+            accept = client._client.headers["accept"]
+            assert "text/html" in accept
+            assert "application/json" not in accept
+
+
 class TestGetMetagame:
     """Tests for metagame page parsing."""
 
