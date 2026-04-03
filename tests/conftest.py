@@ -7,6 +7,7 @@ from fastmcp import Client
 
 from mtg_mcp_server.server import mcp
 from mtg_mcp_server.services.edhrec import EDHRECClient
+from mtg_mcp_server.services.moxfield import MoxfieldClient
 from mtg_mcp_server.services.scryfall import ScryfallClient
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
 from mtg_mcp_server.services.spellbook import SpellbookClient
@@ -33,6 +34,7 @@ def _clear_caches():
     SeventeenLandsClient._color_ratings_cache.clear()
     EDHRECClient._commander_cache.clear()
     EDHRECClient._synergy_cache.clear()
+    MoxfieldClient._deck_cache.clear()
 
 
 @pytest.fixture
