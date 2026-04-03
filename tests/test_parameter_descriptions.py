@@ -6,10 +6,12 @@ import pytest
 from fastmcp import Client
 
 from mtg_mcp_server.providers.edhrec import edhrec_mcp
+from mtg_mcp_server.providers.moxfield import moxfield_mcp
 from mtg_mcp_server.providers.scryfall import scryfall_mcp
 from mtg_mcp_server.providers.scryfall_bulk import scryfall_bulk_mcp
 from mtg_mcp_server.providers.seventeen_lands import draft_mcp
 from mtg_mcp_server.providers.spellbook import spellbook_mcp
+from mtg_mcp_server.providers.spicerack import spicerack_mcp
 from mtg_mcp_server.workflows.server import workflow_mcp
 
 
@@ -20,7 +22,9 @@ from mtg_mcp_server.workflows.server import workflow_mcp
         (spellbook_mcp, "spellbook"),
         (draft_mcp, "draft"),
         (edhrec_mcp, "edhrec"),
+        (moxfield_mcp, "moxfield"),
         (scryfall_bulk_mcp, "scryfall_bulk"),
+        (spicerack_mcp, "spicerack"),
         (workflow_mcp, "workflow"),
     ],
 )

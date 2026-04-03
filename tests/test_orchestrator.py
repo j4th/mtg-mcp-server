@@ -20,6 +20,7 @@ SEVENTEEN_LANDS_FIXTURES = Path(__file__).parent / "fixtures" / "seventeen_lands
 EDHREC_FIXTURES = Path(__file__).parent / "fixtures" / "edhrec"
 MOXFIELD_FIXTURES = Path(__file__).parent / "fixtures" / "moxfield"
 SCRYFALL_BULK_FIXTURES = Path(__file__).parent / "fixtures" / "scryfall_bulk"
+SPICERACK_FIXTURES = Path(__file__).parent / "fixtures" / "spicerack"
 SCRYFALL_BASE = "https://api.scryfall.com"
 SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 SEVENTEEN_LANDS_BASE = "https://www.17lands.com"
@@ -202,6 +203,18 @@ class TestMoxfieldMounted:
         assert "Sol Ring" in text
 
 
+class TestSpicerackMounted:
+    """Verify Spicerack tools appear with spicerack_ namespace on the orchestrator."""
+
+    async def test_namespaced_tools_appear(self, mcp_client: Client):
+        """All three Spicerack tools are listed with the spicerack_ namespace prefix."""
+        tools = await mcp_client.list_tools()
+        tool_names = {t.name for t in tools}
+        assert "spicerack_recent_tournaments" in tool_names
+        assert "spicerack_tournament_results" in tool_names
+        assert "spicerack_format_decklists" in tool_names
+
+
 class TestScryfallBulkMounted:
     """Verify Scryfall bulk data tools appear with bulk_ namespace on the orchestrator."""
 
@@ -277,6 +290,7 @@ class TestServerMetadata:
         assert "edhrec_*" in server.instructions
         assert "moxfield_*" in server.instructions
         assert "bulk_*" in server.instructions
+        assert "spicerack_*" in server.instructions
         assert "Workflow" in server.instructions
 
     def test_server_name(self):
@@ -360,7 +374,7 @@ class TestToolSchemaCompleteness:
         """Server exposes the expected number of tools."""
         tools = await mcp_client.list_tools()
         tool_names = sorted(t.name for t in tools)
-        assert len(tools) == 53, f"Expected 53 tools, got {len(tools)}.\nTools: {tool_names}"
+        assert len(tools) == 56, f"Expected 56 tools, got {len(tools)}.\nTools: {tool_names}"
 
     async def test_no_context_parameter_exposed(self, mcp_client: Client):
         """No tool should expose 'ctx' (Context) as a user-visible parameter."""
@@ -421,6 +435,7 @@ class TestResourcePropagation:
             "tribe/{tribe}",  # Tribal staples
             "signals",  # Draft signals
             "moxfield/",  # Moxfield deck
+            "tournament/",  # Spicerack tournaments
             # rules/keywords and rules/sections are static (no URI params)
             # so they appear in list_resources(), not list_resource_templates()
         ]
@@ -431,10 +446,10 @@ class TestResourcePropagation:
             )
 
     async def test_resource_template_count(self, mcp_client: Client):
-        """At least 17 resource templates are registered (19 total minus 2 static)."""
+        """At least 18 resource templates are registered (20 total minus 2 static)."""
         templates = await mcp_client.list_resource_templates()
-        assert len(templates) >= 17, (
-            f"Expected >= 17 resource templates, got {len(templates)}.\n"
+        assert len(templates) >= 18, (
+            f"Expected >= 18 resource templates, got {len(templates)}.\n"
             f"Templates: {[t.uriTemplate for t in templates]}"
         )
 
@@ -507,6 +522,7 @@ class TestToolNamingConventions:
             "edhrec_": ["edhrec_commander_staples", "edhrec_card_synergy"],
             "moxfield_": ["moxfield_decklist", "moxfield_deck_info"],
             "bulk_": ["bulk_card_lookup", "bulk_card_search"],
+            "spicerack_": ["spicerack_recent_tournaments", "spicerack_tournament_results"],
         }
         for prefix, expected_tools in backend_prefixes.items():
             for tool_name in expected_tools:
