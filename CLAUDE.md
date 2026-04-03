@@ -4,7 +4,7 @@ Unified MCP server providing Magic: The Gathering data to AI assistants. Compose
 
 ## Stack
 
-Python 3.12+ · FastMCP 3.1.x · httpx · Pydantic v2 · structlog
+Python 3.12+ · FastMCP 3.2.x · httpx · Pydantic v2 · structlog
 Tooling: mise · uv · ruff · ty · pytest · respx
 
 Prerequisites: [mise](https://mise.jdx.dev) must be installed. Then `mise install` gets everything else.
