@@ -216,7 +216,7 @@ Get top-finishing decklists across recent tournaments for a format.
 | Field | Detail |
 |-------|--------|
 | Input | `format: str`, `num_days: int = 14`, `limit: int = 10`, `response_format: "detailed" \| "concise" = "detailed"` |
-| Output | Top-finishing decklists with: player name, tournament name, standing, decklist text or Moxfield URL. Structured content uses slim standing + tournament fields. |
+| Output | Top-finishing decklists with: player name, tournament name, standing, Moxfield URL. Structured content uses slim standing + tournament fields. |
 | Backend | `SpicerackClient.get_tournaments()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 | Tags | constructed |

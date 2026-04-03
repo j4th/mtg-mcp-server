@@ -31,9 +31,13 @@ def _safe_str(val: object, default: str = "") -> str:
 
 
 def _safe_int(val: object) -> int:
-    """Return ``int(val)`` if *val* is an int, else ``0``."""
-    if isinstance(val, int) and not isinstance(val, bool):
+    """Return ``int(val)`` if *val* is numeric (int or float), else ``0``."""
+    if isinstance(val, bool):
+        return 0
+    if isinstance(val, int):
         return val
+    if isinstance(val, float):
+        return int(val)
     return 0
 
 
@@ -172,20 +176,22 @@ class SpicerackClient(BaseClient):
             return []
 
         standings: list[SpicerackStanding] = []
+        rank = 1
         for idx, entry in enumerate(raw_standings):
             if not isinstance(entry, dict):
                 log.warning("parse_standings.skip_non_dict", index=idx)
                 continue
 
-            standing = self._parse_single_standing(idx, entry)
+            standing = self._parse_single_standing(rank, entry)
             standings.append(standing)
+            rank += 1
 
         return standings
 
-    def _parse_single_standing(self, idx: int, entry: Any) -> SpicerackStanding:
+    def _parse_single_standing(self, rank: int, entry: Any) -> SpicerackStanding:
         """Parse a single standing dict into a SpicerackStanding."""
         return SpicerackStanding(
-            rank=idx + 1,
+            rank=rank,
             player_name=_safe_str(entry.get("name")),
             decklist_url=_safe_str(entry.get("decklist")),
             wins=_safe_int(entry.get("winsSwiss")),

@@ -128,7 +128,7 @@ async def recent_tournaments(
 async def tournament_results(
     tournament_id: Annotated[
         str,
-        Field(description="Spicerack tournament ID (e.g. 'SR-2026-0042')"),
+        Field(description="Spicerack tournament ID (e.g. '3135276')"),
     ],
     format: Annotated[
         str | None,

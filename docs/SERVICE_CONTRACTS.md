@@ -503,24 +503,22 @@ Returns: JSON array of tournament objects with embedded standings.
 [
   {
     "TID": "3135276",
-    "tournament_name": "ETB x LOTN 3k-5k Legacy Monthly (February)",
-    "event_format": "Legacy",
-    "start_date": "2026-03-22",
-    "player_count": 32,
-    "rounds_swiss": 5,
-    "rounds_top": 3,
-    "bracket_url": "https://melee.gg/Tournament/View/3135276",
+    "tournamentName": "ETB x LOTN 3k-5k Legacy Monthly (February)",
+    "format": "Legacy",
+    "startDate": 1774710000,
+    "players": 79,
+    "swissRounds": 5,
+    "topCut": 8,
+    "bracketUrl": "https://www.spicerack.gg/events/3135276/tournament",
     "standings": [
       {
-        "standing": 1,
-        "player_name": "Chris Switalski",
-        "wins": 5,
-        "losses": 0,
+        "name": "Chris Switalski",
+        "winsSwiss": 5,
+        "lossesSwiss": 0,
         "draws": 0,
-        "wins_bracket": 3,
-        "losses_bracket": 0,
-        "decklist_url": "https://www.moxfield.com/decks/...",
-        "decklist_text": "4 Brainstorm\n4 Force of Will\n..."
+        "winsBracket": 3,
+        "lossesBracket": 0,
+        "decklist": "https://www.moxfield.com/decks/..."
       }
     ]
   }
@@ -529,10 +527,13 @@ Returns: JSON array of tournament objects with embedded standings.
 
 Key fields:
 - **`TID`**: Tournament ID (string). Used for `tournament_results` lookups.
-- **`event_format`**: Title-case format name.
-- **`standing`**: 1-indexed rank. May have gaps (e.g. 1, 2, 3, 4, 5, 5, 5, 5 for tied 5th-8th).
-- **`decklist_url`**: Moxfield URL. May be empty if player didn't submit a list.
-- **`decklist_text`**: Only present when `decklist_as_text=true`. Newline-separated card list.
+- **`format`**: Title-case format name (e.g. "Legacy", "Modern").
+- **`startDate`**: Unix timestamp (integer), not an ISO date string.
+- **`players`**: Player count (integer).
+- **`topCut`**: Number of players in the top cut bracket.
+- **`bracketUrl`**: Link to bracket on spicerack.gg.
+- **Standings rank**: Derived from array position (no explicit rank field in the API response).
+- **`decklist`**: Moxfield URL. May be empty if player didn't submit a list.
 
 ### Service Architecture
 

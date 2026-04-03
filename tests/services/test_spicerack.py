@@ -327,10 +327,8 @@ class TestDefensiveParsing:
         # Only the valid dict entry is parsed; non-dict is skipped
         assert len(result[0].standings) == 1
         assert result[0].standings[0].player_name == "Bob"
-        # Rank should be 2 (index 1 + 1), since index 0 was skipped
-        # Actually, the rank loop uses enumerate on raw_standings so
-        # the non-dict at index 0 is skipped but Bob is at index 1
-        assert result[0].standings[0].rank == 2
+        # Rank counter assigns sequential ranks to valid entries only
+        assert result[0].standings[0].rank == 1
 
     @respx.mock
     async def test_non_list_standings_returns_empty(self):
