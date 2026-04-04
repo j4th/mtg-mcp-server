@@ -25,7 +25,7 @@ Claude Code / claude.ai / any MCP client
               │ stdio (default) or streamable HTTP
               │
     ┌─────────▼──────────┐
-    │   MTG Orchestrator  │  ← FastMCP("MTG"), 69 tools, 19 prompts, 20 resources
+    │   MTG Orchestrator  │  ← FastMCP("MTG"), 69 tools, 19 prompts, 21 resources
     │                     │
     │  Workflow Tools:     │  ← Compose across backends (no namespace)
     │  Commander:          │  Draft/Limited:

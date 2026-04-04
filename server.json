@@ -16,12 +16,12 @@
         "source": "github",
         "id": "1187666627"
     },
-    "version": "2.2.0",
+    "version": "3.0.0",
     "packages": [
         {
             "registryType": "pypi",
             "identifier": "mtg-mcp-server",
-            "version": "2.2.0",
+            "version": "3.0.0",
             "transport": {"type": "stdio"},
             "runtimeHint": "uvx",
             "environmentVariables": [
@@ -83,6 +83,24 @@
                     "name": "MTG_MCP_DISABLE_CACHE",
                     "description": "Disable in-memory TTL caching (useful for testing)",
                     "default": "false",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_ENABLE_MOXFIELD",
+                    "description": "Enable Moxfield deck search and import backend (reverse-engineered API)",
+                    "default": "true",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_ENABLE_SPICERACK",
+                    "description": "Enable Spicerack tournament results backend",
+                    "default": "true",
+                    "isSecret": false
+                },
+                {
+                    "name": "MTG_MCP_ENABLE_MTGGOLDFISH",
+                    "description": "Enable MTGGoldfish metagame data backend (HTML scraping)",
+                    "default": "true",
                     "isSecret": false
                 }
             ]

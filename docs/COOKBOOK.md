@@ -512,6 +512,121 @@ targeting your creature with ward will not trigger it.
 
 ---
 
+## Constructed
+
+### Explore a Format's Metagame
+
+You want to see what people are playing in a competitive format.
+
+**Tools involved:**
+- `metagame_snapshot`
+- `archetype_decklist`
+
+**Prompts:**
+
+> What does the Modern metagame look like right now?
+
+**Example output** (from `metagame_snapshot`)**:**
+
+```
+Modern Metagame Snapshot
+
+Tier 1 (>10% meta share):
+  Boros Energy         20.3%   142 decks   ~$348
+  Mardu Energy         11.5%    80 decks   ~$412
+
+Tier 2 (3-10%):
+  Azorius Control       5.2%    36 decks   ~$520
+  Jeskai Control        4.8%    33 decks   ~$485
+  Golgari Midrange      3.9%    27 decks   ~$380
+
+Tier 3 (<3%):
+  Living End            2.1%    15 decks   ~$290
+  Goryo's Vengeance     1.8%    12 decks   ~$325
+  ...
+```
+
+Drill into a specific deck:
+
+> Show me the stock Boros Energy decklist for Modern.
+
+**Tips:** The `explore_format` prompt chains metagame exploration with archetype details automatically.
+
+---
+
+### Build a Sideboard
+
+You have a mainboard and need a sideboard plan.
+
+**Tools involved:**
+- `suggest_sideboard`
+- `sideboard_guide`
+- `sideboard_matrix`
+
+**Prompts:**
+
+> Suggest a sideboard for this Modern deck:
+>
+> 4 Lightning Bolt
+> 4 Monastery Swiftspear
+> ... (paste full mainboard)
+
+For a specific matchup plan:
+
+> Give me a sideboard guide for my deck against Azorius Control.
+
+For the full matrix:
+
+> Generate a sideboard matrix for my deck across the top Modern matchups.
+
+**What you get:** `suggest_sideboard` provides 15 categorized cards (graveyard hate, removal, counterspells, etc.) with format staple markers. `sideboard_guide` gives an in/out plan with reasoning per card. `sideboard_matrix` shows a grid with each sideboard card vs. each matchup as IN/OUT/FLEX.
+
+**Tips:** The `build_constructed_deck` prompt walks through the full flow from metagame analysis to sideboard construction. Archetype names use fuzzy matching -- "boros energy" and "Boros Energy" both work.
+
+---
+
+### Find Tournament Results
+
+You want to see what won recent events.
+
+**Tools involved:**
+- `spicerack_recent_tournaments`
+- `spicerack_tournament_results`
+- `spicerack_format_decklists`
+
+**Prompts:**
+
+> What Legacy tournaments happened in the last two weeks?
+
+> Show me the top 8 standings from that tournament.
+
+> Show me the top-finishing decklists in Modern from the last two weeks.
+
+**What you get:** Tournament listings with dates and player counts, full standings with Swiss and bracket records, and links to top-finishing decklists on Moxfield.
+
+---
+
+### Search for Decks on Moxfield
+
+You want to find decklists for inspiration.
+
+**Tools involved:**
+- `moxfield_search_decks`
+- `moxfield_user_decks`
+- `moxfield_decklist`
+
+**Prompts:**
+
+> Search Moxfield for Modern decks.
+
+> Show me all public decks by user "aspiringspike".
+
+> Fetch the decklist from this Moxfield URL: https://www.moxfield.com/decks/abc123
+
+**What you get:** Paginated deck search results with format, author, colors, and dates. User deck listings. Full decklists organized by board (mainboard, sideboard, commanders).
+
+---
+
 ## What's Next
 
-This cookbook covers the most common workflows. For the full list of all 51 tools, 17 prompts, and 18 resource templates, see [TOOL_DESIGN.md](TOOL_DESIGN.md).
+This cookbook covers the most common workflows. For the full list of all 69 tools, 19 prompts, and 21 resource templates, see [TOOL_DESIGN.md](TOOL_DESIGN.md).

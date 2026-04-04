@@ -11,3 +11,4 @@ Technical reference for the MTG MCP server. For installation and usage, see the 
 | [DATA_SOURCES.md](DATA_SOURCES.md) | All data sources evaluated with stability and access patterns |
 | [CACHING_DESIGN.md](CACHING_DESIGN.md) | TTL cache strategy, per-method TTLs, Scryfall bulk data design |
 | [RELEASE_NOTES_v2.md](RELEASE_NOTES_v2.md) | v2.0.0 milestone summary |
+| [RELEASE_NOTES_v3.md](RELEASE_NOTES_v3.md) | v3.0.0 milestone summary |
