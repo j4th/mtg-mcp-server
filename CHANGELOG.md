@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-04-03
+
+v3.0.0 marks the constructed metagame milestone. The server now covers all major
+MTG domains -- Commander, draft/limited, competitive constructed, sideboard strategy,
+and deck sharing -- across 8 data sources. This is not a breaking change. All existing
+tools retain their parameters and behavior.
+
+### Added
+
+#### Metagame Workflows (4 tools)
+- `metagame_snapshot` -- Tiered metagame breakdown (T1/T2/T3) with MTGGoldfish primary, Spicerack fallback
+- `archetype_decklist` -- Stock decklist for a competitive archetype with fuzzy name matching
+- `archetype_comparison` -- Side-by-side comparison of 2-4 competitive archetypes
+- `format_entry_guide` -- Beginner guide for entering a competitive format with budget options
+
+#### Sideboard Workflows (3 tools)
+- `suggest_sideboard` -- 15-card sideboard suggestions with format staple markers
+- `sideboard_guide` -- In/out plan for a specific matchup with reasoning
+- `sideboard_matrix` -- Full sideboard matrix across common matchups
+
+#### Moxfield Provider (2 new tools)
+- `moxfield_search_decks` -- Search public Moxfield decks by format, keyword, or sort order
+- `moxfield_user_decks` -- List a user's public decks on Moxfield
+
+#### Prompts (2 new, 19 total)
+- `explore_format` -- Explore a competitive format's metagame and find your deck
+- `build_constructed_deck` -- Build a competitive deck with metagame awareness
+
+#### Infrastructure
+- Fuzzy matching utility (`utils/fuzzy.py`) for archetype and matchup name resolution
+- `parse_decklist` utility consolidated from duplicated implementations
+
+### Changed
+- Moxfield provider: added `search_decks` and `user_decks` tools alongside existing `decklist` and `deck_info`
+
+### Fixed
+- `archetype_decklist` double-slug generation causing 404s on MTGGoldfish lookups
+- Moxfield `user_decks` search parameter (`filter` not `q`)
+
+### Security
+- Upgraded pygments >=2.20.0 to resolve CVE-2026-4539
+
+[3.0.0]: https://github.com/j4th/mtg-mcp-server/compare/v2.2.0...v3.0.0
+
 ## [2.1.0] - 2026-04-02
 
 ### Added
