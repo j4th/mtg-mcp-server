@@ -480,9 +480,9 @@ _TYPE_SCORES: dict[str, float] = {
 
 _RARITY_SCORES: dict[str, float] = {
     "mythic": 0.0,
-    "rare": 5.0,
-    "uncommon": 10.0,
-    "common": 15.0,
+    "rare": 2.0,
+    "uncommon": 3.5,
+    "common": 5.0,
 }
 
 
@@ -503,7 +503,7 @@ def _score_competitive(card: Card) -> float:
             type_score = bonus
             break
 
-    # Rarity: rarer cards tend to define formats
+    # Rarity: mild tiebreaker — secondary to CMC, type, and price
     rarity_score = _RARITY_SCORES.get(card.rarity, 10.0)
 
     # Price as demand proxy: higher price → lower score

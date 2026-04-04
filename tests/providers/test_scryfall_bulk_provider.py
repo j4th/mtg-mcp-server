@@ -753,8 +753,8 @@ class TestScoreCompetitive:
         )
         score = _score_competitive(card)
         assert isinstance(score, float)
-        # Without price bonus, score = CMC(16) + type(-5) + rarity(15) + price(0) + keyword(0) = 26
-        assert score == 26.0
+        # Without price bonus, score = CMC(16) + type(-5) + rarity(5) + price(0) + keyword(0) = 16
+        assert score == 16.0
 
     def test_competitive_keywords_give_bonus(self):
         """Cards with flash/haste/hexproof/cycling get -3 per keyword."""
