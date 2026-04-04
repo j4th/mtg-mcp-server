@@ -30,6 +30,7 @@ from mtg_mcp_server.providers import (
 from mtg_mcp_server.providers import mtggoldfish as _goldfish_mod
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient, ScryfallBulkError
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
+from mtg_mcp_server.utils.format_rules import get_format_rules
 from mtg_mcp_server.utils.formatters import ResponseFormat, format_card_detail
 from mtg_mcp_server.utils.query_parser import parse_query
 from mtg_mcp_server.utils.slim import slim_card
@@ -461,8 +462,6 @@ async def format_search(
 # Format staples ranking helpers
 # ---------------------------------------------------------------------------
 
-_SINGLETON_FORMATS = frozenset({"commander", "brawl", "oathbreaker"})
-
 _COMPETITIVE_KEYWORDS = frozenset({"flash", "haste", "hexproof", "cycling"})
 
 _TYPE_SCORES: dict[str, float] = {
@@ -519,11 +518,19 @@ def _score_competitive(card: Card) -> float:
 RankingMode = Literal["auto", "edhrec", "competitive", "tournament"]
 
 
+def _is_singleton_format(fmt: str) -> bool:
+    """Check if a format uses singleton deck construction rules."""
+    try:
+        return get_format_rules(fmt).singleton
+    except KeyError:
+        return False
+
+
 def _resolve_ranking_mode(mode: RankingMode, fmt: str) -> str:
     """Resolve 'auto' to a concrete ranking mode based on format and availability."""
     if mode != "auto":
         return mode
-    if fmt in _SINGLETON_FORMATS:
+    if _is_singleton_format(fmt):
         return "edhrec"
     # Prefer tournament data when MTGGoldfish is available
     if _goldfish_mod._client is not None:
@@ -618,9 +625,14 @@ async def format_staples(
 
     if resolved_mode == "edhrec":
         matches.sort(key=lambda c: c.edhrec_rank or 0)
+        matches = matches[:limit]
+        scored: list[tuple[float, Card]] | None = None
     else:
-        matches.sort(key=_score_competitive)
-    matches = matches[:limit]
+        scored = sorted(
+            ((_score_competitive(card), card) for card in matches),
+            key=lambda t: t[0],
+        )[:limit]
+        matches = [card for _, card in scored]
 
     lines = [f"## {fmt.title()} Staples"]
     if color:
@@ -630,13 +642,14 @@ async def format_staples(
     lines.append("")
 
     if response_format == "concise":
-        for card in matches:
-            if resolved_mode == "edhrec":
+        if scored is None:
+            for card in matches:
                 lines.append(f"  {card.name} (rank: {card.edhrec_rank})")
-            else:
-                lines.append(f"  {card.name} (score: {_score_competitive(card):.1f})")
+        else:
+            for score, card in scored:
+                lines.append(f"  {card.name} (score: {score:.1f})")
     else:
-        if resolved_mode == "edhrec":
+        if scored is None:
             lines.append("| Rank | Card | Mana Cost | Type |")
             lines.append("|------|------|-----------|------|")
             for card in matches:
@@ -645,9 +658,8 @@ async def format_staples(
         else:
             lines.append("| Score | Card | Mana Cost | Type |")
             lines.append("|-------|------|-----------|------|")
-            for card in matches:
+            for score, card in scored:
                 cost = card.mana_cost or ""
-                score = _score_competitive(card)
                 lines.append(f"| {score:.1f} | {card.name} | {cost} | {card.type_line} |")
 
     return ToolResult(
