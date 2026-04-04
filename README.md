@@ -12,22 +12,22 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-51 tools, 17 prompts, and 18 resources that give AI assistants deep access to Magic: The Gathering -- card data, combos, draft analytics, Commander metagame, deck building, rules engine, and more. Works with Claude Code, Claude Desktop, or any MCP client.
+69 tools, 19 prompts, and 21 resources that give AI assistants deep access to Magic: The Gathering -- card data, combos, draft analytics, Commander metagame, competitive constructed, sideboard strategy, deck building, rules engine, and more. Works with Claude Code, Claude Desktop, or any MCP client.
 
-> Built on data from [Scryfall](https://scryfall.com), [Commander Spellbook](https://commanderspellbook.com), [17Lands](https://www.17lands.com), and [EDHREC](https://edhrec.com). See [Data Sources & Attribution](#data-sources--attribution) for details and usage terms.
+> Built on data from [Scryfall](https://scryfall.com), [Commander Spellbook](https://commanderspellbook.com), [17Lands](https://www.17lands.com), [EDHREC](https://edhrec.com), [Moxfield](https://www.moxfield.com), [Spicerack](https://spicerack.gg), and [MTGGoldfish](https://www.mtggoldfish.com). See [Data Sources & Attribution](#data-sources--attribution) for details and usage terms.
 
 ## Table of Contents
 
 - [What You Can Do](#what-you-can-do) — example prompts and real tool output
 - [Install](#install) — hosted, Claude Code, Claude Desktop, PyPI, development
 - [Configuration](#configuration) — environment variables and feature flags
-- [Tools](#tools) — all 51 tools across 10 domains
+- [Tools](#tools) — all 69 tools across 13 domains
 - [Architecture](#architecture) — FastMCP 3.x mount system
 - [Stack](#stack) — Python 3.12+, FastMCP, httpx, Pydantic
 - [Development](#development) — mise commands for testing, linting, typechecking
 - [Documentation](#documentation) — cookbook, architecture, tool reference, and more
 - [Status](#status) — current tool/test counts
-- [Data Sources & Attribution](#data-sources--attribution) — Scryfall, Spellbook, 17Lands, EDHREC
+- [Data Sources & Attribution](#data-sources--attribution) — Scryfall, Spellbook, 17Lands, EDHREC, Moxfield, Spicerack, MTGGoldfish
 
 ## What You Can Do
 
@@ -51,6 +51,12 @@ Ask your AI assistant questions like these and it will use the MTG tools automat
 **Rules**
 - "How do deathtouch and trample interact?"
 - "Resolve this combat scenario: my 3/3 with first strike blocks their 5/5 with trample"
+
+**Constructed**
+- "What does the Modern metagame look like right now?"
+- "Show me the stock Boros Energy decklist for Modern"
+- "Build me a sideboard for this Pioneer deck"
+- "Give me a sideboard guide for my deck against Azorius Control"
 
 ### See It in Action
 
@@ -194,7 +200,7 @@ See `.env.example` for all available options including base URLs, rate limits, a
 
 ## Tools
 
-51 tools across 10 domains. See [docs/TOOL_DESIGN.md](docs/TOOL_DESIGN.md) for full input/output details.
+69 tools across 13 domains. See [docs/TOOL_DESIGN.md](docs/TOOL_DESIGN.md) for full input/output details.
 
 ### Card Data (`scryfall_*`)
 
@@ -244,6 +250,32 @@ See `.env.example` for all available options including base URLs, rate limits, a
 | `commander_staples` | Most-played cards for a commander with synergy scores |
 | `card_synergy` | Synergy data for a card with a specific commander |
 
+### Decklists (`moxfield_*`)
+
+| Tool | Description |
+|------|-------------|
+| `decklist` | Fetch a full decklist by deck ID or URL |
+| `deck_info` | Deck metadata (name, format, author, dates) |
+| `search_decks` | Search public decks by format, keyword, or sort order |
+| `user_decks` | List a user's public decks |
+
+### Tournament Data (`spicerack_*`)
+
+| Tool | Description |
+|------|-------------|
+| `recent_tournaments` | Recent tournaments for a competitive format |
+| `tournament_results` | Full standings for a specific tournament |
+| `format_decklists` | Top-finishing decklists across recent tournaments |
+
+### Metagame (`goldfish_*`)
+
+| Tool | Description |
+|------|-------------|
+| `metagame` | Current metagame breakdown for a competitive format |
+| `archetype_list` | Sample decklist for an archetype |
+| `format_staples` | Most-played cards in a format with deck inclusion % |
+| `deck_price` | Estimated paper price for an archetype deck |
+
 ### Commander Workflows
 
 | Tool | Description |
@@ -280,11 +312,18 @@ See `.env.example` for all available options including base URLs, rate limits, a
 | `draft_signal_read` | Detect open colors from draft picks |
 | `draft_log_review` | Pick-by-pick review of a completed draft with grade |
 
-### Constructed
+### Constructed Workflows
 
 | Tool | Description |
 |------|-------------|
 | `rotation_check` | Standard rotation status and rotating cards |
+| `metagame_snapshot` | Tiered metagame breakdown with prices |
+| `archetype_decklist` | Stock decklist for a competitive archetype |
+| `archetype_comparison` | Compare 2-4 archetypes side-by-side |
+| `format_entry_guide` | Beginner guide for entering a competitive format |
+| `suggest_sideboard` | 15-card sideboard suggestions for a deck |
+| `sideboard_guide` | In/out plan for a specific matchup |
+| `sideboard_matrix` | Sideboard matrix across common matchups |
 
 ### Rules Engine
 
@@ -307,7 +346,10 @@ MTG (orchestrator)
 ├── draft (namespace: draft_)           -> 17Lands data
 ├── edhrec (namespace: edhrec_)         -> EDHREC (scraped, feature-flagged)
 ├── bulk (namespace: bulk_)             -> Scryfall Oracle Cards bulk data
-└── workflows (no namespace)            -> 27 tools (22 composed + 5 rules)
+├── moxfield (namespace: moxfield_)     -> Moxfield (reverse-engineered, feature-flagged)
+├── spicerack (namespace: spicerack_)   -> Spicerack tournament API
+├── goldfish (namespace: goldfish_)     -> MTGGoldfish (scraped, feature-flagged)
+└── workflows (no namespace)            -> 36 tools (31 composed + 5 rules)
 ```
 
 Services are pure async API clients. Providers register MCP tools. Workflows compose across services with partial failure tolerance. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
@@ -317,12 +359,13 @@ Services are pure async API clients. Providers register MCP tools. Workflows com
 | | |
 |---|---|
 | Runtime | Python 3.12+, uv |
-| MCP | FastMCP 3.1.x |
+| MCP | FastMCP 3.2.x |
 | HTTP | httpx (async) |
 | Validation | Pydantic v2 |
 | Logging | structlog |
 | Tooling | mise, ruff, ty (Astral) |
 | Testing | pytest, respx, pytest-asyncio |
+| HTML parsing | selectolax |
 
 ## Development
 
@@ -347,7 +390,7 @@ mise run fix          # Auto-fix lint and format issues
 | Doc | What it covers |
 |-----|----------------|
 | [COOKBOOK.md](docs/COOKBOOK.md) | Usage recipes -- Commander, draft, deck building, rules workflows |
-| [TOOL_DESIGN.md](docs/TOOL_DESIGN.md) | Full reference for all 51 tools, 17 prompts, 18 resources |
+| [TOOL_DESIGN.md](docs/TOOL_DESIGN.md) | Full reference for all 69 tools, 19 prompts, 21 resources |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture, FastMCP patterns, design decisions |
 | [SERVICE_CONTRACTS.md](docs/SERVICE_CONTRACTS.md) | API endpoints, rate limits, response shapes per backend |
 | [DATA_SOURCES.md](docs/DATA_SOURCES.md) | All data sources with auth, stability, and access patterns |
@@ -357,7 +400,7 @@ mise run fix          # Auto-fix lint and format issues
 
 ## Status
 
-51 tools, 17 prompts, 18 resource templates. 989 tests at 88% coverage.
+69 tools, 19 prompts, 21 resource templates. 1340 tests at 88% coverage.
 
 | Phase | What | Status |
 |-------|------|--------|
@@ -369,6 +412,10 @@ mise run fix          # Auto-fix lint and format issues
 | 5 | Analysis & comparison workflows, prompts, resources (4 tools) | Done |
 | Branch A | Structured output, rules engine, validation tools (17 tools) | Done |
 | Branch B | Format workflows -- deck building, commander depth, limited, constructed (11 tools) | Done |
+| Moxfield | Moxfield decklist provider (4 tools) | Done |
+| Spicerack | Tournament results provider (3 tools) | Done |
+| MTGGoldfish | Metagame data provider (4 tools) | Done |
+| v2.3.0 | Metagame workflows, sideboard tools, Moxfield search (9 tools) | Done |
 
 ## Data Sources & Attribution
 
@@ -378,8 +425,9 @@ This project composes data from multiple third-party services:
 - **[Commander Spellbook](https://commanderspellbook.com)** -- Combo search, bracket estimation ([MIT license](https://github.com/SpaceCowMedia/commander-spellbook-backend))
 - **[17Lands](https://www.17lands.com)** -- Draft card ratings, archetype win rates ([usage guidelines](https://www.17lands.com/usage_guidelines))
 - **[EDHREC](https://edhrec.com)** -- Commander staples, synergy scores (undocumented endpoints, behind feature flag)
-
-Scryfall bulk data (Oracle Cards) replaced MTGJSON in v2.0 for richer card information including prices, legalities, images, and EDHREC rank.
+- **[Moxfield](https://www.moxfield.com)** -- Public decklists and deck search (reverse-engineered API, behind feature flag)
+- **[Spicerack](https://spicerack.gg)** -- Tournament results and standings ([documented API](https://docs.spicerack.gg))
+- **[MTGGoldfish](https://www.mtggoldfish.com)** -- Competitive metagame data, archetypes, format staples (HTML scraping, behind feature flag)
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for full license texts and usage terms.
 
