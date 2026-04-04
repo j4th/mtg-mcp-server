@@ -44,20 +44,30 @@ For each call: note PASS / FAIL (with detail) / SKIP (tool unavailable or featur
 
 If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_search` and SKIP the regression check.
 
-### 3. Spellbook (sequential — need combo ID from search)
+### 3. Bulk Format Staples — Ranking Modes (parallel batch)
+
+| Call | Validate |
+|------|----------|
+| `bulk_format_staples(format="commander", limit=5)` | EDHREC mode: header contains "Rank", Sol Ring likely in top 5 |
+| `bulk_format_staples(format="modern", limit=5)` | Tournament or competitive mode: header contains "% Decks" or "Score" (NOT "Rank #") |
+| `bulk_format_staples(format="pauper", limit=5)` | Tournament or competitive mode: header contains "% Decks" or "Score", results should be commons (Lightning Bolt, Counterspell typical) |
+
+Commander uses EDHREC rank (singleton format). Modern and Pauper auto-select tournament mode (MTGGoldfish data) or competitive heuristic (fallback). Verify no Commander staples like Sol Ring appear in Modern/Pauper results.
+
+### 4. Spellbook (sequential — need combo ID from search)
 
 1. `spellbook_find_combos(card_name="Muldrotha, the Gravetide")` — expect combos with card lists
 2. `spellbook_combo_details(combo_id=<first ID from above>)` — expect step-by-step description
 
-### 4. Draft / 17Lands
+### 5. Draft / 17Lands
 
 `draft_card_ratings(set_code="FDN")` — expect card ratings with GIH WR data. If no data for FDN, try BLB, MKM, or OTJ.
 
-### 5. EDHREC (may fail)
+### 6. EDHREC (may fail)
 
 `edhrec_commander_staples(commander_name="Muldrotha, the Gravetide")` — expect synergy scores. EDHREC scrapes undocumented endpoints; SKIP on error, don't fail the overall test.
 
-### 6. Rules Engine (parallel batch)
+### 7. Rules Engine (parallel batch)
 
 | Call | Validate |
 |------|----------|
@@ -67,7 +77,7 @@ If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_se
 | `rules_scenario(scenario="A 1/1 creature with deathtouch and trample is blocked by a 5/5 creature")` | Rule citations present, scenario analysis |
 | `combat_calculator(attackers=["Typhoid Rats"], blockers=["Grizzly Bears"], keywords=["deathtouch"])` | Combat steps, damage assignment, outcome |
 
-### 7. Core Workflows (parallel batch)
+### 8. Core Workflows (parallel batch)
 
 | Call | Validate |
 |------|----------|
@@ -76,7 +86,7 @@ If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_se
 | `price_comparison(cards=["Lightning Bolt", "Counterspell"])` | USD prices for both cards (avoid Sol Ring — Oracle Cards printing lacks prices) |
 | `deck_validate(decklist=["4 Lightning Bolt", "4 Sol Ring", "52 Island"], format="modern")` | INVALID — Sol Ring not modern-legal |
 
-### 8. Deck Building Workflows (parallel batch)
+### 9. Deck Building Workflows (parallel batch)
 
 | Call | Validate |
 |------|----------|
@@ -85,7 +95,7 @@ If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_se
 | `color_identity_staples(color_identity="simic")` | Cards in UG color identity |
 | `rotation_check()` | Standard-legal sets listed with release dates |
 
-### 9. MTGGoldfish (sequential — need archetype from metagame)
+### 10. MTGGoldfish (sequential — need archetype from metagame)
 
 1. `goldfish_metagame(format="Modern")` — expect archetypes with meta share %, deck count, prices
 2. `goldfish_format_staples(format="Modern", limit=5)` — expect card names with % of decks and avg copies
@@ -94,24 +104,24 @@ If bulk tools unavailable (older server), try `bulk_card_lookup` / `bulk_card_se
 
 MTGGoldfish scrapes HTML — SKIP on error, don't fail the overall test.
 
-### 10. Spicerack (sequential — need tournament ID from first call)
+### 11. Spicerack (sequential — need tournament ID from first call)
 
 1. `spicerack_recent_tournaments(format="Legacy", num_days=30)` — expect at least one tournament, format = "Legacy"
 2. `spicerack_tournament_results(tournament_id=<first ID from above>)` — expect standings with player names and records
 3. `spicerack_format_decklists(format="Legacy", num_days=30, limit=5)` — expect decklists with card text or Moxfield URLs
 
-### 11. Moxfield (may fail — reverse-engineered API)
+### 12. Moxfield (may fail — reverse-engineered API)
 
 `moxfield_decklist(deck_id="DuXYtaJFEkScp1U1dxvAmw")` — expect deck name, commander board, mainboard with card names and quantities. Moxfield uses undocumented v3 endpoints; SKIP on error, don't fail the overall test.
 
-### 12. Commander Depth Workflows (parallel batch)
+### 13. Commander Depth Workflows (parallel batch)
 
 | Call | Validate |
 |------|----------|
 | `commander_comparison(commanders=["Muldrotha, the Gravetide", "Meren of Clan Nel Toth"])` | Both commanders compared, color identity shown |
 | `color_identity_staples(color_identity="sultai", category="creatures")` | Creature cards in BUG identity |
 
-### 13. Cross-Tool Consistency
+### 14. Cross-Tool Consistency
 
 Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`bulk_card_lookup("Sol Ring")`):
 - Names match
@@ -129,6 +139,7 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 | Health | 1 | | | |
 | Scryfall API | 3 | | | |
 | Bulk Data | 4 | | | |
+| Format Staples | 3 | | | |
 | Spellbook | 2 | | | |
 | Draft | 1 | | | |
 | EDHREC | 1 | | | |
@@ -140,7 +151,7 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 | Moxfield | 1 | | | |
 | Commander Depth | 2 | | | |
 | Consistency | 1 | | | |
-| **Total** | **36** | | | |
+| **Total** | **39** | | | |
 
 ### Failures
 [Details for each FAIL — what was expected vs actual]
