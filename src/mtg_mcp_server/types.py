@@ -13,6 +13,7 @@ Backends:
     Spicerack — SpicerackStanding, SpicerackTournament
     MTGGoldfish — GoldfishArchetype, GoldfishMetaSnapshot, GoldfishFormatStaple,
                   GoldfishArchetypeDetail, GoldfishDeckPrice
+    Moxfield — MoxfieldDeckSummary, MoxfieldUser, MoxfieldSearchResult
 """
 
 from __future__ import annotations
@@ -42,7 +43,10 @@ __all__ = [
     "GoldfishMetaSnapshot",
     "MoxfieldCard",
     "MoxfieldDeck",
+    "MoxfieldDeckSummary",
     "MoxfieldDecklist",
+    "MoxfieldSearchResult",
+    "MoxfieldUser",
     "Rule",
     "Ruling",
     "SetInfo",
@@ -506,8 +510,8 @@ class MoxfieldDeckSummary(BaseModel):
     author: str = ""
     public_url: str = ""
     colors: list[str] = Field(default_factory=list)
-    mainboard_count: int = 0
-    sideboard_count: int = 0
+    mainboard_count: int = Field(0, ge=0)
+    sideboard_count: int = Field(0, ge=0)
     created_at: str = ""
     updated_at: str = ""
 
@@ -515,7 +519,7 @@ class MoxfieldDeckSummary(BaseModel):
 class MoxfieldUser(BaseModel):
     """A Moxfield user from search results."""
 
-    username: str
+    username: str = Field(min_length=1)
     display_name: str = ""
     badges: list[str] = Field(default_factory=list)
 
@@ -524,9 +528,9 @@ class MoxfieldSearchResult(BaseModel):
     """Paginated search result from Moxfield deck search."""
 
     decks: list[MoxfieldDeckSummary] = Field(default_factory=list)
-    total_results: int = 0
-    page: int = 1
-    page_size: int = 20
+    total_results: int = Field(0, ge=0)
+    page: int = Field(1, ge=1)
+    page_size: int = Field(20, ge=1)
 
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.utils.decklist import parse_decklist
 from mtg_mcp_server.utils.format_rules import get_format_rules
 from mtg_mcp_server.utils.fuzzy import match_archetype
@@ -135,12 +136,11 @@ def _estimate_metagame_from_tournaments(
     tournaments: list,
     format_name: str,
 ) -> WorkflowResult:
-    """Estimate meta shares from Spicerack tournament standings.
+    """Build a WorkflowResult from Spicerack tournament data.
 
-    Counts archetype appearances via decklist URLs (each unique URL prefix
-    is treated as an archetype). Since Spicerack doesn't provide archetype
-    names, we count player appearances per tournament and report top
-    tournament winners as proxy for "metagame".
+    Used as a fallback when MTGGoldfish is unavailable. Reports tournament
+    activity summary rather than archetype breakdown, since Spicerack does
+    not provide archetype classification.
     """
     # Count how many top finishes each tournament has
     tournament_count = len(tournaments)
@@ -209,7 +209,7 @@ async def metagame_snapshot(
     if mtggoldfish is not None:
         try:
             snapshot: GoldfishMetaSnapshot = await mtggoldfish.get_metagame(format)
-        except Exception as exc:
+        except ServiceError as exc:
             log.warning(
                 "metagame_snapshot.mtggoldfish_failed",
                 format=format,
@@ -253,7 +253,7 @@ async def metagame_snapshot(
             tournaments = await spicerack.get_tournaments(
                 event_format=format.title(),
             )
-        except Exception as exc:
+        except ServiceError as exc:
             log.warning(
                 "metagame_snapshot.spicerack_failed",
                 format=format,
@@ -280,6 +280,7 @@ async def metagame_snapshot(
         data={
             "format": format,
             "source": None,
+            "error": "no_sources",
             "tiers": {"T1": [], "T2": [], "T3": []},
             "archetypes": [],
         },
@@ -352,7 +353,7 @@ async def archetype_decklist(
                     has_prices = True
             if has_prices:
                 total_price = round(price_sum, 2)
-        except Exception as exc:
+        except ServiceError as exc:
             log.warning(
                 "archetype_decklist.bulk_pricing_failed",
                 error=str(exc),
@@ -484,7 +485,7 @@ async def archetype_comparison(
         )
 
     # Fetch decklists concurrently
-    fetch_tasks = [mtggoldfish.get_archetype(format, arch.slug) for arch in matched_archetypes]
+    fetch_tasks = [mtggoldfish.get_archetype(format, arch.name) for arch in matched_archetypes]
     detail_results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
     # Build comparison table
@@ -634,7 +635,7 @@ async def format_entry_guide(
             snapshot = await mtggoldfish.get_metagame(format)
             source = "mtggoldfish"
             goldfish_archetypes = snapshot.archetypes
-        except Exception as exc:
+        except ServiceError as exc:
             log.warning(
                 "format_entry_guide.mtggoldfish_failed",
                 format=format,
@@ -665,7 +666,7 @@ async def format_entry_guide(
     try:
         rules = get_format_rules(format_lower)
     except KeyError:
-        log.debug("format_entry_guide.no_format_rules", format=format)
+        log.info("format_entry_guide.no_format_rules", format=format)
 
     if rules is not None and not concise:
         lines.append("## Format Rules")
@@ -772,7 +773,7 @@ async def format_entry_guide(
                     price_str = f"${card.prices.usd}" if card.prices.usd is not None else "N/A"
                     lines.append(f"- **{card.name}** ({card.type_line}) — {price_str}")
                 lines.append("")
-        except Exception as exc:
+        except ServiceError as exc:
             log.warning(
                 "format_entry_guide.bulk_staples_failed",
                 error=str(exc),

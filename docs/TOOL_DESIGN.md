@@ -185,11 +185,11 @@ Get metadata for a Moxfield deck (name, format, author, dates).
 | Tags | beta |
 
 ### `moxfield_search_decks`
-Search public Moxfield decks by format, keyword, or commander.
+Search public Moxfield decks by format, keyword, or sort order.
 
 | Field | Detail |
 |-------|--------|
-| Input | `query: str`, `format: str | None = None`, `sort: str = "views"`, `page: int = 1`, `page_size: int = 20` |
+| Input | `query: str | None = None`, `format: str | None = None`, `sort: str = "Updated"` (also "Created", "Views"), `page: int = 1`, `page_size: int = 20` |
 | Output | Paginated deck summaries with name, format, author, colors, card counts, public URL |
 | Backend | `MoxfieldClient.search_decks()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
@@ -200,7 +200,7 @@ List a user's public decks on Moxfield.
 
 | Field | Detail |
 |-------|--------|
-| Input | `username: str`, `format: str | None = None`, `page: int = 1`, `page_size: int = 20` |
+| Input | `username: str`, `format: str | None = None` |
 | Output | User's public decks with name, format, colors, card counts. Verifies user exists first. |
 | Backend | `MoxfieldClient.search_users()` + `MoxfieldClient.search_decks()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
@@ -616,7 +616,7 @@ Get the current metagame breakdown for a competitive format with tier assignment
 |-------|--------|
 | Input | `format: str`, `response_format: "detailed" \| "concise" = "detailed"` |
 | Output | Markdown with: tiered archetype list (T1 >10%, T2 3-10%, T3 <3%), meta shares, deck counts, prices |
-| Backends | MTGGoldfish (primary) + Spicerack (fallback) + Bulk data (optional, pricing) |
+| Backends | MTGGoldfish (primary) + Spicerack (fallback) |
 | Partial failure | MTGGoldfish unavailable → falls back to Spicerack tournament frequency. Neither → error message |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 

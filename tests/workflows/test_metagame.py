@@ -10,6 +10,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mtg_mcp_server.services.mtggoldfish import MTGGoldfishError
+from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkError
+from mtg_mcp_server.services.spicerack import SpicerackError
 from mtg_mcp_server.types import (
     Card,
     CardPrices,
@@ -369,7 +372,7 @@ class TestMetagameSnapshot:
         mock_mtggoldfish: AsyncMock,
         mock_spicerack: AsyncMock,
     ) -> None:
-        mock_mtggoldfish.get_metagame.side_effect = RuntimeError("scrape failed")
+        mock_mtggoldfish.get_metagame.side_effect = MTGGoldfishError("scrape failed")
 
         result = await metagame_snapshot(
             "modern",
@@ -398,8 +401,8 @@ class TestMetagameSnapshot:
         mock_mtggoldfish: AsyncMock,
         mock_spicerack: AsyncMock,
     ) -> None:
-        mock_mtggoldfish.get_metagame.side_effect = RuntimeError("scrape failed")
-        mock_spicerack.get_tournaments.side_effect = RuntimeError("api down")
+        mock_mtggoldfish.get_metagame.side_effect = MTGGoldfishError("scrape failed")
+        mock_spicerack.get_tournaments.side_effect = SpicerackError("api down")
 
         result = await metagame_snapshot(
             "modern",
@@ -542,7 +545,7 @@ class TestArchetypeDecklist:
         mock_mtggoldfish: AsyncMock,
         mock_bulk: AsyncMock,
     ) -> None:
-        mock_bulk.get_cards.side_effect = RuntimeError("bulk data unavailable")
+        mock_bulk.get_cards.side_effect = ScryfallBulkError("bulk data unavailable")
 
         result = await archetype_decklist(
             "modern",
@@ -696,6 +699,24 @@ class TestArchetypeComparison:
         assert "Lightning Bolt" in result.markdown
 
     @pytest.mark.anyio
+    async def test_uses_name_not_slug_for_get_archetype(
+        self,
+        mock_mtggoldfish: AsyncMock,
+    ) -> None:
+        """Verify archetype_comparison passes name (not slug) to get_archetype."""
+        await archetype_comparison(
+            "modern",
+            ["Boros Energy", "Azorius Control"],
+            mtggoldfish=mock_mtggoldfish,
+            bulk=None,
+        )
+
+        # get_archetype should receive names — it slugifies internally
+        calls = mock_mtggoldfish.get_archetype.call_args_list
+        assert calls[0].args == ("modern", "Boros Energy")
+        assert calls[1].args == ("modern", "Azorius Control")
+
+    @pytest.mark.anyio
     async def test_fetch_failure_partial(
         self,
         mock_mtggoldfish: AsyncMock,
@@ -704,7 +725,7 @@ class TestArchetypeComparison:
         detail_a = _mock_archetype_detail("Boros Energy")
         mock_mtggoldfish.get_archetype.side_effect = [
             detail_a,
-            RuntimeError("fetch failed"),
+            MTGGoldfishError("fetch failed"),
         ]
 
         result = await archetype_comparison(
@@ -892,7 +913,7 @@ class TestFormatEntryGuide:
         mock_mtggoldfish: AsyncMock,
         mock_bulk: AsyncMock,
     ) -> None:
-        mock_bulk.filter_cards.side_effect = RuntimeError("bulk down")
+        mock_bulk.filter_cards.side_effect = ScryfallBulkError("bulk down")
 
         result = await format_entry_guide(
             "modern",

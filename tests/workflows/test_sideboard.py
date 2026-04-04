@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mtg_mcp_server.services.mtggoldfish import MTGGoldfishError
 from mtg_mcp_server.types import (
     Card,
     CardPrices,
@@ -373,7 +374,7 @@ class TestSuggestSideboardWithGoldfish:
         """MTGGoldfish failure doesn't crash — falls back to heuristic-only."""
         mock_goldfish_failing = AsyncMock()
         mock_goldfish_failing.get_format_staples = AsyncMock(
-            side_effect=Exception("MTGGoldfish is down")
+            side_effect=MTGGoldfishError("MTGGoldfish is down")
         )
 
         result = await suggest_sideboard(
@@ -467,8 +468,8 @@ class TestSideboardGuideSuccess:
         )
 
         out_names = [o["name"] for o in result.data["outs"]]
-        # Primeval Titan (CMC 6) should be a candidate for cutting against aggro
-        assert "Primeval Titan" in out_names or len(out_names) > 0
+        # Aggro matchup should produce outs (slow/expensive cards are cut candidates)
+        assert len(out_names) > 0
 
     async def test_control_matchup_cuts_removal(self, mock_bulk: AsyncMock) -> None:
         """Against control, creature removal should be suggested as outs."""
@@ -529,7 +530,9 @@ class TestSideboardGuideWithGoldfish:
 
     async def test_goldfish_failure_falls_back(self, mock_bulk: AsyncMock) -> None:
         mock_goldfish_failing = AsyncMock()
-        mock_goldfish_failing.get_metagame = AsyncMock(side_effect=Exception("MTGGoldfish down"))
+        mock_goldfish_failing.get_metagame = AsyncMock(
+            side_effect=MTGGoldfishError("MTGGoldfish down")
+        )
 
         result = await sideboard_guide(
             decklist=["4x Lightning Bolt"],
@@ -667,7 +670,9 @@ class TestSideboardMatrixWithGoldfish:
     async def test_goldfish_failure_no_matchups(self, mock_bulk: AsyncMock) -> None:
         """When goldfish fails and no matchups provided, returns error message."""
         mock_goldfish_failing = AsyncMock()
-        mock_goldfish_failing.get_metagame = AsyncMock(side_effect=Exception("MTGGoldfish down"))
+        mock_goldfish_failing.get_metagame = AsyncMock(
+            side_effect=MTGGoldfishError("MTGGoldfish down")
+        )
 
         result = await sideboard_matrix(
             decklist=["4x Lightning Bolt"],

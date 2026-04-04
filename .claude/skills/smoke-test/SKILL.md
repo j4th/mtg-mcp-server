@@ -134,6 +134,7 @@ If MTGGoldfish unavailable, metagame_snapshot should fall back to Spicerack data
 |------|----------|
 | `suggest_sideboard(decklist=["4 Lightning Bolt", "4 Goblin Guide", "4 Eidolon of the Great Revel", "4 Monastery Swiftspear", "4 Searing Blaze", "4 Lava Spike", "4 Rift Bolt", "4 Skullcrack", "12 Mountain", "4 Inspiring Vantage", "4 Sacred Foundry", "4 Sunbaked Canyon"], format="modern")` | Categorized sideboard suggestions (15 cards max) |
 | `sideboard_guide(decklist=["4 Lightning Bolt", "4 Goblin Guide", "12 Mountain"], sideboard=["2 Rest in Peace", "2 Smash to Smithereens"], format="modern", matchup="control")` | IN/OUT plan with reasoning |
+| `sideboard_matrix(decklist=["4 Lightning Bolt", "4 Goblin Guide", "12 Mountain"], sideboard=["2 Rest in Peace", "2 Smash to Smithereens"], format="modern", matchups=["aggro", "control", "combo"])` | Matrix table with IN/OUT/FLEX per matchup |
 
 ### 15. Commander Depth Workflows (parallel batch)
 
@@ -171,10 +172,10 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 | Spicerack | 3 | | | |
 | Moxfield | 3 | | | |
 | Metagame | 3 | | | |
-| Sideboard | 2 | | | |
+| Sideboard | 3 | | | |
 | Commander Depth | 2 | | | |
 | Consistency | 1 | | | |
-| **Total** | **46** | | | |
+| **Total** | **47** | | | |
 
 ### Failures
 [Details for each FAIL — what was expected vs actual]

@@ -242,6 +242,7 @@ class MoxfieldClient(BaseClient):
 
         user_list = data.get("data")
         if not isinstance(user_list, list):
+            log.warning("search_users.unexpected_data_field", has_data="data" in data)
             return []
 
         users: list[MoxfieldUser] = []
@@ -274,10 +275,13 @@ class MoxfieldClient(BaseClient):
         """
         if not isinstance(data, dict):
             log.warning("parse_search_result.unexpected_type", data_type=type(data).__name__)
-            return MoxfieldSearchResult()
+            raise MoxfieldError(
+                f"Moxfield returned unexpected data format (expected JSON object, got {type(data).__name__})"
+            )
 
         deck_list = data.get("data")
         if not isinstance(deck_list, list):
+            log.warning("parse_search_result.missing_data_key", keys=list(data.keys()))
             deck_list = []
 
         decks: list[MoxfieldDeckSummary] = []

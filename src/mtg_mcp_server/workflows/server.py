@@ -68,9 +68,9 @@ async def workflow_lifespan(server: FastMCP):
     """Initialize all service clients needed by workflow tools.
 
     Uses ``AsyncExitStack`` to manage multiple clients in a single lifespan.
-    Feature-flagged backends (17Lands, EDHREC, Scryfall bulk data) are only created
-    when their corresponding ``Settings`` flag is enabled. All clients are torn down
-    when the server shuts down.
+    Feature-flagged backends (17Lands, EDHREC, Scryfall bulk data, MTGGoldfish,
+    Spicerack, Moxfield) are only created when their corresponding ``Settings``
+    flag is enabled. All clients are torn down when the server shuts down.
     """
     global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk, _rules
     global _mtggoldfish, _spicerack, _moxfield
@@ -1043,8 +1043,8 @@ async def archetype_decklist(
 ) -> ToolResult:
     """Get the stock decklist for a competitive archetype.
 
-    Returns a full 75-card list (mainboard + sideboard) with card roles annotated,
-    total price, and key cards explained. Archetype name is fuzzy-matched.
+    Returns a full decklist (mainboard + sideboard) with deck metadata and
+    total price when available. Archetype name is fuzzy-matched.
     """
     from mtg_mcp_server.workflows.metagame import archetype_decklist as impl
 

@@ -50,3 +50,21 @@ class TestMatchArchetype:
     def test_best_match_chosen(self):
         result = match_archetype("Golgari", SAMPLE_ARCHETYPES)
         assert result == "Golgari Midrange"
+
+    def test_word_overlap_reordered(self):
+        """Word overlap pass matches reordered multi-word queries (>= 2 shared words)."""
+        result = match_archetype("Control Azorius", SAMPLE_ARCHETYPES)
+        assert result == "Azorius Control"
+
+    def test_single_word_overlap_uses_substring_not_overlap(self):
+        """Single shared word matches via substring pass, not word overlap (>= 2 required)."""
+        result = match_archetype("Boros", SAMPLE_ARCHETYPES)
+        assert result == "Boros Energy"
+
+    def test_word_overlap_boundary_one_word_high_threshold(self):
+        """With high threshold and no substring match, single shared word should NOT match."""
+        # "xyzzy energy" shares 1 word with "Boros Energy" — word overlap requires >= 2
+        # No substring match either ("xyzzy energy" ∉ "boros energy" and vice versa)
+        # Ratio too low for threshold=0.95 → returns None
+        result = match_archetype("xyzzy energy", SAMPLE_ARCHETYPES, threshold=0.95)
+        assert result is None

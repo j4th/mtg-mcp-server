@@ -4,6 +4,11 @@ These are pure async functions with no MCP awareness. They accept service
 clients as keyword arguments and return ``WorkflowResult``. The workflow
 server (``server.py``) registers them as MCP tools and handles ToolError
 conversion.
+
+Tools:
+    ``suggest_sideboard`` — 15-card sideboard recommendation with reasoning.
+    ``sideboard_guide`` — IN/OUT plan for a specific matchup.
+    ``sideboard_matrix`` — Matrix of sideboard plans across common matchups.
 """
 
 from __future__ import annotations
@@ -12,6 +17,7 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.utils.decklist import parse_decklist
 from mtg_mcp_server.utils.fuzzy import match_archetype
 from mtg_mcp_server.workflows import WorkflowResult
@@ -154,8 +160,8 @@ def _opposing_colors(deck_colors: set[str]) -> frozenset[str] | set[str]:
 def _match_archetype_name(query: str, archetypes: list[str]) -> str | None:
     """Match a query against archetype names, falling back to strategy keywords.
 
-    Returns ``None`` only for empty queries. Unknown names pass through
-    as-is so callers can use custom matchup labels.
+    Returns ``None`` for empty or whitespace-only queries. Unknown names
+    pass through as-is so callers can use custom matchup labels.
     """
     if not query or not query.strip():
         return None
@@ -194,7 +200,8 @@ def _classify_archetype_strategy(matchup: str) -> str:
             if kw in matchup_lower:
                 return strategy
 
-    return "midrange"  # Default
+    log.debug("classify_strategy.default", matchup=matchup, using="midrange")
+    return "midrange"
 
 
 def _card_addresses_matchup(card: Card | None, matchup_strategy: str) -> str:
@@ -300,7 +307,7 @@ async def suggest_sideboard(
             staples = await mtggoldfish.get_format_staples(format.lower(), limit=50)
             staple_names = {s.name.lower() for s in staples}
             log.debug("suggest_sideboard.staples_loaded", count=len(staple_names))
-        except Exception:
+        except ServiceError:
             log.warning("suggest_sideboard.mtggoldfish_failed", exc_info=True)
 
     # Parse meta_context for category prioritization
@@ -361,7 +368,7 @@ async def suggest_sideboard(
                 limit=10,
                 text_any=text_any,
             )
-        except Exception:
+        except ServiceError:
             log.warning("suggest_sideboard.filter_failed", category=cat_name, exc_info=True)
             continue
 
@@ -439,7 +446,7 @@ async def suggest_sideboard(
                     if hoser_cards:
                         categories_result["Color Hosers"] = hoser_cards
                         all_suggested.extend(hoser_cards)
-                except Exception:
+                except ServiceError:
                     log.warning("suggest_sideboard.hoser_search_failed", exc_info=True)
 
     # Format output
@@ -558,7 +565,7 @@ async def sideboard_guide(
             known_archetypes = (
                 [a.name for a in meta.archetypes] if meta.archetypes else known_archetypes
             )
-        except Exception:
+        except ServiceError:
             log.warning("sideboard_guide.mtggoldfish_failed", exc_info=True)
 
     matched_name = _match_archetype_name(matchup, known_archetypes) or matchup
@@ -791,7 +798,7 @@ async def sideboard_matrix(
             meta = await mtggoldfish.get_metagame(format.lower())
             if meta.archetypes:
                 matchup_names = [a.name for a in meta.archetypes[:6]]
-        except Exception:
+        except ServiceError:
             log.warning("sideboard_matrix.mtggoldfish_failed", exc_info=True)
 
     if not matchup_names:
