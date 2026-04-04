@@ -26,6 +26,8 @@ def _load_fixture(name: str) -> dict:
 def _clear_moxfield_caches():
     """Clear MoxfieldClient caches before each test to prevent leakage."""
     MoxfieldClient._deck_cache.clear()
+    MoxfieldClient._search_cache.clear()
+    MoxfieldClient._user_search_cache.clear()
 
 
 @pytest.fixture
@@ -235,10 +237,10 @@ class TestToolRegistration:
     """Moxfield provider tool registration."""
 
     async def test_all_tools_registered(self, client: Client):
-        """Both Moxfield tools are registered on the provider."""
+        """All Moxfield tools are registered on the provider."""
         tools = await client.list_tools()
         tool_names = {t.name for t in tools}
-        assert tool_names == {"decklist", "deck_info"}
+        assert tool_names == {"decklist", "deck_info", "search_decks", "user_decks"}
 
     async def test_tools_have_annotations(self, client: Client):
         """Tools have the expected readOnly, idempotent, and openWorld annotations."""
@@ -296,3 +298,180 @@ class TestMoxfieldResource:
         templates = await client.list_resource_templates()
         template_uris = {t.uriTemplate for t in templates}
         assert "mtg://moxfield/{deck_id}" in template_uris
+
+
+class TestMoxfieldSearchDecks:
+    """Moxfield search_decks tool behavior."""
+
+    @respx.mock
+    async def test_returns_search_results(self, client: Client):
+        """search_decks returns formatted markdown with deck list."""
+        fixture = _load_fixture("search_decks.json")
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result = await client.call_tool("search_decks", {})
+        text = result.content[0].text
+
+        assert "150" in text  # total results
+        assert "Mono-Blue Terror" in text
+        assert "Grixis Control" in text
+        assert "Muldrotha Self-Mill" in text
+        # Attribution
+        assert "Data provided by [Moxfield]" in text
+
+    @respx.mock
+    async def test_structured_content_has_search_data(self, client: Client):
+        """Structured content contains decks, total_results, page, page_size."""
+        fixture = _load_fixture("search_decks.json")
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        result = await client.call_tool("search_decks", {})
+        sc = result.structured_content
+
+        assert sc is not None
+        assert sc["total_results"] == 150
+        assert sc["page"] == 1
+        assert sc["page_size"] == 20
+        assert len(sc["decks"]) == 3
+
+    @respx.mock
+    async def test_format_filter(self, client: Client):
+        """search_decks passes format filter to API."""
+        fixture = _load_fixture("search_decks.json")
+        route = respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+
+        await client.call_tool("search_decks", {"format": "pauper"})
+        request = route.calls[0].request
+        assert "fmt=pauper" in str(request.url)
+
+    @respx.mock
+    async def test_empty_results(self, client: Client):
+        """search_decks with no results returns a helpful message."""
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "pageNumber": 1,
+                    "pageSize": 20,
+                    "totalResults": 0,
+                    "totalPages": 0,
+                    "data": [],
+                },
+            )
+        )
+
+        result = await client.call_tool("search_decks", {})
+        text = result.content[0].text
+        assert "No decks found" in text
+
+    @respx.mock
+    async def test_server_error_returns_error(self, client: Client):
+        """search_decks returns an error response for server errors."""
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.call_tool(
+            "search_decks",
+            {},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "Moxfield API error" in result.content[0].text
+
+
+class TestMoxfieldUserDecks:
+    """Moxfield user_decks tool behavior."""
+
+    @respx.mock
+    async def test_returns_user_decks(self, client: Client):
+        """user_decks returns formatted markdown with user's decks."""
+        user_fixture = _load_fixture("user_search.json")
+        search_fixture = _load_fixture("search_decks.json")
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json=user_fixture)
+        )
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=search_fixture)
+        )
+
+        result = await client.call_tool("user_decks", {"username": "player1"})
+        text = result.content[0].text
+
+        assert "player1" in text
+        assert "Data provided by [Moxfield]" in text
+
+    @respx.mock
+    async def test_structured_content_has_user_and_decks(self, client: Client):
+        """Structured content contains username and deck list."""
+        user_fixture = _load_fixture("user_search.json")
+        search_fixture = _load_fixture("search_decks.json")
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json=user_fixture)
+        )
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=search_fixture)
+        )
+
+        result = await client.call_tool("user_decks", {"username": "player1"})
+        sc = result.structured_content
+
+        assert sc is not None
+        assert sc["username"] == "player1"
+        assert "decks" in sc
+        assert isinstance(sc["decks"], list)
+
+    @respx.mock
+    async def test_user_not_found_returns_error(self, client: Client):
+        """user_decks returns error if user not found."""
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
+
+        result = await client.call_tool(
+            "user_decks",
+            {"username": "nonexistent_user"},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "not found" in result.content[0].text.lower()
+
+    @respx.mock
+    async def test_server_error_returns_error(self, client: Client):
+        """user_decks returns error on server failures."""
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+
+        result = await client.call_tool(
+            "user_decks",
+            {"username": "player1"},
+            raise_on_error=False,
+        )
+        assert result.is_error
+        assert "Moxfield API error" in result.content[0].text
+
+    @respx.mock
+    async def test_format_filter(self, client: Client):
+        """user_decks passes format filter to search."""
+        user_fixture = _load_fixture("user_search.json")
+        search_fixture = _load_fixture("search_decks.json")
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json=user_fixture)
+        )
+        route = respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=search_fixture)
+        )
+
+        await client.call_tool(
+            "user_decks",
+            {"username": "player1", "format": "commander"},
+        )
+        request = route.calls[0].request
+        assert "fmt=commander" in str(request.url)

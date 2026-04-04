@@ -1,0 +1,56 @@
+{
+  "pageNumber": 1,
+  "pageSize": 20,
+  "totalResults": 150,
+  "totalPages": 8,
+  "data": [
+    {
+      "publicId": "abc123",
+      "name": "Mono-Blue Terror",
+      "format": "pauper",
+      "publicUrl": "https://www.moxfield.com/decks/abc123",
+      "createdByUser": {
+        "userName": "player1",
+        "displayName": "Player One",
+        "badges": ["creator"]
+      },
+      "mainboardCount": 60,
+      "sideboardCount": 15,
+      "colors": ["U"],
+      "createdAtUtc": "2026-01-15T10:00:00Z",
+      "lastUpdatedAtUtc": "2026-03-20T14:30:00Z"
+    },
+    {
+      "publicId": "def456",
+      "name": "Grixis Control",
+      "format": "modern",
+      "publicUrl": "https://www.moxfield.com/decks/def456",
+      "createdByUser": {
+        "userName": "player2",
+        "displayName": "Player Two",
+        "badges": []
+      },
+      "mainboardCount": 60,
+      "sideboardCount": 15,
+      "colors": ["U", "B", "R"],
+      "createdAtUtc": "2026-02-10T08:00:00Z",
+      "lastUpdatedAtUtc": "2026-03-18T22:15:00Z"
+    },
+    {
+      "publicId": "ghi789",
+      "name": "Muldrotha Self-Mill",
+      "format": "commander",
+      "publicUrl": "https://www.moxfield.com/decks/ghi789",
+      "createdByUser": {
+        "userName": "mtgplayer42",
+        "displayName": "MTG Player 42",
+        "badges": ["creator", "contentCreator"]
+      },
+      "mainboardCount": 99,
+      "sideboardCount": 0,
+      "colors": ["U", "B", "G"],
+      "createdAtUtc": "2025-11-01T12:00:00Z",
+      "lastUpdatedAtUtc": "2026-03-25T09:45:00Z"
+    }
+  ]
+}

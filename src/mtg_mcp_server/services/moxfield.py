@@ -15,7 +15,14 @@ from cachetools import TTLCache
 
 from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, BaseClient, ServiceError
 from mtg_mcp_server.services.cache import async_cached
-from mtg_mcp_server.types import MoxfieldCard, MoxfieldDeck, MoxfieldDecklist
+from mtg_mcp_server.types import (
+    MoxfieldCard,
+    MoxfieldDeck,
+    MoxfieldDecklist,
+    MoxfieldDeckSummary,
+    MoxfieldSearchResult,
+    MoxfieldUser,
+)
 
 if TYPE_CHECKING:
     # httpx.Response.json() returns Any; we alias for clarity in parsing helpers.
@@ -69,6 +76,10 @@ class MoxfieldClient(BaseClient):
 
     # 4h cache — decklists change infrequently during a session.
     _deck_cache: TTLCache = TTLCache(maxsize=100, ttl=14400)
+    # 1h cache — search results change as users publish new decks.
+    _search_cache: TTLCache = TTLCache(maxsize=50, ttl=3600)
+    # 4h cache — user profiles rarely change.
+    _user_search_cache: TTLCache = TTLCache(maxsize=100, ttl=14400)
 
     def __init__(
         self,
@@ -150,6 +161,183 @@ class MoxfieldClient(BaseClient):
         """
         decklist = await self.get_deck(deck_id_or_url)
         return decklist.deck
+
+    @async_cached(_search_cache)
+    async def search_decks(
+        self,
+        query: str | None = None,
+        fmt: str | None = None,
+        sort: str = "Updated",
+        page: int = 1,
+        page_size: int = 20,
+    ) -> MoxfieldSearchResult:
+        """Search public Moxfield decks.
+
+        Args:
+            query: Optional search text.
+            fmt: Optional format filter (e.g. "pauper", "commander").
+            sort: Sort type (e.g. "Updated", "Created", "Views").
+            page: Page number (1-indexed).
+            page_size: Results per page.
+
+        Returns:
+            Paginated search results with deck summaries.
+
+        Raises:
+            MoxfieldError: On API errors or invalid responses.
+        """
+        log.debug("search_decks", query=query, fmt=fmt, sort=sort, page=page)
+
+        params: dict[str, str | int] = {
+            "pageNumber": page,
+            "pageSize": page_size,
+            "sortType": sort,
+            "sortDirection": "Descending",
+        }
+        if query:
+            params["q"] = query
+        if fmt:
+            params["fmt"] = fmt
+
+        try:
+            response = await self._get("/v2/decks/search", params=params)
+        except ServiceError as exc:
+            raise MoxfieldError(exc.message, status_code=exc.status_code) from exc
+
+        try:
+            data = response.json()
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise MoxfieldError("Moxfield returned invalid JSON for deck search") from exc
+
+        return self._parse_search_result(data)
+
+    @async_cached(_user_search_cache)
+    async def search_users(self, query: str) -> list[MoxfieldUser]:
+        """Search Moxfield users by name.
+
+        Args:
+            query: Username or display name to search for.
+
+        Returns:
+            List of matching users.
+
+        Raises:
+            MoxfieldError: On API errors or invalid responses.
+        """
+        log.debug("search_users", query=query)
+
+        try:
+            response = await self._get("/v2/users/search-sfw", params={"filter": query})
+        except ServiceError as exc:
+            raise MoxfieldError(exc.message, status_code=exc.status_code) from exc
+
+        try:
+            data = response.json()
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise MoxfieldError("Moxfield returned invalid JSON for user search") from exc
+
+        if not isinstance(data, dict):
+            log.warning("search_users.unexpected_type", data_type=type(data).__name__)
+            return []
+
+        user_list = data.get("data")
+        if not isinstance(user_list, list):
+            log.warning("search_users.unexpected_data_field", has_data="data" in data)
+            return []
+
+        users: list[MoxfieldUser] = []
+        for entry in user_list:
+            if not isinstance(entry, dict):
+                log.debug("search_users.skip_non_dict")
+                continue
+
+            username = entry.get("userName")
+            if not isinstance(username, str) or not username:
+                log.debug("search_users.skip_no_username")
+                continue
+
+            users.append(
+                MoxfieldUser(
+                    username=username,
+                    display_name=str(entry.get("displayName", "")),
+                    badges=entry.get("badges", []) if isinstance(entry.get("badges"), list) else [],
+                )
+            )
+
+        log.debug("search_users.complete", count=len(users))
+        return users
+
+    def _parse_search_result(self, data: JSONData) -> MoxfieldSearchResult:
+        """Defensively parse a v2 deck search response.
+
+        Every level uses ``isinstance`` and ``.get()`` with defaults because
+        this undocumented API can change without notice.
+        """
+        if not isinstance(data, dict):
+            log.warning("parse_search_result.unexpected_type", data_type=type(data).__name__)
+            raise MoxfieldError(
+                f"Moxfield returned unexpected data format (expected JSON object, got {type(data).__name__})"
+            )
+
+        deck_list = data.get("data")
+        if not isinstance(deck_list, list):
+            log.warning("parse_search_result.missing_data_key", keys=list(data.keys()))
+            deck_list = []
+
+        decks: list[MoxfieldDeckSummary] = []
+        for entry in deck_list:
+            if not isinstance(entry, dict):
+                log.debug("parse_search_result.skip_non_dict")
+                continue
+
+            # Extract author from createdByUser
+            created_by = entry.get("createdByUser")
+            author = ""
+            if isinstance(created_by, dict):
+                author = str(created_by.get("userName", ""))
+
+            # Extract colors defensively
+            colors = entry.get("colors")
+            if not isinstance(colors, list):
+                colors = []
+
+            decks.append(
+                MoxfieldDeckSummary(
+                    id=str(entry.get("publicId", "")),
+                    name=str(entry.get("name", "")),
+                    format=str(entry.get("format", "")),
+                    author=author,
+                    public_url=str(entry.get("publicUrl", "")),
+                    colors=colors,
+                    mainboard_count=entry.get("mainboardCount", 0)
+                    if isinstance(entry.get("mainboardCount"), int)
+                    else 0,
+                    sideboard_count=entry.get("sideboardCount", 0)
+                    if isinstance(entry.get("sideboardCount"), int)
+                    else 0,
+                    created_at=str(entry.get("createdAtUtc", "")),
+                    updated_at=str(entry.get("lastUpdatedAtUtc", "")),
+                )
+            )
+
+        total_results = data.get("totalResults", 0)
+        if not isinstance(total_results, int):
+            total_results = 0
+
+        page_number = data.get("pageNumber", 1)
+        if not isinstance(page_number, int):
+            page_number = 1
+
+        page_sz = data.get("pageSize", 20)
+        if not isinstance(page_sz, int):
+            page_sz = 20
+
+        return MoxfieldSearchResult(
+            decks=decks,
+            total_results=total_results,
+            page=page_number,
+            page_size=page_sz,
+        )
 
     def _parse_deck(self, data: JSONData) -> MoxfieldDecklist:
         """Defensively parse a v3 deck response into a :class:`MoxfieldDecklist`.

@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "userName": "player1",
+      "displayName": "Player One",
+      "badges": ["creator"]
+    },
+    {
+      "userName": "player1alt",
+      "displayName": "Player One Alt",
+      "badges": []
+    }
+  ]
+}
