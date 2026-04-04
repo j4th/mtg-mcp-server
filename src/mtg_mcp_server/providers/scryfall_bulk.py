@@ -27,7 +27,12 @@ from mtg_mcp_server.providers import (
     TOOL_ANNOTATIONS,
     format_legalities,
 )
+
+# Runtime availability check only — no method calls from scryfall_bulk's lifespan.
+# The orchestrator starts both lifespans; we read _goldfish_mod._client to decide
+# whether tournament-mode ranking is available.
 from mtg_mcp_server.providers import mtggoldfish as _goldfish_mod
+from mtg_mcp_server.services.mtggoldfish import MTGGoldfishError
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient, ScryfallBulkError
 from mtg_mcp_server.utils.color_identity import is_within_identity, parse_color_identity
 from mtg_mcp_server.utils.format_rules import get_format_rules
@@ -516,6 +521,7 @@ def _score_competitive(card: Card) -> float:
 
 
 RankingMode = Literal["auto", "edhrec", "competitive", "tournament"]
+ResolvedRankingMode = Literal["edhrec", "competitive", "tournament"]
 
 
 def _is_singleton_format(fmt: str) -> bool:
@@ -523,10 +529,11 @@ def _is_singleton_format(fmt: str) -> bool:
     try:
         return get_format_rules(fmt).singleton
     except KeyError:
+        log.debug("singleton_check.unknown_format", format=fmt)
         return False
 
 
-def _resolve_ranking_mode(mode: RankingMode, fmt: str) -> str:
+def _resolve_ranking_mode(mode: RankingMode, fmt: str) -> ResolvedRankingMode:
     """Resolve 'auto' to a concrete ranking mode based on format and availability."""
     if mode != "auto":
         return mode
@@ -586,6 +593,7 @@ async def format_staples(
         raise ToolError(str(exc)) from exc
 
     # --- Tournament mode: MTGGoldfish-driven ranking ---
+    fallback_note = ""
     if resolved_mode == "tournament":
         result = await _format_staples_tournament(
             client,
@@ -601,6 +609,10 @@ async def format_staples(
         # Goldfish failed — fall back to competitive
         log.warning("format_staples.goldfish_fallback", format=fmt)
         resolved_mode = "competitive"
+        fallback_note = (
+            "\n\n> **Note:** Tournament data unavailable;"
+            " results use competitive heuristic ranking."
+        )
 
     try:
         all_cards = await client.all_cards()
@@ -663,7 +675,7 @@ async def format_staples(
                 lines.append(f"| {score:.1f} | {card.name} | {cost} | {card.type_line} |")
 
     return ToolResult(
-        content="\n".join(lines) + ATTRIBUTION_SCRYFALL_BULK,
+        content="\n".join(lines) + fallback_note + ATTRIBUTION_SCRYFALL_BULK,
         structured_content={
             "format": fmt,
             "color": color,
@@ -687,20 +699,23 @@ async def _format_staples_tournament(
     """Attempt tournament-mode ranking via MTGGoldfish. Returns None on failure."""
     goldfish = _goldfish_mod._client
     if goldfish is None:
+        log.debug("format_staples.tournament_skip", format=fmt, reason="goldfish_client_none")
         return None
     try:
         staples = await goldfish.get_format_staples(fmt, limit=limit * 2)
-    except Exception:
+    except MTGGoldfishError:
         log.warning("format_staples.goldfish_error", format=fmt, exc_info=True)
         return None
 
     if not staples:
+        log.debug("format_staples.tournament_skip", format=fmt, reason="empty_staples")
         return None
 
     # Cross-reference goldfish names with bulk data for full Card details
     try:
         all_cards = await client.all_cards()
     except ScryfallBulkError:
+        log.warning("format_staples.tournament_bulk_error", format=fmt, exc_info=True)
         return None
 
     cards_by_name: dict[str, Card] = {c.name.lower(): c for c in all_cards}
@@ -718,17 +733,19 @@ async def _format_staples_tournament(
         ranked.append((gs.pct_of_decks, card))
 
     if not ranked:
+        log.debug("format_staples.tournament_skip", format=fmt, reason="no_matches_after_filter")
         return None
 
     ranked.sort(key=lambda t: t[0], reverse=True)
     ranked = ranked[:limit]
 
-    lines = [f"## {fmt.title()} Staples (Tournament Data)"]
+    header = f"## {fmt.title()} Staples (Tournament Data"
     if color:
-        lines[0] = lines[0].replace(")", f", {color})")
+        header += f", {color}"
+    header += ")"
     if card_type:
-        lines[0] += f" -- {card_type.title()}"
-    lines.append("")
+        header += f" -- {card_type.title()}"
+    lines = [header, ""]
 
     if response_format == "concise":
         for pct, card in ranked:

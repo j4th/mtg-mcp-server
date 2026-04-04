@@ -314,13 +314,13 @@ Search for cards legal in a specific format.
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `bulk_format_staples`
-Top-played cards in a format (by EDHREC rank).
+Find the most popular staple cards legal in a format. Ranking adapts to the format: singleton formats (Commander, Brawl, Oathbreaker) use EDHREC rank; competitive formats use MTGGoldfish tournament frequency when available, falling back to a mana-efficiency heuristic.
 
 | Field | Detail |
 |-------|--------|
-| Input | `format: str`, `card_type: str | None = None`, `limit: int = 20` |
-| Output | Ranked list of staple cards in the format |
-| Backend | `ScryfallBulkClient.filter_cards()` |
+| Input | `format: str`, `color: str \| None = None` (color identity filter), `card_type: str \| None = None`, `limit: int = 20`, `ranking_mode: "auto" \| "edhrec" \| "competitive" \| "tournament" = "auto"`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Ranked list of staple cards. EDHREC mode shows Rank column; competitive shows Score; tournament shows % Decks. |
+| Backend | `ScryfallBulkClient.filter_cards()`, optionally `MTGGoldfishClient.get_format_staples()` |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
 ### `bulk_ban_list`
