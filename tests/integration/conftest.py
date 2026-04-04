@@ -162,6 +162,16 @@ async def mcp_client():
                 200, json=_load_json(MOXFIELD_FIXTURES / "deck_commander.json")
             )
         )
+        respx.get(url__regex=re.escape(MOXFIELD_BASE) + r"/v2/decks/search").mock(
+            return_value=httpx.Response(
+                200, json=_load_json(MOXFIELD_FIXTURES / "search_decks.json")
+            )
+        )
+        respx.get(url__regex=re.escape(MOXFIELD_BASE) + r"/v2/users/search-sfw").mock(
+            return_value=httpx.Response(
+                200, json=_load_json(MOXFIELD_FIXTURES / "user_search.json")
+            )
+        )
 
         # --- Spicerack routes ---
         respx.get(f"{SPICERACK_BASE}/api/export-decklists/").mock(

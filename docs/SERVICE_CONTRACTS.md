@@ -470,6 +470,107 @@ Behind `MTG_MCP_ENABLE_RULES` (default `true`). When disabled:
 
 ---
 
+## Moxfield
+
+**Status:** No official public API. Reverse-engineered REST endpoints at `api2.moxfield.com`.
+
+### Connection Details
+
+| Field | Value |
+|-------|-------|
+| Base URL | `https://api2.moxfield.com` |
+| Auth | None. Requires Moxfield-style `User-Agent` header (blocks bot UAs). |
+| Rate limit | Self-imposed: 1 req/sec. No documented limits. |
+| Documentation | None. Reverse-engineered via network inspection. |
+
+### Key Endpoints
+
+**GET `/v3/decks/all/{deck_id}`** — Full deck data by public ID
+Returns: JSON with deck metadata, per-board card maps (`commanders`, `mainboard`, `sideboard`, `companions`).
+
+**GET `/v2/decks/search`** — Search public decks
+```
+?pageNumber=1&pageSize=20&sortType=Updated&sortDirection=Descending&q=keyword&fmt=modern
+```
+Parameters:
+- `pageNumber` (int): 1-indexed page
+- `pageSize` (int): Results per page (default 20)
+- `sortType` (str): "Updated", "Created", or "Views"
+- `sortDirection` (str): "Ascending" or "Descending"
+- `q` (str, optional): Search text
+- `fmt` (str, optional): Format filter (e.g. "modern", "commander", "pauper")
+
+Returns: Paginated JSON with `data` array of deck summaries.
+
+**GET `/v2/users/search-sfw`** — Search users by name
+```
+?filter=username
+```
+Parameters:
+- `filter` (str): Username or display name to search
+
+Returns: JSON with `data` array of user objects.
+
+### Response Shape (Deck Search)
+
+```json
+{
+  "pageNumber": 1,
+  "pageSize": 20,
+  "totalResults": 150,
+  "totalPages": 8,
+  "data": [
+    {
+      "publicId": "abc123",
+      "name": "Mono-Blue Terror",
+      "format": "pauper",
+      "publicUrl": "https://www.moxfield.com/decks/abc123",
+      "createdByUser": {
+        "userName": "player1",
+        "displayName": "Player One",
+        "badges": ["creator"]
+      },
+      "mainboardCount": 60,
+      "sideboardCount": 15,
+      "colors": ["U"],
+      "createdAtUtc": "2026-01-15T10:00:00Z",
+      "lastUpdatedAtUtc": "2026-03-20T14:30:00Z"
+    }
+  ]
+}
+```
+
+### Response Shape (User Search)
+
+```json
+{
+  "data": [
+    {
+      "userName": "player1",
+      "displayName": "Player One",
+      "badges": ["creator"]
+    }
+  ]
+}
+```
+
+### Service Architecture
+
+`MoxfieldClient` extends `BaseClient` with:
+- `rate_limit_rps=1.0`
+- Custom `User-Agent` header (browser-like, blocks bot UAs)
+- Error hierarchy: `MoxfieldError(ServiceError)`
+- 3 class-level TTLCaches: `_deck_cache` (4h/100), `_search_cache` (1h/50), `_user_search_cache` (4h/100)
+- `_moxfield_deck_key`: custom cache key normalizing URLs to deck IDs
+- Defensive parsing: `isinstance()` checks, `.get()` chains for all response fields
+- `_parse_search_result` raises `MoxfieldError` on non-dict responses (consistent with `_parse_deck`)
+
+### Feature Flag
+
+Behind `MTG_MCP_ENABLE_MOXFIELD` (default `true`). High fragility — reverse-engineered API with no stability guarantees.
+
+---
+
 ## Spicerack
 
 **Status:** Documented public REST API. Returns tournament results, standings, and Moxfield decklist URLs for competitive paper events.

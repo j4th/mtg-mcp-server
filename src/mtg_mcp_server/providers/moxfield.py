@@ -372,12 +372,19 @@ async def user_decks(
             )
             if deck.public_url:
                 lines.append(f"  {deck.public_url}")
+        if result.total_results > len(result.decks):
+            lines.append("")
+            lines.append(
+                f"*(showing first {len(result.decks)} results — "
+                "use `moxfield_search_decks` with a page parameter to see more)*"
+            )
 
     # Build structured content
     structured = {
         "username": matched_user.username,
         "display_name": matched_user.display_name,
         "badges": matched_user.badges,
+        "total_results": result.total_results,
         "decks": [
             {
                 "id": d.id,
