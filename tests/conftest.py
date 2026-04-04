@@ -37,6 +37,8 @@ def _clear_caches():
     EDHRECClient._commander_cache.clear()
     EDHRECClient._synergy_cache.clear()
     MoxfieldClient._deck_cache.clear()
+    MoxfieldClient._search_cache.clear()
+    MoxfieldClient._user_search_cache.clear()
     SpicerackClient._tournaments_cache.clear()
     MTGGoldfishClient._metagame_cache.clear()
     MTGGoldfishClient._archetype_cache.clear()

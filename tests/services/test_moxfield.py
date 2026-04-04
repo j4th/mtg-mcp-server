@@ -10,7 +10,7 @@ import pytest
 import respx
 
 from mtg_mcp_server.services.moxfield import DeckNotFoundError, MoxfieldClient, MoxfieldError
-from mtg_mcp_server.types import MoxfieldDeck, MoxfieldDecklist
+from mtg_mcp_server.types import MoxfieldDeck, MoxfieldDecklist, MoxfieldSearchResult, MoxfieldUser
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "moxfield"
 BASE_URL = "https://api2.moxfield.com"
@@ -18,8 +18,10 @@ BASE_URL = "https://api2.moxfield.com"
 
 @pytest.fixture(autouse=True)
 def _clear_moxfield_cache():
-    """Clear MoxfieldClient cache before every test to prevent leakage."""
+    """Clear MoxfieldClient caches before every test to prevent leakage."""
     MoxfieldClient._deck_cache.clear()
+    MoxfieldClient._search_cache.clear()
+    MoxfieldClient._user_search_cache.clear()
 
 
 def _load_fixture(name: str) -> dict:
@@ -354,3 +356,304 @@ class TestDecklistFormatCompatibility:
         for (qty, name), card in zip(parsed, all_cards, strict=True):
             assert qty == card.quantity
             assert name == card.name
+
+
+class TestSearchDecks:
+    """Deck search endpoint."""
+
+    @respx.mock
+    async def test_returns_search_result(self):
+        """Fixture parses into MoxfieldSearchResult with correct deck summaries."""
+        fixture = _load_fixture("search_decks.json")
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_decks()
+
+        assert isinstance(result, MoxfieldSearchResult)
+        assert result.total_results == 150
+        assert result.page == 1
+        assert result.page_size == 20
+        assert len(result.decks) == 3
+
+    @respx.mock
+    async def test_deck_summary_fields(self):
+        """Each deck summary has correct fields extracted."""
+        fixture = _load_fixture("search_decks.json")
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_decks()
+
+        deck = result.decks[0]
+        assert deck.id == "abc123"
+        assert deck.name == "Mono-Blue Terror"
+        assert deck.format == "pauper"
+        assert deck.author == "player1"
+        assert deck.public_url == "https://www.moxfield.com/decks/abc123"
+        assert deck.colors == ["U"]
+        assert deck.mainboard_count == 60
+        assert deck.sideboard_count == 15
+        assert deck.created_at == "2026-01-15T10:00:00Z"
+        assert deck.updated_at == "2026-03-20T14:30:00Z"
+
+    @respx.mock
+    async def test_format_filter_passed(self):
+        """format parameter is sent as 'fmt' to the API."""
+        fixture = _load_fixture("search_decks.json")
+        route = respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            await client.search_decks(fmt="pauper")
+
+        assert route.call_count == 1
+        request = route.calls[0].request
+        assert "fmt" in str(request.url)
+        assert "pauper" in str(request.url)
+
+    @respx.mock
+    async def test_sort_and_pagination_params(self):
+        """sort, page, and page_size parameters are forwarded."""
+        fixture = _load_fixture("search_decks.json")
+        route = respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            await client.search_decks(sort="Updated", page=2, page_size=10)
+
+        request = route.calls[0].request
+        url_str = str(request.url)
+        assert "pageNumber=2" in url_str
+        assert "pageSize=10" in url_str
+        assert "sortType=Updated" in url_str
+
+    @respx.mock
+    async def test_empty_results(self):
+        """Empty search returns zero decks."""
+        empty_response = {
+            "pageNumber": 1,
+            "pageSize": 20,
+            "totalResults": 0,
+            "totalPages": 0,
+            "data": [],
+        }
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=empty_response)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_decks()
+
+        assert isinstance(result, MoxfieldSearchResult)
+        assert result.total_results == 0
+        assert len(result.decks) == 0
+
+    @respx.mock
+    async def test_server_error_raises(self):
+        """500 response raises MoxfieldError."""
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            with pytest.raises(MoxfieldError):
+                await client.search_decks()
+
+    @respx.mock
+    async def test_invalid_json_raises(self):
+        """200 with non-JSON body raises MoxfieldError."""
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, content=b"<html>Not JSON</html>")
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            with pytest.raises(MoxfieldError, match="invalid JSON"):
+                await client.search_decks()
+
+    @respx.mock
+    async def test_defensive_missing_user(self):
+        """Deck entries with missing createdByUser are handled gracefully."""
+        fixture = {
+            "pageNumber": 1,
+            "pageSize": 20,
+            "totalResults": 1,
+            "totalPages": 1,
+            "data": [
+                {
+                    "publicId": "test1",
+                    "name": "No Author",
+                    "format": "modern",
+                    "publicUrl": "",
+                    "mainboardCount": 60,
+                    "sideboardCount": 15,
+                }
+            ],
+        }
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_decks()
+
+        assert len(result.decks) == 1
+        assert result.decks[0].author == ""
+
+    @respx.mock
+    async def test_defensive_non_dict_data_entries_skipped(self):
+        """Non-dict entries in data array are skipped."""
+        fixture = {
+            "pageNumber": 1,
+            "pageSize": 20,
+            "totalResults": 2,
+            "totalPages": 1,
+            "data": [
+                "not-a-dict",
+                {
+                    "publicId": "valid",
+                    "name": "Valid Deck",
+                    "format": "modern",
+                    "publicUrl": "",
+                    "mainboardCount": 60,
+                    "sideboardCount": 15,
+                },
+            ],
+        }
+        respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_decks()
+
+        assert len(result.decks) == 1
+        assert result.decks[0].id == "valid"
+
+
+class TestSearchUsers:
+    """User search endpoint."""
+
+    @respx.mock
+    async def test_returns_users(self):
+        """Fixture parses into list of MoxfieldUser."""
+        fixture = _load_fixture("user_search.json")
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_users("player1")
+
+        assert len(result) == 2
+        assert all(isinstance(u, MoxfieldUser) for u in result)
+
+    @respx.mock
+    async def test_user_fields(self):
+        """Each user has correct fields extracted."""
+        fixture = _load_fixture("user_search.json")
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_users("player1")
+
+        user = result[0]
+        assert user.username == "player1"
+        assert user.display_name == "Player One"
+        assert user.badges == ["creator"]
+
+    @respx.mock
+    async def test_query_param_passed(self):
+        """Query is sent as 'q' parameter."""
+        fixture = _load_fixture("user_search.json")
+        route = respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            await client.search_users("testuser")
+
+        request = route.calls[0].request
+        assert "q=testuser" in str(request.url)
+
+    @respx.mock
+    async def test_empty_results(self):
+        """Empty user search returns empty list."""
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_users("nonexistent")
+
+        assert result == []
+
+    @respx.mock
+    async def test_server_error_raises(self):
+        """500 response raises MoxfieldError."""
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            with pytest.raises(MoxfieldError):
+                await client.search_users("player1")
+
+    @respx.mock
+    async def test_defensive_non_dict_entries_skipped(self):
+        """Non-dict user entries are skipped."""
+        respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        "not-a-dict",
+                        {"userName": "valid", "displayName": "Valid", "badges": []},
+                    ]
+                },
+            )
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result = await client.search_users("valid")
+
+        assert len(result) == 1
+        assert result[0].username == "valid"
+
+
+class TestSearchCaching:
+    """TTL cache behavior for search methods."""
+
+    @respx.mock
+    async def test_search_decks_cached(self):
+        """Second search_decks call returns cached result without HTTP call."""
+        fixture = _load_fixture("search_decks.json")
+        route = respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result1 = await client.search_decks()
+            result2 = await client.search_decks()
+
+        assert route.call_count == 1
+        assert result1.total_results == result2.total_results
+
+    @respx.mock
+    async def test_search_users_cached(self):
+        """Second search_users call returns cached result without HTTP call."""
+        fixture = _load_fixture("user_search.json")
+        route = respx.get(f"{BASE_URL}/v2/users/search-sfw").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            result1 = await client.search_users("player1")
+            result2 = await client.search_users("player1")
+
+        assert route.call_count == 1
+        assert len(result1) == len(result2)
+
+    @respx.mock
+    async def test_different_search_params_cached_separately(self):
+        """Different search parameters produce separate cache entries."""
+        fixture = _load_fixture("search_decks.json")
+        route = respx.get(f"{BASE_URL}/v2/decks/search").mock(
+            return_value=httpx.Response(200, json=fixture)
+        )
+        async with MoxfieldClient(base_url=BASE_URL) as client:
+            await client.search_decks(fmt="pauper")
+            await client.search_decks(fmt="modern")
+
+        assert route.call_count == 2
