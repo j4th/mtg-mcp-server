@@ -570,7 +570,7 @@ class TestSearchUsers:
             await client.search_users("testuser")
 
         request = route.calls[0].request
-        assert "q=testuser" in str(request.url)
+        assert "filter=testuser" in str(request.url)
 
     @respx.mock
     async def test_empty_results(self):

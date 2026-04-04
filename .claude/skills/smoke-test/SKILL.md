@@ -116,7 +116,7 @@ MTGGoldfish scrapes HTML — SKIP on error, don't fail the overall test.
 |------|----------|
 | `moxfield_decklist(deck_id="DuXYtaJFEkScp1U1dxvAmw")` | Deck name, commander board, mainboard with card names and quantities |
 | `moxfield_search_decks(query="modern", format="modern", page_size=3)` | At least 1 deck summary with name, format, author |
-| `moxfield_user_decks(username="theMMcast")` | User's public decks listed (or ToolError if user not found) |
+| `moxfield_user_decks(username="j4th")` | User's public decks listed (or ToolError if user not found) |
 
 Moxfield uses undocumented endpoints; SKIP on error, don't fail the overall test.
 

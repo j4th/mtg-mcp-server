@@ -360,8 +360,8 @@ async def archetype_decklist(
             },
         )
 
-    # Fetch the archetype detail using the matched slug
-    detail = await mtggoldfish.get_archetype(format, matched.slug)
+    # Fetch the archetype detail using the matched name (not slug — slug is already format-prefixed)
+    detail = await mtggoldfish.get_archetype(format, matched.name)
 
     # Optionally resolve card prices via bulk data
     total_price: float | None = None

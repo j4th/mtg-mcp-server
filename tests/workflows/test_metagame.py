@@ -574,11 +574,11 @@ class TestArchetypeDecklist:
         assert "Lightning Bolt" in result.markdown
 
     @pytest.mark.anyio
-    async def test_uses_slug_not_name_for_get_archetype(
+    async def test_uses_name_not_slug_for_get_archetype(
         self,
         mock_mtggoldfish: AsyncMock,
     ) -> None:
-        """Verify we pass the slug to get_archetype, not the raw name."""
+        """Verify we pass the name to get_archetype, not the pre-slugified slug."""
         await archetype_decklist(
             "modern",
             "Boros Energy",
@@ -586,8 +586,8 @@ class TestArchetypeDecklist:
             bulk=None,
         )
 
-        # get_archetype should be called with the slug from metagame data
-        mock_mtggoldfish.get_archetype.assert_called_once_with("modern", "boros-energy")
+        # get_archetype should be called with the name — it slugifies internally
+        mock_mtggoldfish.get_archetype.assert_called_once_with("modern", "Boros Energy")
 
     @pytest.mark.anyio
     async def test_structured_data_fields(

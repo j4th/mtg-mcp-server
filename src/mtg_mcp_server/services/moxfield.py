@@ -227,7 +227,7 @@ class MoxfieldClient(BaseClient):
         log.debug("search_users", query=query)
 
         try:
-            response = await self._get("/v2/users/search-sfw", params={"q": query})
+            response = await self._get("/v2/users/search-sfw", params={"filter": query})
         except ServiceError as exc:
             raise MoxfieldError(exc.message, status_code=exc.status_code) from exc
 
