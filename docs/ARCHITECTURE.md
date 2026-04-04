@@ -25,7 +25,7 @@ Claude Code / claude.ai / any MCP client
               │ stdio (default) or streamable HTTP
               │
     ┌─────────▼──────────┐
-    │   MTG Orchestrator  │  ← FastMCP("MTG"), 60 tools, 17 prompts, 20 resources
+    │   MTG Orchestrator  │  ← FastMCP("MTG"), 69 tools, 19 prompts, 20 resources
     │                     │
     │  Workflow Tools:     │  ← Compose across backends (no namespace)
     │  Commander:          │  Draft/Limited:
@@ -182,6 +182,7 @@ mtg-mcp/
 │       │   ├── format_rules.py     # Format-specific rules (deck sizes, copy limits)
 │       │   ├── formatters.py       # Shared formatting helpers (ResponseFormat, markdown)
 │       │   ├── mana.py             # Mana cost parsing utilities
+│       │   ├── fuzzy.py             # Fuzzy matching for archetype/matchup names
 │       │   ├── query_parser.py     # Search query parsing for bulk data
 │       │   └── slim.py             # Slim dict builders for structured_content response sizes
 │       │
@@ -196,6 +197,8 @@ mtg-mcp/
 │           ├── analysis.py         # deck_analysis
 │           ├── building.py         # theme_search, build_around, complete_deck
 │           ├── constructed.py      # rotation_check
+│           ├── metagame.py         # metagame_snapshot, archetype_decklist, archetype_comparison, format_entry_guide
+│           ├── sideboard.py        # suggest_sideboard, sideboard_guide, sideboard_matrix
 │           ├── validation.py       # deck_validate
 │           ├── mana_base.py        # suggest_mana_base
 │           ├── pricing.py          # price_comparison
@@ -244,18 +247,21 @@ mtg-mcp/
 │   │   ├── test_analysis.py        # deck_analysis
 │   │   ├── test_building.py        # theme_search, build_around, complete_deck
 │   │   ├── test_constructed.py     # rotation_check
+│   │   ├── test_metagame.py        # metagame_snapshot, archetype_decklist, archetype_comparison, format_entry_guide
+│   │   ├── test_sideboard.py       # suggest_sideboard, sideboard_guide, sideboard_matrix
 │   │   ├── test_validation.py      # deck_validate
 │   │   ├── test_mana_base.py       # suggest_mana_base
 │   │   ├── test_pricing.py         # price_comparison
 │   │   ├── test_rules.py           # Rules engine tools
 │   │   ├── test_card_resolver.py   # Card resolver utility
 │   │   ├── test_context_progress.py # Progress reporting
-│   │   ├── test_prompts.py         # All 17 prompt registrations
+│   │   ├── test_prompts.py         # All 19 prompt registrations
 │   │   └── test_workflow_server.py # Integration: tool registration + error handling
 │   ├── utils/
 │   │   ├── test_color_identity.py  # Color identity parsing
 │   │   ├── test_decklist.py        # Decklist parsing
 │   │   ├── test_format_rules.py    # Format rule validation
+│   │   ├── test_fuzzy.py           # Fuzzy matching utility
 │   │   ├── test_mana.py            # Mana cost parsing
 │   │   ├── test_query_parser.py    # Search query parsing
 │   │   └── test_slim.py            # Slim dict builder tests
@@ -512,7 +518,7 @@ if __name__ == "__main__":
 
 ### Testing
 
-Four test tiers (1183 tests total), each with a specific purpose. CI runs all tiers on PRs to main.
+Four test tiers (1336 tests total), each with a specific purpose. CI runs all tiers on PRs to main.
 
 **Unit tests** (`tests/services/`, `tests/providers/`, `tests/utils/`, `tests/workflows/`): Test individual services, providers, utilities, and workflow functions in isolation. HTTP mocked via respx with fixture data. FastMCP servers tested using `fastmcp.Client` with the server instance as transport (in-memory, no network). Workflow tests use `AsyncMock` (not respx) since they test pure functions. `~2.5min`
 

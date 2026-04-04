@@ -170,6 +170,7 @@ When reviewing PRs (automated CI or manual), verify these project-specific compl
 - **Branch B** (Format Workflows): Complete — 11 new workflow tools across 4 domains: Deck Building (theme_search, build_around, complete_deck), Commander Depth (commander_comparison, tribal_staples, precon_upgrade, color_identity_staples), Limited (sealed_pool_build, draft_signal_read, draft_log_review), Constructed (rotation_check). 8 new prompts. 51 tools, 17 prompts, 18 resource templates. 989 tests, 88% coverage.
 - **Spicerack** (Tournament Results): Complete — SpicerackClient service with get_tournaments() (TTLCache 4h). 3 tools (recent_tournaments, tournament_results, format_decklists), 1 resource template.
 - **MTGGoldfish** (Metagame Data): Complete — MTGGoldfishClient service with HTML scraping (selectolax). 4 tools (metagame, archetype_list, format_staples, deck_price), 1 resource template. 60 tools total.
+- **v2.3.0** (Metagame + Sideboard + Moxfield): Complete — 4 metagame workflow tools (metagame_snapshot, archetype_decklist, archetype_comparison, format_entry_guide), 3 sideboard workflow tools (suggest_sideboard, sideboard_guide, sideboard_matrix), 2 Moxfield provider tools (search_decks, user_decks), fuzzy matching utility. 69 tools, 19 prompts. 1336 tests, 88% coverage.
 
 ## Environment
 
