@@ -34,9 +34,28 @@ def match_archetype(
         if _slugify(name) == query_slug:
             return name
 
-    # Pass 2: ratio-based fuzzy match
+    # Pass 2: substring match (handles partial names like "Boros" → "Boros Energy")
     query_lower = query.lower()
+    for name in archetypes:
+        name_lower = name.lower()
+        if query_lower in name_lower or name_lower in query_lower:
+            return name
+
+    # Pass 3: word overlap (handles reordering like "Control Azorius" → "Azorius Control")
+    query_words = set(query_lower.split())
     best_name: str | None = None
+    best_overlap = 0
+    for name in archetypes:
+        overlap = len(query_words & set(name.lower().split()))
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_name = name
+
+    if best_overlap >= 2:
+        return best_name
+
+    # Pass 4: ratio-based fuzzy match
+    best_name = None
     best_ratio = 0.0
 
     for name in archetypes:

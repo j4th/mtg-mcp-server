@@ -20,7 +20,9 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.utils.decklist import parse_decklist
 from mtg_mcp_server.utils.format_rules import get_format_rules
+from mtg_mcp_server.utils.fuzzy import match_archetype
 from mtg_mcp_server.utils.slim import slim_archetype
 from mtg_mcp_server.workflows import WorkflowResult
 
@@ -41,50 +43,20 @@ _T1_THRESHOLD = 10.0  # meta share > 10%
 _T2_THRESHOLD = 3.0  # meta share 3-10%
 
 
-# ---------------------------------------------------------------------------
-# Fuzzy archetype matching
-# ---------------------------------------------------------------------------
-
-
-def _normalize_for_match(name: str) -> str:
-    """Lowercase and strip for comparison."""
-    return name.lower().strip()
-
-
 def _match_archetype(
     query: str,
     archetypes: list[GoldfishArchetype],
 ) -> GoldfishArchetype | None:
     """Fuzzy-match a user query against archetype names.
 
-    Tries exact match first, then substring match, then word overlap.
-    Returns the best match or None.
+    Delegates to the shared :func:`match_archetype` utility and maps
+    the matched name back to the corresponding archetype object.
     """
-    query_norm = _normalize_for_match(query)
-
-    # Exact match
-    for arch in archetypes:
-        if _normalize_for_match(arch.name) == query_norm:
-            return arch
-
-    # Substring match (query in name or name in query)
-    for arch in archetypes:
-        name_norm = _normalize_for_match(arch.name)
-        if query_norm in name_norm or name_norm in query_norm:
-            return arch
-
-    # Word overlap: pick archetype with the most shared words
-    query_words = set(query_norm.split())
-    best: GoldfishArchetype | None = None
-    best_overlap = 0
-    for arch in archetypes:
-        name_words = set(_normalize_for_match(arch.name).split())
-        overlap = len(query_words & name_words)
-        if overlap > best_overlap:
-            best_overlap = overlap
-            best = arch
-
-    return best if best_overlap > 0 else None
+    names = [a.name for a in archetypes]
+    matched_name = match_archetype(query, names)
+    if matched_name is None:
+        return None
+    return next((a for a in archetypes if a.name == matched_name), None)
 
 
 # ---------------------------------------------------------------------------
@@ -366,19 +338,9 @@ async def archetype_decklist(
     # Optionally resolve card prices via bulk data
     total_price: float | None = None
     if bulk is not None and detail.mainboard:
-        # Extract card names from "4 Card Name" format
-        card_names: list[str] = []
-        quantities: dict[str, int] = {}
-        for entry in detail.mainboard:
-            parts = entry.split(" ", 1)
-            if len(parts) == 2 and parts[0].isdigit():
-                qty = int(parts[0])
-                name = parts[1]
-            else:
-                qty = 1
-                name = entry
-            card_names.append(name)
-            quantities[name] = qty
+        parsed = parse_decklist(detail.mainboard)
+        card_names = [name for _, name in parsed]
+        quantities = {name: qty for qty, name in parsed}
 
         try:
             cards = await bulk.get_cards(card_names)
@@ -579,15 +541,8 @@ async def archetype_comparison(
         else:
             mainboard_sizes.append(str(len(result.mainboard)))
             sideboard_sizes.append(str(len(result.sideboard)))
-            # Parse card names from "4 Card Name" format for overlap analysis
-            cards_counter: Counter[str] = Counter()
-            for entry in result.mainboard:
-                parts = entry.split(" ", 1)
-                if len(parts) == 2 and parts[0].isdigit():
-                    cards_counter[parts[1]] += 1
-                else:
-                    cards_counter[entry] += 1
-            all_mainboard_cards.append(cards_counter)
+            parsed = parse_decklist(result.mainboard)
+            all_mainboard_cards.append(Counter(name for _, name in parsed))
 
     row = "| Mainboard | " + " | ".join(mainboard_sizes) + " |"
     lines.append(row)

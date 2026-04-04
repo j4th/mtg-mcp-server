@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Literal
 import structlog
 
 from mtg_mcp_server.utils.decklist import parse_decklist
+from mtg_mcp_server.utils.fuzzy import match_archetype
 from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
@@ -150,27 +151,26 @@ def _opposing_colors(deck_colors: set[str]) -> frozenset[str] | set[str]:
     return ALL_COLORS - deck_colors
 
 
-def _match_archetype_name(query: str, archetypes: list[str], threshold: float = 0.5) -> str | None:
-    """Simple substring-based archetype matching.
+def _match_archetype_name(query: str, archetypes: list[str]) -> str | None:
+    """Match a query against archetype names, falling back to strategy keywords.
 
-    Returns the first archetype whose name contains the query (case-insensitive),
-    or the query if it matches a known strategy keyword.
+    Returns ``None`` only for empty queries. Unknown names pass through
+    as-is so callers can use custom matchup labels.
     """
-    query_lower = query.lower().strip()
-    if not query_lower:
+    if not query or not query.strip():
         return None
 
-    # Direct match against archetype list
-    for arch in archetypes:
-        if query_lower in arch.lower() or arch.lower() in query_lower:
-            return arch
+    matched = match_archetype(query, archetypes)
+    if matched is not None:
+        return matched
 
-    # Check if query matches a strategy keyword
+    # Fall back to strategy keyword recognition
+    query_lower = query.lower()
     for keyword in _ARCHETYPE_STRATEGIES:
         if keyword in query_lower or query_lower in keyword:
             return query
 
-    return query  # Return as-is for custom matchup names
+    return query
 
 
 def _classify_archetype_strategy(matchup: str) -> str:
@@ -368,32 +368,31 @@ async def suggest_sideboard(
         # Filter out main deck cards and already-suggested cards
         cat_cards: list[dict[str, str]] = []
         for card in candidates:
-            if card.name.lower() in main_deck_lower:
-                continue
-            if card.name.lower() in seen_names:
+            name_lower = card.name.lower()
+            if name_lower in main_deck_lower or name_lower in seen_names:
                 continue
             if len(cat_cards) >= slots_per_category:
                 break
             if len(all_suggested) + len(cat_cards) >= _MAX_SIDEBOARD:
                 break
 
-            # Compute reasoning
             reasons = []
-            if card.name.lower() in staple_names:
+            if name_lower in staple_names:
                 reasons.append("format staple")
             reasons.append(f"addresses {cat_name.lower()}")
             if card.prices.usd is not None:
                 reasons.append(f"${card.prices.usd}")
 
-            entry = {
-                "name": card.name,
-                "category": cat_name,
-                "reasoning": "; ".join(reasons),
-                "type_line": card.type_line,
-                "mana_cost": card.mana_cost or "",
-            }
-            cat_cards.append(entry)
-            seen_names.add(card.name.lower())
+            cat_cards.append(
+                {
+                    "name": card.name,
+                    "category": cat_name,
+                    "reasoning": "; ".join(reasons),
+                    "type_line": card.type_line,
+                    "mana_cost": card.mana_cost or "",
+                }
+            )
+            seen_names.add(name_lower)
 
         if cat_cards:
             categories_result[cat_name] = cat_cards
