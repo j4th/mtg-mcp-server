@@ -3,9 +3,10 @@
 This module is the wiring layer between MCP and the pure workflow functions
 in ``commander.py``, ``commander_depth.py``, ``draft.py``, ``draft_limited.py``,
 ``deck.py``, ``analysis.py``, ``building.py``, ``constructed.py``,
-``validation.py``, ``mana_base.py``, ``pricing.py``, and ``rules.py``.  Each tool
-here wraps a pure async function, injecting the service clients from the
-module-level state and converting service exceptions to ``ToolError``.
+``metagame.py``, ``sideboard.py``, ``validation.py``, ``mana_base.py``,
+``pricing.py``, and ``rules.py``.  Each tool here wraps a pure async function,
+injecting the service clients from the module-level state and converting
+service exceptions to ``ToolError``.
 
 The workflow server is mounted on the orchestrator **without** a namespace
 so tool names stay clean (e.g. ``commander_overview``, not
@@ -39,11 +40,14 @@ from mtg_mcp_server.providers import (
 )
 from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.services.edhrec import CommanderNotFoundError, EDHRECClient
+from mtg_mcp_server.services.moxfield import MoxfieldClient
+from mtg_mcp_server.services.mtggoldfish import MTGGoldfishClient
 from mtg_mcp_server.services.rules import RulesService
 from mtg_mcp_server.services.scryfall import CardNotFoundError, ScryfallClient
 from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
 from mtg_mcp_server.services.seventeen_lands import SeventeenLandsClient
 from mtg_mcp_server.services.spellbook import SpellbookClient
+from mtg_mcp_server.services.spicerack import SpicerackClient
 
 # Module-level clients managed by the lifespan via AsyncExitStack.
 # Workflows need multiple clients simultaneously; AsyncExitStack is cleaner
@@ -54,6 +58,9 @@ _seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
 _bulk: ScryfallBulkClient | None = None
 _rules: RulesService | None = None
+_mtggoldfish: MTGGoldfishClient | None = None
+_spicerack: SpicerackClient | None = None
+_moxfield: MoxfieldClient | None = None
 
 
 @lifespan
@@ -66,6 +73,7 @@ async def workflow_lifespan(server: FastMCP):
     when the server shuts down.
     """
     global _scryfall, _spellbook, _seventeen_lands, _edhrec, _bulk, _rules
+    global _mtggoldfish, _spicerack, _moxfield
     settings = Settings()
     async with AsyncExitStack() as stack:
         _scryfall = await stack.enter_async_context(
@@ -102,6 +110,21 @@ async def workflow_lifespan(server: FastMCP):
                     exc_info=True,
                     hint="Rules tools will attempt to load on first use",
                 )
+        if settings.enable_mtggoldfish:
+            _mtggoldfish = await stack.enter_async_context(
+                MTGGoldfishClient(base_url=settings.mtggoldfish_base_url)
+            )
+        if settings.enable_spicerack:
+            _spicerack = await stack.enter_async_context(
+                SpicerackClient(
+                    base_url=settings.spicerack_base_url,
+                    api_key=settings.spicerack_api_key,
+                )
+            )
+        if settings.enable_moxfield:
+            _moxfield = await stack.enter_async_context(
+                MoxfieldClient(base_url=settings.moxfield_base_url)
+            )
         yield {}
     _scryfall = None
     _spellbook = None
@@ -109,6 +132,9 @@ async def workflow_lifespan(server: FastMCP):
     _edhrec = None
     _bulk = None
     _rules = None
+    _mtggoldfish = None
+    _spicerack = None
+    _moxfield = None
 
 
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan, mask_error_details=True)
@@ -154,6 +180,27 @@ def _require_rules() -> RulesService:
     if _rules is None:
         raise ToolError("Rules engine is not enabled. Set MTG_MCP_ENABLE_RULES=true.")
     return _rules
+
+
+def _require_mtggoldfish() -> MTGGoldfishClient:
+    """Return MTGGoldfish client or raise ToolError if the feature flag is off."""
+    if _mtggoldfish is None:
+        raise ToolError("MTGGoldfish is not enabled. Set MTG_MCP_ENABLE_MTGGOLDFISH=true.")
+    return _mtggoldfish
+
+
+def _require_spicerack() -> SpicerackClient:
+    """Return Spicerack client or raise ToolError if the feature flag is off."""
+    if _spicerack is None:
+        raise ToolError("Spicerack is not enabled. Set MTG_MCP_ENABLE_SPICERACK=true.")
+    return _spicerack
+
+
+def _require_moxfield() -> MoxfieldClient:
+    """Return Moxfield client or raise ToolError if the feature flag is off."""
+    if _moxfield is None:
+        raise ToolError("Moxfield is not enabled. Set MTG_MCP_ENABLE_MOXFIELD=true.")
+    return _moxfield
 
 
 _log = structlog.get_logger(service="workflows")
@@ -939,6 +986,284 @@ async def rotation_check(
         return ToolResult(content=result.markdown, structured_content=result.data)
     except ServiceError as exc:
         raise ToolError(f"rotation_check failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Constructed Metagame Workflow Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def metagame_snapshot(
+    format: Annotated[
+        str,
+        Field(description="Competitive format (e.g. 'Modern', 'Legacy', 'Pioneer', 'Pauper')"),
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Get the current metagame breakdown for a competitive format.
+
+    Shows top archetypes with meta share %, tier classification, and prices.
+    Uses MTGGoldfish as primary source with Spicerack tournament data as fallback.
+    """
+    from mtg_mcp_server.workflows.metagame import metagame_snapshot as impl
+
+    try:
+        result = await impl(
+            format=format,
+            mtggoldfish=_mtggoldfish,
+            spicerack=_spicerack,
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"metagame_snapshot failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def archetype_decklist(
+    format: Annotated[
+        str,
+        Field(description="Competitive format (e.g. 'Modern', 'Legacy', 'Pioneer', 'Pauper')"),
+    ],
+    archetype: Annotated[
+        str,
+        Field(
+            description="Archetype name (e.g. 'Boros Energy', 'Mono-Blue Terror') — fuzzy matched"
+        ),
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Get the stock decklist for a competitive archetype.
+
+    Returns a full 75-card list (mainboard + sideboard) with card roles annotated,
+    total price, and key cards explained. Archetype name is fuzzy-matched.
+    """
+    from mtg_mcp_server.workflows.metagame import archetype_decklist as impl
+
+    try:
+        result = await impl(
+            format=format,
+            archetype=archetype,
+            mtggoldfish=_require_mtggoldfish(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"archetype_decklist failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def archetype_comparison(
+    format: Annotated[
+        str,
+        Field(description="Competitive format (e.g. 'Modern', 'Legacy', 'Pioneer', 'Pauper')"),
+    ],
+    archetypes: Annotated[
+        list[str],
+        Field(description="2-4 archetype names to compare (fuzzy matched)"),
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Compare 2-4 competitive archetypes side-by-side.
+
+    Shows price, colors, key cards, shared staples, and differences.
+    """
+    from mtg_mcp_server.workflows.metagame import archetype_comparison as impl
+
+    if len(archetypes) < 2:
+        raise ToolError("Provide at least 2 archetypes to compare.")
+    if len(archetypes) > 4:
+        raise ToolError("Compare at most 4 archetypes at a time.")
+
+    try:
+        result = await impl(
+            format=format,
+            archetypes=archetypes,
+            mtggoldfish=_require_mtggoldfish(),
+            bulk=_bulk,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"archetype_comparison failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def format_entry_guide(
+    format: Annotated[
+        str,
+        Field(description="Competitive format (e.g. 'Modern', 'Legacy', 'Pioneer', 'Pauper')"),
+    ],
+    budget: Annotated[
+        float | None,
+        Field(description="Max budget in USD — filters archetypes to this price ceiling"),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Get a beginner-oriented guide for entering a competitive format.
+
+    Shows archetypes sorted by budget accessibility, cross-archetype staples
+    (buy once, play everywhere), and format rules summary.
+    """
+    from mtg_mcp_server.workflows.metagame import format_entry_guide as impl
+
+    try:
+        result = await impl(
+            format=format,
+            mtggoldfish=_mtggoldfish,
+            spicerack=_spicerack,
+            bulk=_bulk,
+            budget=budget,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"format_entry_guide failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Sideboard Workflow Tools
+# ---------------------------------------------------------------------------
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def suggest_sideboard(
+    decklist: Annotated[
+        list[str],
+        Field(description="Main deck card names (e.g. ['4 Lightning Bolt', '4 Goblin Guide'])"),
+    ],
+    format: Annotated[str, Field(description="Competitive format (e.g. 'Modern', 'Pauper')")],
+    meta_context: Annotated[
+        str | None,
+        Field(
+            description="Optional context about local metagame "
+            "(e.g. 'heavy on Mono-Red and Affinity')"
+        ),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Suggest a 15-card sideboard for a competitive deck.
+
+    Analyzes the main deck's weaknesses and recommends sideboard cards with
+    per-card reasoning. Works with heuristic analysis alone; enhanced with
+    MTGGoldfish frequency data when available.
+    """
+    from mtg_mcp_server.workflows.sideboard import suggest_sideboard as impl
+
+    try:
+        result = await impl(
+            decklist=decklist,
+            format=format,
+            bulk=_require_bulk(),
+            mtggoldfish=_mtggoldfish,
+            meta_context=meta_context,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"suggest_sideboard failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def sideboard_guide(
+    decklist: Annotated[
+        list[str],
+        Field(description="Main deck card names (e.g. ['4 Lightning Bolt', '4 Goblin Guide'])"),
+    ],
+    sideboard: Annotated[
+        list[str],
+        Field(description="Sideboard card names (e.g. ['2 Hydroblast', '3 Tormod\\'s Crypt'])"),
+    ],
+    format: Annotated[str, Field(description="Competitive format (e.g. 'Modern', 'Pauper')")],
+    matchup: Annotated[
+        str,
+        Field(description="Matchup archetype name (e.g. 'Mono-Red Aggro') — fuzzy matched"),
+    ],
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Get a specific sideboard in/out plan for a named matchup.
+
+    Given a full 75 and a matchup archetype, produces specific boarding
+    instructions with reasoning.
+    """
+    from mtg_mcp_server.workflows.sideboard import sideboard_guide as impl
+
+    try:
+        result = await impl(
+            decklist=decklist,
+            sideboard=sideboard,
+            format=format,
+            matchup=matchup,
+            bulk=_require_bulk(),
+            mtggoldfish=_mtggoldfish,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"sideboard_guide failed: {exc}") from exc
+
+
+@workflow_mcp.tool(annotations=TOOL_ANNOTATIONS, tags=TAGS_CONSTRUCTED)
+async def sideboard_matrix(
+    decklist: Annotated[
+        list[str],
+        Field(description="Main deck card names (e.g. ['4 Lightning Bolt', '4 Goblin Guide'])"),
+    ],
+    sideboard: Annotated[
+        list[str],
+        Field(description="Sideboard card names (e.g. ['2 Hydroblast', '3 Tormod\\'s Crypt'])"),
+    ],
+    format: Annotated[str, Field(description="Competitive format (e.g. 'Modern', 'Pauper')")],
+    matchups: Annotated[
+        list[str] | None,
+        Field(description="Matchup names to include — omit to auto-detect from metagame data"),
+    ] = None,
+    response_format: Annotated[
+        Literal["detailed", "concise"],
+        Field(description="Output verbosity: 'detailed' (default) or 'concise'"),
+    ] = "detailed",
+) -> ToolResult:
+    """Generate a sideboard matrix for a deck across common matchups.
+
+    Matrix shows which sideboard cards come IN/OUT/FLEX for each matchup.
+    Auto-detects top matchups from metagame data or uses provided matchup list.
+    """
+    from mtg_mcp_server.workflows.sideboard import sideboard_matrix as impl
+
+    try:
+        result = await impl(
+            decklist=decklist,
+            sideboard=sideboard,
+            format=format,
+            bulk=_require_bulk(),
+            mtggoldfish=_mtggoldfish,
+            matchups=matchups,
+            response_format=response_format,
+        )
+        return ToolResult(content=result.markdown, structured_content=result.data)
+    except ServiceError as exc:
+        raise ToolError(f"sideboard_matrix failed: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -1756,6 +2081,70 @@ Step 4: Assessment:
   - Should the user pivot to a different strategy?
 
 Present: rotation impact summary, replacement plan with costs, and recommendation."""
+
+
+@workflow_mcp.prompt()
+def explore_format(
+    format: Annotated[
+        str,
+        Field(description="Competitive format to explore (e.g. 'Modern', 'Pauper', 'Pioneer')"),
+    ],
+) -> str:
+    """Guided exploration of a competitive format's metagame."""
+    return f"""Explore the {format} metagame.
+
+Step 1: Use metagame_snapshot to see the current metagame breakdown for {format}.
+  Review the tier list — Tier 1 decks are the most popular/successful.
+
+Step 2: Ask the user which archetype interests them.
+  Use archetype_decklist to show the stock 75-card list for that archetype.
+
+Step 3: If the user wants to compare options:
+  Use archetype_comparison with their top 2-3 choices.
+
+Step 4: Once they pick a deck:
+  - Use deck_validate to verify the list is legal
+  - Use suggest_mana_base if they want to tune the mana base
+  - Use suggest_sideboard if they need sideboard guidance
+
+Present: metagame overview, then guide them to a specific deck choice."""
+
+
+@workflow_mcp.prompt()
+def build_constructed_deck(
+    concept: Annotated[
+        str,
+        Field(description="Deck concept or strategy (e.g. 'burn', 'control', 'mill')"),
+    ],
+    format: Annotated[
+        str,
+        Field(description="Competitive format (e.g. 'Modern', 'Pauper', 'Pioneer')"),
+    ],
+    budget: Annotated[float | None, Field(description="Max total deck budget in USD")] = None,
+) -> str:
+    """Build a competitive constructed deck with metagame awareness."""
+    budget_line = f" under ${budget:.2f} total" if budget else ""
+    return f"""Build a {concept} deck for {format}{budget_line}.
+
+Step 1: Use metagame_snapshot to see where {concept} strategies sit in the {format}
+  metagame. Is there an established archetype? What tier is it?
+
+Step 2: If an established archetype exists:
+  - Use archetype_decklist to get the stock list
+  - Adapt it to the user's concept and budget
+
+Step 3: If building from scratch:
+  - Use theme_search to find cards matching the "{concept}" theme in {format}
+  - Use build_around with the top 3-5 cards for synergy discovery
+  - Use complete_deck to fill gaps in the list
+
+Step 4: Finalize:
+  - Use deck_validate to verify format legality
+  - Use suggest_mana_base for the land base
+  - Use suggest_sideboard for a 15-card sideboard
+  - Use price_comparison for total cost
+
+Present: complete 75-card decklist with sideboard and total price."""
 
 
 # ---------------------------------------------------------------------------
