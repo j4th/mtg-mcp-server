@@ -311,6 +311,16 @@ class TestCrossFormatLive:
         text = result.content[0].text
         assert "Sol Ring" in text or "Commander" in text.lower()
 
+    async def test_format_staples_modern_nonsingleton(self, live_client):
+        """Non-singleton format should use tournament or competitive mode, not EDHREC."""
+        result = await live_client.call_tool(
+            "bulk_format_staples", {"format": "modern", "limit": 5}
+        )
+        text = result.content[0].text
+        assert "Modern" in text
+        # Should use tournament (% Decks) or competitive (Score), NOT edhrec (Rank #)
+        assert "% Decks" in text or "Score" in text
+
     async def test_card_in_formats(self, live_client):
         result = await live_client.call_tool(
             "bulk_card_in_formats", {"card_name": "Lightning Bolt"}
