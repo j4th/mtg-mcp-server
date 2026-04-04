@@ -50,6 +50,8 @@ Our server runs a single asyncio event loop — no thread contention on dict acc
 | EDHREC | `commander_top_cards` | 24h | 100 | EDHREC aggregates daily |
 | EDHREC | `card_synergy` | 24h | 200 | Same aggregation cycle |
 | Moxfield | `get_deck` | 4h | 100 | Decklists change infrequently during a session; tournament-winning lists are typically stable |
+| Moxfield | `search_decks` | 1h | 50 | Search results are volatile — new decks posted frequently |
+| Moxfield | `search_users` | 4h | 100 | User data changes very infrequently |
 | Spicerack | `get_tournaments` | 4h | 50 | Tournament data changes infrequently during a session; events added daily but results are stable |
 | MTGGoldfish | `get_metagame` | 6h | 50 | Metagame shares shift slowly; 6h balances freshness vs. scraping load |
 | MTGGoldfish | `get_archetype` | 12h | 100 | Sample decklists are stable once posted |

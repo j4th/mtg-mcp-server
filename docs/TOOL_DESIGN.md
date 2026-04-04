@@ -184,6 +184,28 @@ Get metadata for a Moxfield deck (name, format, author, dates).
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 | Tags | beta |
 
+### `moxfield_search_decks`
+Search public Moxfield decks by format, keyword, or commander.
+
+| Field | Detail |
+|-------|--------|
+| Input | `query: str`, `format: str | None = None`, `sort: str = "views"`, `page: int = 1`, `page_size: int = 20` |
+| Output | Paginated deck summaries with name, format, author, colors, card counts, public URL |
+| Backend | `MoxfieldClient.search_decks()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
+### `moxfield_user_decks`
+List a user's public decks on Moxfield.
+
+| Field | Detail |
+|-------|--------|
+| Input | `username: str`, `format: str | None = None`, `page: int = 1`, `page_size: int = 20` |
+| Output | User's public decks with name, format, colors, card counts. Verifies user exists first. |
+| Backend | `MoxfieldClient.search_users()` + `MoxfieldClient.search_decks()` |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+| Tags | beta |
+
 ---
 
 ## Spicerack Backend (namespace: `spicerack`)
@@ -587,6 +609,79 @@ Check Standard rotation status and which cards are in rotating sets.
 | Backends | Scryfall API (sets) + Bulk data (card legality) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
+### `metagame_snapshot`
+Get the current metagame breakdown for a competitive format with tier assignment.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Markdown with: tiered archetype list (T1 >10%, T2 3-10%, T3 <3%), meta shares, deck counts, prices |
+| Backends | MTGGoldfish (primary) + Spicerack (fallback) + Bulk data (optional, pricing) |
+| Partial failure | MTGGoldfish unavailable → falls back to Spicerack tournament frequency. Neither → error message |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `archetype_decklist`
+Get the stock decklist for a competitive archetype.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `archetype: str`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Markdown with: deck metadata, full mainboard + sideboard card list, card roles, optional pricing |
+| Backends | MTGGoldfish (required) + Bulk data (optional, pricing) |
+| Error | Raises `ToolError` if MTGGoldfish disabled. Fuzzy-matches archetype name. |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `archetype_comparison`
+Compare 2-4 competitive archetypes side-by-side.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `archetypes: list[str]` (2-4 names), `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Markdown comparison table: meta share, deck count, price, colors, mainboard/sideboard sizes. Shared staples analysis. |
+| Backends | MTGGoldfish (required) + Bulk data (optional) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `format_entry_guide`
+Beginner-oriented guide for entering a competitive format.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str`, `budget: float | None = None`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Markdown with: format rules, budget-sorted archetypes, recommended first deck, cross-archetype staples |
+| Backends | MTGGoldfish (optional) + Spicerack (optional) + Bulk data (optional) |
+| Partial failure | Degrades gracefully — returns format rules even without metagame data |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `suggest_sideboard`
+Suggest a 15-card sideboard for a competitive deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `format: str`, `meta_context: str | None = None`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Markdown with: categorized sideboard suggestions (graveyard hate, removal, counterspells, board wipes, etc.), format staple markers |
+| Backends | Bulk data (required) + MTGGoldfish (optional, format staples) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `sideboard_guide`
+Get a specific sideboard in/out plan for a named matchup.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `sideboard: list[str]`, `format: str`, `matchup: str`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Markdown with: matchup strategy classification, IN/OUT plan with reasoning per card, balanced swaps |
+| Backends | Bulk data (required) + MTGGoldfish (optional, archetype data) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
+### `sideboard_matrix`
+Generate a sideboard matrix for a deck across common matchups.
+
+| Field | Detail |
+|-------|--------|
+| Input | `decklist: list[str]`, `sideboard: list[str]`, `format: str`, `matchups: list[str] | None = None`, `response_format: "detailed" \| "concise" = "detailed"` |
+| Output | Markdown matrix: rows = sideboard cards, columns = matchups, cells = IN/OUT/FLEX |
+| Backends | Bulk data (required) + MTGGoldfish (optional, metagame for auto matchups) |
+| Annotations | readOnly=true, idempotent=true, openWorld=true |
+
 ### `deck_validate`
 Validate a decklist against format construction rules.
 
@@ -677,7 +772,7 @@ Provide combat phase rules framework with card data.
 
 ## Prompts (workflow server)
 
-Prompts are user-invocable templates registered on the workflow server. They guide multi-step analysis workflows by generating structured instructions for the AI assistant. 17 prompts total.
+Prompts are user-invocable templates registered on the workflow server. They guide multi-step analysis workflows by generating structured instructions for the AI assistant. 19 prompts total.
 
 ### `evaluate_commander_swap`
 Evaluate swapping a card in a Commander deck.
@@ -814,6 +909,22 @@ Plan for Standard rotation — identify rotating cards and replacements.
 |-------|--------|
 | Input | *(no parameters)* |
 | Output | Multi-step prompt: rotation_check → bulk_similar_cards for replacements → price_comparison |
+
+### `explore_format`
+Explore a competitive format's metagame and find your deck.
+
+| Field | Detail |
+|-------|--------|
+| Input | `format: str` |
+| Output | Multi-step prompt: metagame_snapshot → archetype_decklist for top decks → format_entry_guide for budget options |
+
+### `build_constructed_deck`
+Build a competitive constructed deck with metagame awareness.
+
+| Field | Detail |
+|-------|--------|
+| Input | `concept: str`, `format: str`, `budget: float | None = None` |
+| Output | Multi-step prompt: metagame_snapshot → archetype_decklist (if matching archetype) → suggest_sideboard → deck_validate |
 
 ---
 

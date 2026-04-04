@@ -110,18 +110,39 @@ MTGGoldfish scrapes HTML — SKIP on error, don't fail the overall test.
 2. `spicerack_tournament_results(tournament_id=<first ID from above>)` — expect standings with player names and records
 3. `spicerack_format_decklists(format="Legacy", num_days=30, limit=5)` — expect decklists with card text or Moxfield URLs
 
-### 12. Moxfield (may fail — reverse-engineered API)
+### 12. Moxfield (may fail — reverse-engineered API, parallel batch)
 
-`moxfield_decklist(deck_id="DuXYtaJFEkScp1U1dxvAmw")` — expect deck name, commander board, mainboard with card names and quantities. Moxfield uses undocumented v3 endpoints; SKIP on error, don't fail the overall test.
+| Call | Validate |
+|------|----------|
+| `moxfield_decklist(deck_id="DuXYtaJFEkScp1U1dxvAmw")` | Deck name, commander board, mainboard with card names and quantities |
+| `moxfield_search_decks(query="modern", format="modern", page_size=3)` | At least 1 deck summary with name, format, author |
+| `moxfield_user_decks(username="theMMcast")` | User's public decks listed (or ToolError if user not found) |
 
-### 13. Commander Depth Workflows (parallel batch)
+Moxfield uses undocumented endpoints; SKIP on error, don't fail the overall test.
+
+### 13. Metagame Workflows (sequential — need format data)
+
+1. `metagame_snapshot(format="modern")` — expect tiered archetype list with meta shares, T1/T2/T3 labels
+2. `archetype_decklist(format="modern", archetype=<first T1 archetype from step 1>)` — expect mainboard + sideboard card list
+3. `format_entry_guide(format="modern")` — expect format rules, budget-sorted archetypes
+
+If MTGGoldfish unavailable, metagame_snapshot should fall back to Spicerack data. SKIP section on error.
+
+### 14. Sideboard Workflows (parallel batch)
+
+| Call | Validate |
+|------|----------|
+| `suggest_sideboard(decklist=["4 Lightning Bolt", "4 Goblin Guide", "4 Eidolon of the Great Revel", "4 Monastery Swiftspear", "4 Searing Blaze", "4 Lava Spike", "4 Rift Bolt", "4 Skullcrack", "12 Mountain", "4 Inspiring Vantage", "4 Sacred Foundry", "4 Sunbaked Canyon"], format="modern")` | Categorized sideboard suggestions (15 cards max) |
+| `sideboard_guide(decklist=["4 Lightning Bolt", "4 Goblin Guide", "12 Mountain"], sideboard=["2 Rest in Peace", "2 Smash to Smithereens"], format="modern", matchup="control")` | IN/OUT plan with reasoning |
+
+### 15. Commander Depth Workflows (parallel batch)
 
 | Call | Validate |
 |------|----------|
 | `commander_comparison(commanders=["Muldrotha, the Gravetide", "Meren of Clan Nel Toth"])` | Both commanders compared, color identity shown |
 | `color_identity_staples(color_identity="sultai", category="creatures")` | Creature cards in BUG identity |
 
-### 14. Cross-Tool Consistency
+### 16. Cross-Tool Consistency
 
 Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`bulk_card_lookup("Sol Ring")`):
 - Names match
@@ -148,10 +169,12 @@ Compare results from step 1 (`scryfall_card_details("Sol Ring")`) and step 2 (`b
 | Deck Building | 4 | | | |
 | MTGGoldfish | 4 | | | |
 | Spicerack | 3 | | | |
-| Moxfield | 1 | | | |
+| Moxfield | 3 | | | |
+| Metagame | 3 | | | |
+| Sideboard | 2 | | | |
 | Commander Depth | 2 | | | |
 | Consistency | 1 | | | |
-| **Total** | **39** | | | |
+| **Total** | **46** | | | |
 
 ### Failures
 [Details for each FAIL — what was expected vs actual]
