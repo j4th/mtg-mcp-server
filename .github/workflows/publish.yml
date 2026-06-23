@@ -15,7 +15,7 @@ jobs:
     environment: pypi
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v4
 
@@ -34,7 +34,7 @@ jobs:
     permissions:
       id-token: write  # Required for MCP Registry OIDC
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install mcp-publisher
         run: |
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: pypi
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v4
 
