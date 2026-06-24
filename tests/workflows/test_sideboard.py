@@ -16,7 +16,9 @@ from mtg_mcp_server.types import (
 )
 from mtg_mcp_server.workflows.sideboard import (
     _classify_archetype_strategy,
+    _classify_matrix_cell,
     _extract_deck_colors,
+    _infer_matchup_colors,
     _match_archetype_name,
     _opposing_colors,
     sideboard_guide,
@@ -151,6 +153,43 @@ SKULLCRACK = _mock_card(
     oracle_text="Players can't gain life this turn. Damage can't be prevented this turn. "
     "Skullcrack deals 3 damage to target opponent.",
     type_line="Instant",
+    colors=["R"],
+    color_identity=["R"],
+    mana_cost="{1}{R}",
+    cmc=2.0,
+)
+PYROBLAST = _mock_card(
+    "Pyroblast",
+    oracle_text="Counter target spell if it's blue.",
+    type_line="Instant",
+    colors=["R"],
+    color_identity=["R"],
+    mana_cost="{R}",
+    cmc=1.0,
+)
+HYDROBLAST = _mock_card(
+    "Hydroblast",
+    oracle_text="Counter target spell if it's red.",
+    type_line="Instant",
+    colors=["U"],
+    color_identity=["U"],
+    mana_cost="{U}",
+    cmc=1.0,
+)
+SURGICAL = _mock_card(
+    "Surgical Extraction",
+    oracle_text="Exile target card from a graveyard. "
+    "You may exile target card from your graveyard rather than pay this spell's mana cost.",
+    type_line="Instant",
+    colors=["B"],
+    color_identity=["B"],
+    mana_cost="{1}{B/P}",
+    cmc=1.0,
+)
+PYROCLASM = _mock_card(
+    "Pyroclasm",
+    oracle_text="Pyroclasm deals 2 damage to each creature.",
+    type_line="Sorcery",
     colors=["R"],
     color_identity=["R"],
     mana_cost="{1}{R}",
@@ -729,3 +768,227 @@ class TestSideboardMatrixResponseFormat:
 
         assert "**Legend:**" in detailed.markdown
         assert "**Legend:**" not in concise.markdown
+
+
+# ===========================================================================
+# Part A — #64: color-identity filter in suggest_sideboard
+# ===========================================================================
+
+
+class TestSuggestSideboardColorFilter:
+    """suggest_sideboard applies deck color_identity to candidate filtering."""
+
+    async def test_color_filter_passes_deck_identity(self, mock_bulk: AsyncMock) -> None:
+        """UR (Izzet) deck should pass its color identity to filter_cards."""
+        decklist = ["4x Lightning Bolt", "4x Counterspell"]
+        mock_bulk.get_cards = AsyncMock(
+            return_value={"Lightning Bolt": BOLT, "Counterspell": COUNTERSPELL}
+        )
+
+        await suggest_sideboard(decklist, "modern", bulk=mock_bulk)
+
+        call_kwargs = mock_bulk.filter_cards.call_args.kwargs
+        assert call_kwargs.get("color_identity") == frozenset({"R", "U"})
+
+    async def test_colorless_card_survives_filter(self, mock_bulk: AsyncMock) -> None:
+        """Colorless hate cards are still suggested for a colored deck."""
+        decklist = ["4x Lightning Bolt"]
+        mock_bulk.get_cards = AsyncMock(return_value={"Lightning Bolt": BOLT})
+        mock_bulk.filter_cards = AsyncMock(return_value=[RIP, SURGICAL])
+
+        result = await suggest_sideboard(decklist, "modern", bulk=mock_bulk)
+
+        suggested_names = [c["name"] for c in result.data["suggested_cards"]]
+        assert "Surgical Extraction" in suggested_names
+
+    async def test_gap_note_for_empty_category(self, mock_bulk: AsyncMock) -> None:
+        """Categories with zero on-color candidates emit gap notes."""
+        decklist = ["4x Lightning Bolt"]
+        mock_bulk.get_cards = AsyncMock(return_value={"Lightning Bolt": BOLT})
+        mock_bulk.filter_cards = AsyncMock(return_value=[])
+
+        result = await suggest_sideboard(decklist, "modern", bulk=mock_bulk)
+
+        assert "empty_categories" in result.data
+        assert len(result.data["empty_categories"]) > 0
+        assert "No strong on-color answers" in result.markdown
+
+    async def test_skip_filter_when_no_cards_resolved(self, mock_bulk: AsyncMock) -> None:
+        """If get_cards returns nothing, color filter is skipped but categories still searched."""
+        mock_bulk.get_cards = AsyncMock(return_value={})
+        mock_bulk.filter_cards = AsyncMock(return_value=[])
+
+        result = await suggest_sideboard(["4x Lightning Bolt"], "modern", bulk=mock_bulk)
+
+        assert "Sideboard Suggestions" in result.markdown
+        assert "empty_categories" not in result.data
+        assert mock_bulk.filter_cards.call_count > 0
+        for call in mock_bulk.filter_cards.call_args_list:
+            assert "color_identity" not in call.kwargs
+
+
+# ===========================================================================
+# Part B — #63: color-aware matrix cell classifier
+# ===========================================================================
+
+
+class TestInferMatchupColors:
+    """_infer_matchup_colors heuristic."""
+
+    def test_mono_color(self) -> None:
+        assert _infer_matchup_colors("Mono-Blue Delver") == frozenset({"U"})
+
+    def test_guild_name(self) -> None:
+        assert _infer_matchup_colors("Izzet Phoenix") == frozenset({"U", "R"})
+
+    def test_unknown_returns_empty(self) -> None:
+        assert _infer_matchup_colors("Eldrazi Aggro") == frozenset()
+
+
+class TestClassifyMatrixCell:
+    """_classify_matrix_cell with strategy and matchup colors."""
+
+    def test_color_hate_in_when_color_in_matchup(self) -> None:
+        verdict = _classify_matrix_cell(
+            PYROBLAST, strategy="combo", matchup_colors=frozenset({"U", "R"})
+        )
+        assert verdict == "IN"
+
+    def test_color_hate_out_when_color_not_in_matchup(self) -> None:
+        verdict = _classify_matrix_cell(
+            PYROBLAST, strategy="combo", matchup_colors=frozenset({"G"})
+        )
+        assert verdict == "OUT"
+
+    def test_color_hate_flex_when_unknown_colors(self) -> None:
+        """Unknown matchup colors fall through to role/strategy."""
+        verdict = _classify_matrix_cell(PYROBLAST, strategy="combo", matchup_colors=frozenset())
+        # Falls through to role/strategy: counterspell vs combo = IN
+        assert verdict == "IN"
+
+    def test_graveyard_hate_in_vs_combo(self) -> None:
+        verdict = _classify_matrix_cell(SURGICAL, strategy="combo", matchup_colors=frozenset({"U"}))
+        assert verdict == "IN"
+
+    def test_board_wipe_in_vs_midrange(self) -> None:
+        verdict = _classify_matrix_cell(
+            PYROCLASM, strategy="midrange", matchup_colors=frozenset({"G"})
+        )
+        assert verdict == "IN"
+
+    def test_counterspell_in_vs_combo_regression(self) -> None:
+        verdict = _classify_matrix_cell(COUNTERSPELL, strategy="combo", matchup_colors=frozenset())
+        assert verdict == "IN"
+
+    def test_none_card_returns_flex(self) -> None:
+        verdict = _classify_matrix_cell(None, strategy="aggro", matchup_colors=frozenset())
+        assert verdict == "FLEX"
+
+
+class TestSideboardMatrixColorAware:
+    """sideboard_matrix with color-aware classifier."""
+
+    async def test_not_uniform_flex_with_colors(self, mock_bulk: AsyncMock) -> None:
+        from mtg_mcp_server.types import GoldfishArchetype
+
+        mock_goldfish_colored = AsyncMock()
+        mock_goldfish_colored.get_metagame = AsyncMock(
+            return_value=GoldfishMetaSnapshot(
+                format="modern",
+                archetypes=[
+                    GoldfishArchetype(
+                        name="Izzet Phoenix",
+                        slug="izzet-phoenix",
+                        meta_share=10.0,
+                        colors=["U", "R"],
+                    ),
+                    GoldfishArchetype(
+                        name="Mono-Green Tron", slug="mono-green-tron", meta_share=8.0, colors=["G"]
+                    ),
+                ],
+                total_decks=200,
+            )
+        )
+
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Pyroblast": PYROBLAST,
+                "Surgical Extraction": SURGICAL,
+                "Pyroclasm": PYROCLASM,
+            }
+        )
+
+        result = await sideboard_matrix(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Pyroblast", "2x Surgical Extraction", "2x Pyroclasm"],
+            format="modern",
+            bulk=mock_bulk,
+            mtggoldfish=mock_goldfish_colored,
+        )
+
+        matrix = result.data["matrix"]
+        all_verdicts = [v for row in matrix.values() for v in row.values()]
+        assert "IN" in all_verdicts
+        assert "OUT" in all_verdicts
+
+    async def test_pyroblast_in_vs_blue_out_vs_colorless(self, mock_bulk: AsyncMock) -> None:
+        """Pyroblast IN vs blue matchup, FLEX vs colorless (no color match, no role match)."""
+        mock_bulk.get_cards = AsyncMock(return_value={"Pyroblast": PYROBLAST})
+
+        result = await sideboard_matrix(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Pyroblast"],
+            format="modern",
+            bulk=mock_bulk,
+            matchups=["Izzet Phoenix", "Eldrazi Aggro"],
+        )
+
+        matrix = result.data["matrix"]
+        # Izzet Phoenix infers U,R; Pyroblast hates blue → IN
+        assert matrix["Pyroblast"]["Izzet Phoenix"] == "IN"
+        # Eldrazi Aggro infers no colors; no role match → FLEX
+        assert matrix["Pyroblast"]["Eldrazi Aggro"] == "FLEX"
+
+    async def test_surgical_extraction_in_vs_combo(self, mock_bulk: AsyncMock) -> None:
+        mock_bulk.get_cards = AsyncMock(return_value={"Surgical Extraction": SURGICAL})
+
+        result = await sideboard_matrix(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Surgical Extraction"],
+            format="modern",
+            bulk=mock_bulk,
+            matchups=["Storm Combo"],
+        )
+
+        matrix = result.data["matrix"]
+        assert matrix["Surgical Extraction"]["Storm Combo"] == "IN"
+
+    async def test_explicit_matchups_color_inference(self, mock_bulk: AsyncMock) -> None:
+        mock_bulk.get_cards = AsyncMock(return_value={"Pyroblast": PYROBLAST})
+
+        result = await sideboard_matrix(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Pyroblast"],
+            format="modern",
+            bulk=mock_bulk,
+            matchups=["Mono-Blue Delver", "Izzet Tempo"],
+        )
+
+        matrix = result.data["matrix"]
+        assert matrix["Pyroblast"]["Mono-Blue Delver"] == "IN"
+        assert matrix["Pyroblast"]["Izzet Tempo"] == "IN"
+
+    async def test_goldfish_six_archetypes_preserved(
+        self, mock_bulk: AsyncMock, mock_goldfish: AsyncMock
+    ) -> None:
+        """Auto-detect path still returns top 6 archetypes."""
+        result = await sideboard_matrix(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Counterspell"],
+            format="modern",
+            bulk=mock_bulk,
+            mtggoldfish=mock_goldfish,
+        )
+
+        assert len(result.data["matchups"]) == 6
+        assert "Boros Energy" in result.data["matchups"]
