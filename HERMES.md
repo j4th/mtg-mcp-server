@@ -1,150 +1,86 @@
-# HERMES.md — Orchestrator Interface
+# HERMES.md — Orchestrator Contract
 
-You are the orchestrating agent (Hermes). This document is the contract between you and **pi**, your implementation agent for this repo. pi has its own instruction file (`AGENTS.md`) loaded automatically in every session here — do not duplicate its contents in task prompts; reference it.
+Hermes (orchestrator) ↔ pi (implementer) for this repo. This is Hermes's operating contract; Hermes keeps it current. pi loads `AGENTS.md` automatically — don't duplicate it in task prompts; reference it. Harness detail (pi's MCP servers, extensions, agents, skills) lives in AGENTS.md § Pi Harness.
 
-**Role split:** You own task decomposition, sequencing, git push/PR/review/merge, and verification strategy. pi owns implementation: branching, TDD, code, tests, atomic commits. You call; pi executes; the mise gates judge.
+## Roles — confirmed
 
-## Quick orientation
+- **User + Hermes together:** architecture, brainstorming, prioritization, planning.
+- **Hermes owns:** specs/plans, task decomposition, sequencing, verification strategy, review, push/PR/merge. Nothing leaves the machine except through Hermes.
+- **pi owns:** branch creation, implementation, TDD, tests, atomic commits. pi commits freely; pi never pushes.
+- The wall that matters: judgment-heavy work (what/why/whether) stays above it with user + Hermes; procedure-heavy work (how) goes below it to pi. Handoffs cross the wall as **files**, never as chat.
 
-- **Repo:** MTG MCP server — Python 3.12, FastMCP 3.2.x, httpx, Pydantic v2, structlog. Tooling via mise/uv.
-- **Truth lives in:** `AGENTS.md` (conventions, gotchas), `docs/ARCHITECTURE.md` and siblings (design), `HERMES.md` (this file).
-- **Current state:** 69 tools, 19 prompts, ~1336 tests, 88% coverage. See "Implementation Status" in `AGENTS.md`.
+## The loop (one feature = one card = one branch = one PR)
+
+1. **Brainstorm** — user + Hermes (`superpowers:brainstorming`). Dispatch pi's `scout` subagent for cheap repo facts when planning needs them.
+2. **Plan** — Hermes writes `docs/plans/<slug>.md` (`superpowers:writing-plans` format) with acceptance criteria mapped to a named gate. User approves.
+3. **Execute** — Hermes hands pi the plan path over the rpc channel. pi runs `superpowers:executing-plans` / `subagent-driven-development` on a `feat/`|`fix/`|`chore/` branch cut from `main`. **Never stack branches** — land config/harness branches before cutting feature branches off `main`.
+4. **Verify** — pi ends the task with the gate green; Hermes re-runs it or reads CI. Data-layer changes also require `mise run test:live`.
+5. **Review** — pi's `code-reviewer` subagent pre-review → Hermes reviews diff against the plan.
+6. **Land** — Hermes: draft PR → CI → ready → review → merge (merge-commit style, preserves pi's atomic commits) → delete branch → close kanban card.
+
+Small fixes with no design decisions skip brainstorm and board: lean task prompt straight to pi.
+
+## Handoff artifacts
+
+- `docs/plans/<slug>.md` — implementation plans. Written above the wall, executed below it. Self-contained: pi works from the file in a fresh session, no chat context assumed.
+- `docs/adr/NNNN-<slug>.md` — architecture decision records. Immutable once accepted; supersede with a new ADR, never edit. Status: proposed → accepted → superseded.
+- Kanban cards track in-flight work; the card body links plan file, branch, and PR.
 
 ## Invoking pi
 
 ```bash
-# One-shot task (fire and forget):
-cd /home/j4th/Code/create/mtg-mcp && pi --print "<task prompt>"
+# Standing channel (send tasks, stream events, steer mid-run):
+pi --mode rpc    # JSONL commands on stdin
 
-# Structured event stream (if you want progress events):
-pi --mode json "<task prompt>" > events.jsonl
+# Fire-and-forget with an event stream for post-hoc reading:
+pi --mode json "<task>" > events.jsonl
 
-# Multi-turn control (steering mid-run):
-pi --mode rpc   # JSONL commands on stdin
+# One-shot (no visibility until it exits — avoid for long tasks):
+pi --print "<task>"
 ```
 
-**Hard requirements:**
-- `cwd` must be the repo root — pi discovers `.pi/`, `.agents/skills/`, `AGENTS.md` from cwd.
-- Project trust is already granted (`~/.pi/agent/trust.json`). Do not remove.
-- `Z_AI_API_KEY` must be in pi's **process env** (not just `.env` — that only loads for mise tasks). Either `set -a; source .env; set +a` before launching, or use `mise exec -- pi ...`.
-- Fresh session per task for predictable, reproducible runs. Resume a session only to iterate on the same task.
+**Hard requirements:** cwd = repo root (pi discovers `.pi/`, `.agents/`, `AGENTS.md` from cwd); project trust granted in `~/.pi/agent/trust.json`; `Z_AI_API_KEY` in pi's **process env** (`set -a; source .env; set +a` before launching, or `mise exec -- pi ...`); fresh session per task.
 
-## Task prompt format (keep prompts lean)
+## Task prompts — lean
 
-Give pi the **what** and the **verdict**, not the how — it discovers implementation detail from `AGENTS.md` and `docs/` on demand.
-
-Good shape:
+Give pi the what and the verdict, not the how; it discovers detail from `AGENTS.md` and `docs/` on demand. Never paste architecture docs, file contents, or conventions into prompts. Do include: branch name, files known in/out of scope, and the gate that defines done. If a task came from a plan, give the plan file path — not its contents.
 
 ```
-Task: Add a "pauper staples" tool to the Spicerack provider.
-Scope: src/mtg_mcp_server/providers/spicerack.py + service + tests + docs entry.
-Done: mise run check passes. Commit atomically on feat/pauper-staples.
+Task: Fix Scryfall bulk-data download_uri → jsonl_download_uri.
+Plan: docs/plans/scryfall-bulk-download-uri.md
+Branch: fix/scryfall-bulk-download-uri (off main)
+Done: mise run check + mise run test:live green. Commit atomically.
 ```
-
-Do **not** paste architecture docs, file contents, or conventions into prompts. Do include: branch name, any files known to be in/out of scope, and which gate defines done. If a task came from a spec/plan, reference the plan file path instead of inlining it.
 
 ## Verdicts — gates are ground truth
 
 | Gate | Command | Use |
 |---|---|---|
-| Fast | `mise run check:quick` | ~10s; quick validation between small steps |
-| Standard | `mise run check` | ~3min; **default done criterion** (lint + typecheck + all tests except live) |
-| Data-layer | `+ mise run test:live` | Real APIs; require for changes to parsing/models/fixtures |
-| Complete | `mise run check:full` | Everything including live; CI parity |
+| Fast | `mise run check:quick` | ~10s warm. **Cold testmon cache runs the full suite (~20 min)** — after branch switches, warm it once or use `check` directly |
+| Standard | `mise run check` | **Default done criterion** (lint + typecheck + all tests except live) |
+| Data-layer | `+ mise run test:live` | Real APIs; required for parsing/models/fixtures changes |
+| Complete | `mise run check:full` | Everything incl. live; CI parity |
 
-Treat the exit code as the verdict. Run the gate yourself, or require pi to end every task with it — either works; be consistent.
+Exit code is the verdict. Either pi ends each task with the gate or Hermes runs it — be consistent. CI on PRs is the external second opinion (`check` + `live-tests` + `build` + `security`); on known-stale config-only branches, admin-merge is acceptable with the rationale stated.
 
-## Git landing contract
+## Hermes-side setup (state for future Hermes sessions)
 
-- pi works on `feat/` or `chore/` branches off `main`, committing atomically per logical unit.
-- **Recommendation (pending your decision):** pi owns branch + commits; you own push, PR (`gh pr create --draft` — automated review triggers on `ready_for_review`, not `opened`), review cycle, merge. Nothing leaves the machine until you push. Alternative: pi leaves a dirty-but-green tree and you slice commits — workable but weaker (loses commit-as-checkpoint safety mid-task).
-- This branch (`chore/pi-harness`) is config-only (new paths: `.pi/`, `.agents/`, `AGENTS.md`, `HERMES.md`) — near-zero conflict risk with concurrent code branches. Land by diffing/merging the tip; no commit-hash pinning needed.
-- Open draft PR #67 (`fix/sideboard-color-awareness`) is unrelated work; land independently.
+- **MCP servers:** `mtg`, `context7`, `web-reader`, `zread` wired via `hermes mcp add` (Z.ai auth: key lands in `~/.hermes/.env`, config.yaml holds only a `${VAR}` reference). `web-search-prime`/`zai-vision` intentionally not wired — native `web_search`/`vision_analyze` cover them.
+- **Skills:** `superpowers/*` symlinked from the repo's `.agents/skills/superpowers/` into `~/.hermes/skills/superpowers/` — versioned with the repo; do not re-vendor. Their "Task tool" references mean Hermes's `delegate_task` or pi's `subagent` extension.
+- **Board:** kanban for in-flight features. Routing verdict (supersedes PR #70): board for real features, chat for small fixes — process weight proportional to blast radius.
+- **Memory stays narrow** (identity, environment); procedures go into skills. Once the loop has run end-to-end, distill it into a `hermes-pi-orchestration` skill.
 
-## MCP servers available to pi (verified live)
+## Housekeeping / known limitations
 
-All auto-load for any pi session here. Tools are named `mcp__<server>__<tool>`.
-
-| Server | Tools | Exposure | Auth | Purpose |
-|---|---|---|---|---|
-| `mtg` | 69 | codemode | none | **This repo's own server.** First-check target; use for smoke tests |
-| `context7` | 2 | direct | none | Version-pinned library docs (FastMCP, Pydantic, httpx) |
-| `web-search-prime` | 1 | direct | `Z_AI_API_KEY` | Web search — current releases, real-time info |
-| `web-reader` | 1 | direct | `Z_AI_API_KEY` | Fetch any webpage as structured content |
-| `zread` | 3 | deferred | `Z_AI_API_KEY` | Search docs/issues/PRs in any public GitHub repo |
-| `zai-vision` | 8 | deferred | `Z_AI_API_KEY` | Image/video analysis, screenshot OCR, diagram reading |
-
-Config: `.pi/mcp.json` (committed). A local (gitignored) `.mcp.json` mirrors the Z.ai entries for Claude Code. Verify anytime: `pi mcp list`.
-
-If you need these servers yourself, wire them from the manifest above — entries are Claude-compatible (`mcpServers` format); remote ones are streamable HTTP + `Authorization: Bearer $Z_AI_API_KEY`.
-
-## pi's extensions and agents
-
-**Extensions** (`.pi/extensions/`, project-trusted):
-- `subagent` — isolated-context delegation: single `{agent, task}`, parallel `{tasks:[...]}` (≤8, 4 concurrent), or chained `{chain:[... {previous} ...]}`. Project agents need `agentScope: "both"` in the call.
-- `git-checkpoint` — per-turn stash checkpoints for fork/restore.
-- `guards` — blocks `.env` edits; ruff-formats touched `.py` files (port of the old Claude hooks; code below).
-
-**Subagents** (`.pi/agents/`): `scout` (fast recon), `code-reviewer` (project-convention review — run it as a review gate before requesting PRs).
-
-**Codemode** is on: pi can batch MCP calls in JS scripts (`Promise.allSettled`) — that's how the 69-tool smoke test stays fast.
-
-## Skills (`.agents/skills/`, portable — you can use them too)
-
-- `superpowers/` — 15 skills vendored from obra/superpowers 7.0.0 (MIT): `brainstorming`, `writing-plans`, `executing-plans`, `subagent-driven-development`, `dispatching-parallel-agents`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `using-git-worktrees`, `finishing-a-development-branch`, `requesting-code-review`, `receiving-code-review`, `writing-skills`, `using-superpowers`, `diagnosing-superpowers`.
-- Repo skills: `smoke-test` (end-to-end MCP verification against real APIs), `new-provider` (scaffold a backend following project patterns), `capture-fixture` (capture live API response as test fixture).
-
-**Spec → plan → execution mapping:** hand pi `brainstorming` → `writing-plans` → `executing-plans`/`subagent-driven-development`. When those skills reference a "Task tool" or dispatching to subagents, that means pi's `subagent` extension tool. `requesting/receiving-code-review` assumed a Claude PR bot — that loop is **yours** now; substitute your review process or pi's `code-reviewer` subagent.
+- `.claude/` tree stays for the Claude Code subscription — untouched. Its `agents/code-reviewer.md` is stale (`.pi/agents/` supersedes); `.claude/worktrees/*` holds 6 stale worktrees, safe to prune.
+- `.kilo/` untracked, ignored. Superpowers vendored at 7.0.0 — re-vendor manually. `.pi/mcp.json` absolute `--project` path is machine-specific by design.
+- PR #70 (task-routing draft) superseded by this file — close unmerged.
+- PR #67 (sideboard color awareness) is unrelated open work; land independently.
+- Smoke-test via pi is thorough (~10-15 min, all 69 tools against live APIs) — budget accordingly. Its 2026-10-20 run found the Scryfall bulk-data drift: 16 tools broken, 9 workflows with inconsistent fallback.
 
 ## First checks when landing here
 
-1. `git status && git branch --show-current` — establish state
-2. `pi mcp list` — all six servers should connect (if Z.ai ones fail: `Z_AI_API_KEY` missing from your env)
-3. `mise run check:quick` — repo health in ~10s
-4. End-to-end sanity of the system under development: ask pi to run the `smoke-test` skill against the `mtg` server (real APIs, ~1-2 min)
-
-## guards.ts (extension source, for reference/review)
-
-```ts
-// .pi/extensions/guards.ts — port of .claude/settings.json hooks for pi
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-const run = promisify(execFile);
-
-function touchedPyFile(event: { toolName: string; input?: { path?: unknown } }): string | undefined {
-	const path = event.input?.path;
-	return (event.toolName === "edit" || event.toolName === "write") &&
-		typeof path === "string" && path.endsWith(".py") ? path : undefined;
-}
-
-export default function (pi: ExtensionAPI) {
-	// Block .env edits (local-only file; .env.example is the template)
-	pi.on("tool_call", async (event) => {
-		const path = event.input?.path;
-		if ((event.toolName === "edit" || event.toolName === "write") &&
-			typeof path === "string" && /(^|\/)\.env(\.(?!example$).+)?$/.test(path)) {
-			return { block: true, reason: "Do not edit .env directly. Use .env.example instead." };
-		}
-		return undefined;
-	});
-
-	// ruff-format touched Python files (real gate is `mise run check`)
-	pi.on("tool_result", async (event) => {
-		const file = touchedPyFile(event);
-		if (file) {
-			try { await run("ruff", ["format", "--quiet", file]); } catch { /* gate catches */ }
-		}
-		return undefined;
-	});
-}
-```
-
-## Known limitations & housekeeping
-
-- `zai-vision` is semi-redundant if pi's driving model is multimodal (pi's `read` tool attaches images natively) — kept for OCR/diagram/video tooling and GLM vision routing; costs nothing at deferred exposure.
-- `.claude/` tree (skills, agents, hooks, settings) remains for the Claude Code subscription — intentionally untouched. `.claude/agents/code-reviewer.md` has stale conventions (superseded by `.pi/agents/code-reviewer.md`); `.claude/worktrees/*` holds 6 stale agent worktrees — safe to prune whenever.
-- `.kilo/` is untracked (another harness's data); ignored here.
-- Superpowers skills are vendored at 7.0.0 — upstream updates require manual re-vendor.
-- `mtg` server env in `.pi/mcp.json` uses an absolute `--project` path — machine-specific by design (matches the existing local `.mcp.json` precedent).
+1. `git status && git branch --show-current` — establish state.
+2. `pi mcp list` — six servers should connect.
+3. `mise run check:quick` (beware cold cache) or read CI on the open PR.
+4. For data-layer work: pi runs the `smoke-test` skill — it catches live-API drift the fixtures can't.
