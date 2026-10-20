@@ -61,6 +61,28 @@ Treat the exit code as the verdict. Run the gate yourself, or require pi to end 
 - This branch (`chore/pi-harness`) is config-only (new paths: `.pi/`, `.agents/`, `AGENTS.md`, `HERMES.md`) — near-zero conflict risk with concurrent code branches. Land by diffing/merging the tip; no commit-hash pinning needed.
 - Open draft PR #67 (`fix/sideboard-color-awareness`) is unrelated work; land independently.
 
+## Task routing: kanban board vs ad-hoc chat
+
+**Verdict (pilot, 2026-10-20): implementation work flows through the kanban board; chat stays the cockpit. Rule of thumb: if it needs a branch, it needs a card.**
+
+Both gates the pilot required are proven: pi's six MCP servers verified live, and the first dispatched loop (smoke-test skill, real APIs, `pi --print`) ran unattended and surfaced a real upstream breakage — Scryfall bulk metadata now ships `jsonl_download_uri` instead of `download_uri`, breaking the bulk tools. The pipeline doesn't just work; it finds real work. The board supplies what chat can't: durable task state, parallel isolated workers, review gating, retries/reclaims, and completion notifications. Chat supplies what cards can't: live steering and zero ceremony.
+
+| Route | Use for |
+|---|---|
+| **Chat (ad-hoc)** | Spec/plan phase (pi: `brainstorming` → `writing-plans`), questions, smoke checks, quick probes — anything finished in one `pi --print` with no branch, or needing the user steering mid-task |
+| **Board (card)** | Anything whose done-state is "gate green + commits on a branch": features, fixes, chores. One card = one pi task = one branch |
+
+Card mechanics:
+
+- **Card body = the task prompt**, in the Task/Scope/Done shape above, plus branch name and gate. Self-contained — the spawned worker sees nothing else. Reference plan files by path; never inline docs.
+- **Division of labor:** the card worker (a Hermes profile) verifies scope, dispatches pi per "Invoking pi", runs the gate itself, and lands per the git contract above. pi never touches the board; the user never herds pi directly for card work.
+- **Create cards from the user's chat** (kanban toolset enabled) so the thread auto-subscribes to completion/block events. Cards created by workers notify nobody — subscribe explicitly or expect silence.
+- **Serialize per repo:** at most one active card dispatching pi into this checkout — pi branch-switches in cwd, so parallel implementation cards here collide on git state. Chain follow-ups with card dependencies (`parents`); parallel across repos is fine. If same-repo parallelism becomes real, give each card a git-worktree workspace and export `Z_AI_API_KEY` from the main checkout's `.env`.
+- **Long runs are normal:** real-API tasks run 10+ min. The worker heartbeats; `pi --print`'s final output is the report. Steering mid-card is coarse (comments land between dispatch and landing) — if a task needs live steering, keep it in chat.
+- **Sizing:** one card per branch-shaped unit. The Scryfall bulk fix (provider + service + fixtures, live gate) is the archetype — and the right first routed card.
+
+Board lives in `~/.hermes/kanban.db`; inspect via the dashboard Kanban tab or `hermes kanban`.
+
 ## MCP servers available to pi (verified live)
 
 All auto-load for any pi session here. Tools are named `mcp__<server>__<tool>`.
