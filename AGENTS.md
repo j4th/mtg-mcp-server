@@ -83,9 +83,16 @@ See @docs/ARCHITECTURE.md for full details.
 
 - Always work on a feature branch (`feat/` or `chore/` + description). Never commit directly to main.
 - Commit atomically after each logical unit of work — don't batch changes into one big commit.
-- **Division of labor (orchestrated mode):** the implementer (pi) owns branch creation and atomic commits per task; the orchestrator (Hermes) owns push, PR creation, review cycle, and merge. Nothing leaves the machine until the orchestrator decides. *(This split is the current recommendation — confirm with orchestrator before assuming.)*
+- **Division of labor (orchestrated mode — confirmed):** pi owns branch creation and atomic commits; the orchestrator (Hermes, see @HERMES.md) owns push, PR creation, review cycle, and merge. Nothing leaves the machine until Hermes pushes. Brainstorming and planning happen above the wall (user + Hermes); pi executes from plan files, never from chat.
 - Create PRs as drafts (`gh pr create --draft`). Automated review triggers on `ready_for_review`, not `opened`.
 - When review comments come in: fetch via `gh api /repos/{owner}/{repo}/pulls/{number}/comments`, assess each, reply via `.../comments/{id}/replies`, fix, run `mise run check`, commit referencing the PR, push, resolve threads via GraphQL `resolveReviewThread`.
+
+## Specs, Plans, and ADRs
+
+- `docs/plans/<slug>.md` — implementation plans (superpowers `writing-plans` format). Authored by user + Hermes during brainstorming; pi executes from the file. Plans are the handoff contract: self-contained, acceptance criteria mapped to a named gate, no chat context assumed.
+- `docs/adr/NNNN-<slug>.md` — architecture decision records. Immutable once accepted — supersede with a new ADR, never edit an accepted one. Status header: proposed → accepted → superseded.
+- One feature = one plan = one branch = one PR. PR description links the plan file.
+- Small fixes (no design decisions) skip the plan file; a lean task prompt is enough.
 
 ### PR Review Checklist
 
@@ -138,6 +145,13 @@ Project is trusted; config lives in-repo and any pi session here picks it up aut
 **Skills** (`.agents/skills/`, portable Agent Skills): `superpowers/*` (15 vendored from obra/superpowers 7.0.0, MIT — brainstorming → writing-plans → executing-plans workflow), `smoke-test`, `new-provider`, `capture-fixture`. Superpowers skills that say "Task tool" mean the `subagent` extension tool here.
 
 **Codemode** is enabled (`+codemode`): batch MCP calls in scripts with `Promise.allSettled` — this is how you parallelize smoke tests.
+
+**Context hygiene** (keep your context small and disposable — a task should succeed in a fresh session with only the plan file):
+- Fresh session per task; resume only to iterate on the same task.
+- Execute from the plan file, never from pasted chat or transcripts.
+- Use the `scout` subagent for recon instead of reading files broadly yourself.
+- Reference docs (`@docs/...`), zread, or context7 instead of pasting file contents into context.
+- Write long outputs (smoke reports, research digests) to files, not stdout.
 
 ## Gotchas
 
