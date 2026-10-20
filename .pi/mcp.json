@@ -1,0 +1,53 @@
+{
+  "mcpServers": {
+    "mtg": {
+      "command": "uv",
+      "args": ["run", "--project", "/home/j4th/Code/create/mtg-mcp", "mtg-mcp-server"],
+      "env": {
+        "MTG_MCP_ENABLE_EDHREC": "true",
+        "MTG_MCP_ENABLE_17LANDS": "true",
+        "MTG_MCP_ENABLE_BULK_DATA": "true"
+      },
+      "description": "This project's MTG MCP server (60+ tools) — the system under development. Use for smoke tests and live verification."
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "description": "Version-pinned library docs (FastMCP, Pydantic, httpx, structlog).",
+      "exposure": "direct"
+    },
+    "zai-vision": {
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server@latest"],
+      "env": {
+        "Z_AI_API_KEY": "${Z_AI_API_KEY}",
+        "Z_AI_MODE": "ZAI"
+      },
+      "description": "Z.ai vision: image analysis, screenshot OCR, error-screenshot diagnosis, diagram understanding, video analysis (GLM vision models).",
+      "exposure": "deferred"
+    },
+    "web-search-prime": {
+      "url": "https://api.z.ai/api/mcp/web_search_prime/mcp",
+      "headers": {
+        "Authorization": "Bearer ${Z_AI_API_KEY}"
+      },
+      "description": "Z.ai web search: current web information, release notes, real-time lookup.",
+      "exposure": "direct"
+    },
+    "web-reader": {
+      "url": "https://api.z.ai/api/mcp/web_reader/mcp",
+      "headers": {
+        "Authorization": "Bearer ${Z_AI_API_KEY}"
+      },
+      "description": "Z.ai web reader: fetch any webpage as structured content (title, body, links).",
+      "exposure": "direct"
+    },
+    "zread": {
+      "url": "https://api.z.ai/api/mcp/zread/mcp",
+      "headers": {
+        "Authorization": "Bearer ${Z_AI_API_KEY}"
+      },
+      "description": "Z.ai repo explorer: search GitHub repo docs/issues/PRs, browse structure, read files in any public repo.",
+      "exposure": "deferred"
+    }
+  }
+}
