@@ -571,7 +571,7 @@ async def card_comparison(
         await on_progress(2, 3)
 
     # EDHREC synergy lookups (parallel)
-    synergy_results: list[EDHRECCard | None | BaseException] = []
+    synergy_results: list[EDHRECCard | BaseException | None] = []
     if edhrec is not None:
         synergy_tasks = [edhrec.card_synergy(card.name, commander_name) for card in card_data]
         synergy_results = await asyncio.gather(*synergy_tasks, return_exceptions=True)
