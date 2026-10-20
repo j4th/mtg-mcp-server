@@ -124,7 +124,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("tool_call", async (event) => {
 		const path = event.input?.path;
 		if ((event.toolName === "edit" || event.toolName === "write") &&
-			typeof path === "string" && /(^|\/)\.env(\..+)?$/.test(path)) {
+			typeof path === "string" && /(^|\/)\.env(\.(?!example$).+)?$/.test(path)) {
 			return { block: true, reason: "Do not edit .env directly. Use .env.example instead." };
 		}
 		return undefined;

@@ -29,7 +29,7 @@ export default function (pi: ExtensionAPI) {
 		if (
 			(event.toolName === "edit" || event.toolName === "write") &&
 			typeof path === "string" &&
-			/(^|\/)\.env(\..+)?$/.test(path)
+			/(^|\/)\.env(\.(?!example$).+)?$/.test(path)
 		) {
 			return { block: true, reason: "Do not edit .env directly. Use .env.example instead." };
 		}
