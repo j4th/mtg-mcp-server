@@ -129,4 +129,4 @@ jobs:
         run: mise run setup
 
       - name: Audit dependencies
-        run: uv run pip-audit --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2025-64340 --ignore-vuln CVE-2026-27124  # pygments + fastmcp — no fix on 3.1.x
+        run: uv run pip-audit  # clean tree as of fastmcp 3.2.x — former pygments/fastmcp 3.1.x no-fix ignores retired
