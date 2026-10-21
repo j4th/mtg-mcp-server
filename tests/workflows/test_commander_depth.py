@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mtg_mcp_server.services.scryfall import CardNotFoundError
+from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkError
 from mtg_mcp_server.services.spellbook import SpellbookError
 from mtg_mcp_server.types import (
     Card,
@@ -107,6 +109,18 @@ def mock_spellbook() -> AsyncMock:
 @pytest.fixture
 def mock_edhrec() -> AsyncMock:
     return AsyncMock()
+
+
+@pytest.fixture
+def mock_scryfall() -> AsyncMock:
+    """AsyncMock ScryfallClient for fallback lookups.
+
+    Defaults to CardNotFoundError so bulk-miss fallbacks map to None unless
+    a test overrides return_value.
+    """
+    client = AsyncMock()
+    client.get_card_by_name = AsyncMock(side_effect=CardNotFoundError("Not found"))
+    return client
 
 
 @pytest.fixture
@@ -546,9 +560,58 @@ class TestTribalStaples:
 class TestPreconUpgrade:
     """Tests for the precon_upgrade workflow function."""
 
+    async def test_bulk_error_falls_back_to_scryfall(
+        self,
+        mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
+        mock_spellbook: AsyncMock,
+        mock_edhrec: AsyncMock,
+        muldrotha: Card,
+    ) -> None:
+        """Bulk data failure degrades to Scryfall fallback for prices."""
+        # Bulk is entirely down
+        mock_bulk.get_cards = AsyncMock(side_effect=ScryfallBulkError("bulk data unavailable"))
+
+        mock_spellbook.find_decklist_combos = AsyncMock(
+            return_value=DecklistCombos(identity="BGU", included=[], almost_included=[])
+        )
+        mock_edhrec.commander_top_cards = AsyncMock(
+            return_value=_mock_edhrec_data(
+                "Muldrotha",
+                [
+                    EDHRECCard(name="Sol Ring", synergy=0.10, inclusion=80, num_decks=8000),
+                    EDHRECCard(name="Spore Frog", synergy=0.61, inclusion=61, num_decks=6100),
+                ],
+            )
+        )
+
+        # Scryfall supplies cards for every name the resolver asks about
+        def _by_name(name: str) -> Card:
+            if name == "Spore Frog":
+                return _mock_card("Spore Frog", usd="0.25", edhrec_rank=1200)
+            return _mock_card(name, usd="3.00", edhrec_rank=1)
+
+        mock_scryfall.get_card_by_name = AsyncMock(side_effect=_by_name)
+
+        result = await precon_upgrade(
+            ["Muldrotha, the Gravetide", "Sol Ring"],
+            "Muldrotha, the Gravetide",
+            bulk=mock_bulk,
+            scryfall=mock_scryfall,
+            spellbook=mock_spellbook,
+            edhrec=mock_edhrec,
+        )
+
+        assert isinstance(result.data, dict)
+        # Workflow completed via Scryfall-sourced data despite bulk being down
+        assert result.data["swaps"]
+        assert all(swap["add_price"] is not None for swap in result.data["swaps"])
+        mock_scryfall.get_card_by_name.assert_any_call("Spore Frog")
+
     async def test_basic_upgrade(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         mock_edhrec: AsyncMock,
         muldrotha: Card,
@@ -591,6 +654,7 @@ class TestPreconUpgrade:
             ["Golgari Signet", "Sol Ring"],
             "Muldrotha, the Gravetide",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             edhrec=mock_edhrec,
         )
@@ -601,6 +665,7 @@ class TestPreconUpgrade:
     async def test_empty_decklist(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
     ) -> None:
         """Empty decklist returns early."""
@@ -608,6 +673,7 @@ class TestPreconUpgrade:
             [],
             "Muldrotha, the Gravetide",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
         )
 
@@ -616,6 +682,7 @@ class TestPreconUpgrade:
     async def test_edhrec_disabled(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         muldrotha: Card,
     ) -> None:
@@ -632,6 +699,7 @@ class TestPreconUpgrade:
             ["Golgari Signet"],
             "Muldrotha, the Gravetide",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             edhrec=None,
         )
@@ -642,6 +710,7 @@ class TestPreconUpgrade:
     async def test_budget_filter(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         mock_edhrec: AsyncMock,
         muldrotha: Card,
@@ -669,6 +738,7 @@ class TestPreconUpgrade:
             ["Golgari Signet"],
             "Muldrotha, the Gravetide",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             edhrec=mock_edhrec,
             budget=0.10,  # Very tight budget
@@ -679,6 +749,7 @@ class TestPreconUpgrade:
     async def test_progress_callback(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         muldrotha: Card,
     ) -> None:
@@ -700,6 +771,7 @@ class TestPreconUpgrade:
             ["Golgari Signet"],
             "Muldrotha, the Gravetide",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             on_progress=on_progress,
         )
@@ -711,6 +783,7 @@ class TestPreconUpgrade:
     async def test_spellbook_failure(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         muldrotha: Card,
     ) -> None:
@@ -727,6 +800,7 @@ class TestPreconUpgrade:
             ["Golgari Signet"],
             "Muldrotha, the Gravetide",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
         )
 
@@ -737,6 +811,7 @@ class TestPreconUpgrade:
     async def test_combo_pieces_protected(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         mock_edhrec: AsyncMock,
         muldrotha: Card,
@@ -783,6 +858,7 @@ class TestPreconUpgrade:
             ["Spore Frog", "Golgari Signet"],
             "Muldrotha, the Gravetide",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             edhrec=mock_edhrec,
         )

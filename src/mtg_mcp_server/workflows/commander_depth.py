@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from mtg_mcp_server.services.edhrec import EDHRECClient
+    from mtg_mcp_server.services.scryfall import ScryfallClient
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
     from mtg_mcp_server.services.spellbook import SpellbookClient
     from mtg_mcp_server.types import Card, DecklistCombos, EDHRECCard, EDHRECCommanderData
@@ -616,6 +617,7 @@ async def precon_upgrade(
     commander: str,
     *,
     bulk: ScryfallBulkClient,
+    scryfall: ScryfallClient,
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None = None,
     budget: float = 50.0,
@@ -628,10 +630,16 @@ async def precon_upgrade(
     Identifies the weakest cards in the decklist and suggests replacements
     from EDHREC staples that fit under the budget ceiling.
 
+    Card/price resolution is bulk-data-first with per-card Scryfall fallback
+    (see :func:`~mtg_mcp_server.workflows.card_resolver.resolve_cards`), so
+    a bulk-data outage degrades prices to Scryfall-sourced data instead of
+    failing the workflow.
+
     Args:
         decklist: Card names in the current decklist.
         commander: Commander name.
         bulk: Initialized ScryfallBulkClient.
+        scryfall: Initialized ScryfallClient (fallback source).
         spellbook: Initialized SpellbookClient.
         edhrec: Initialized EDHRECClient, or None if disabled.
         budget: Maximum price per card in USD.
@@ -650,11 +658,11 @@ async def precon_upgrade(
             data={"commander": commander, "cuts": [], "upgrades": [], "swaps": []},
         )
 
-    # Step 1/4: Resolve all cards via bulk data
+    # Step 1/4: Analyze decklist for cuts (combo data + synergy data).
+    # Cut scoring works on raw names; cards are resolved lazily when
+    # pricing upgrades below.
     if on_progress is not None:
         await on_progress(1, 4)
-
-    await bulk.get_cards(decklist)
 
     # Step 2/4: Analyze for cuts (combo data + synergy data)
     if on_progress is not None:
@@ -729,9 +737,11 @@ async def precon_upgrade(
         # Sort by synergy descending
         all_staples.sort(key=lambda c: c.synergy, reverse=True)
 
-        # Look up prices for top staples via bulk data (batch)
+        # Look up prices for top staples (bulk-data-first, Scryfall fallback)
+        from mtg_mcp_server.workflows.card_resolver import resolve_cards
+
         candidate_names = [e.name for e in all_staples[: num_upgrades * 3]]
-        price_map = await bulk.get_cards(candidate_names)
+        price_map = await resolve_cards(candidate_names, bulk=bulk, scryfall=scryfall)
         upgrade_candidates: list[tuple[EDHRECCard, float]] = []
         for ecard in all_staples[: num_upgrades * 3]:
             card_data = price_map.get(ecard.name)

@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mtg_mcp_server.services.scryfall import CardNotFoundError
+from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkError
 from mtg_mcp_server.services.spellbook import SpellbookError
 from mtg_mcp_server.types import (
     Card,
@@ -77,6 +79,18 @@ def mock_bulk() -> AsyncMock:
     client.get_card = AsyncMock(return_value=None)
     client.get_cards = AsyncMock(return_value={})
     client.filter_cards = AsyncMock(return_value=[])
+    return client
+
+
+@pytest.fixture
+def mock_scryfall() -> AsyncMock:
+    """Provide an AsyncMock ScryfallClient for fallback lookups.
+
+    Defaults to CardNotFoundError so bulk-miss fallbacks map to None unless
+    a test overrides return_value.
+    """
+    client = AsyncMock()
+    client.get_card_by_name = AsyncMock(side_effect=CardNotFoundError("Not found"))
     return client
 
 
@@ -503,7 +517,27 @@ class TestBuildAround:
 class TestCompleteDeck:
     """Tests for the complete_deck workflow."""
 
-    async def test_basic_gap_analysis(self, mock_bulk: AsyncMock) -> None:
+    async def test_bulk_error_falls_back_to_scryfall(
+        self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock
+    ) -> None:
+        """Bulk batch failure degrades to Scryfall per-card fallback."""
+        card = _mock_card("Lightning Bolt", type_line="Instant", cmc=1.0)
+        mock_bulk.get_cards = AsyncMock(side_effect=ScryfallBulkError("bulk data unavailable"))
+        mock_bulk.filter_cards = AsyncMock(side_effect=ScryfallBulkError("bulk data unavailable"))
+        mock_scryfall.get_card_by_name = AsyncMock(return_value=card)
+
+        result = await complete_deck(
+            ["Lightning Bolt"],
+            "modern",
+            bulk=mock_bulk,
+            scryfall=mock_scryfall,
+        )
+
+        # Deck resolved entirely from Scryfall despite bulk being down
+        assert result.data["deck_size_current"] == 1
+        mock_scryfall.get_card_by_name.assert_awaited_once_with("Lightning Bolt")
+
+    async def test_basic_gap_analysis(self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock) -> None:
         """Identifies missing card categories in a partial decklist."""
         creature = _mock_card(
             "Llanowar Elves",
@@ -519,6 +553,7 @@ class TestCompleteDeck:
             ["Llanowar Elves"],
             "commander",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
         )
 
         assert result.data["deck_size_current"] == 1
@@ -528,7 +563,9 @@ class TestCompleteDeck:
             or "missing" in result.markdown.lower()
         )
 
-    async def test_commander_target_size(self, mock_bulk: AsyncMock) -> None:
+    async def test_commander_target_size(
+        self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock
+    ) -> None:
         """Commander format targets 100 cards."""
         cards = {f"Card {i}": _mock_card(f"Card {i}") for i in range(50)}
         mock_bulk.get_cards = AsyncMock(return_value=cards)
@@ -538,11 +575,14 @@ class TestCompleteDeck:
             list(cards.keys()),
             "commander",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
         )
 
         assert result.data["target_size"] == 100
 
-    async def test_constructed_target_size(self, mock_bulk: AsyncMock) -> None:
+    async def test_constructed_target_size(
+        self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock
+    ) -> None:
         """Constructed formats target 60 cards."""
         cards = {f"Card {i}": _mock_card(f"Card {i}") for i in range(30)}
         mock_bulk.get_cards = AsyncMock(return_value=cards)
@@ -552,11 +592,14 @@ class TestCompleteDeck:
             list(cards.keys()),
             "modern",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
         )
 
         assert result.data["target_size"] == 60
 
-    async def test_limited_target_size(self, mock_bulk: AsyncMock) -> None:
+    async def test_limited_target_size(
+        self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock
+    ) -> None:
         """Limited formats target 40 cards."""
         cards = {f"Card {i}": _mock_card(f"Card {i}") for i in range(20)}
         mock_bulk.get_cards = AsyncMock(return_value=cards)
@@ -566,11 +609,12 @@ class TestCompleteDeck:
             list(cards.keys()),
             "limited",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
         )
 
         assert result.data["target_size"] == 40
 
-    async def test_category_breakdown(self, mock_bulk: AsyncMock) -> None:
+    async def test_category_breakdown(self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock) -> None:
         """Output includes card category breakdown."""
         creature = _mock_card("Grizzly Bears", type_line="Creature - Bear", cmc=2.0)
         instant = _mock_card(
@@ -588,12 +632,15 @@ class TestCompleteDeck:
             ["Grizzly Bears", "Lightning Bolt"],
             "modern",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
         )
 
         # Should categorize cards
         assert "creature" in result.markdown.lower() or "Creature" in result.markdown
 
-    async def test_commander_with_commander_name(self, mock_bulk: AsyncMock) -> None:
+    async def test_commander_with_commander_name(
+        self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock
+    ) -> None:
         """Commander name is accepted for commander format."""
         creature = _mock_card("Sol Ring", type_line="Artifact", cmc=1.0)
         mock_bulk.get_cards = AsyncMock(return_value={"Sol Ring": creature})
@@ -603,12 +650,13 @@ class TestCompleteDeck:
             ["Sol Ring"],
             "commander",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             commander="Test Commander",
         )
 
         assert result.markdown is not None
 
-    async def test_progress_reporting(self, mock_bulk: AsyncMock) -> None:
+    async def test_progress_reporting(self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock) -> None:
         """Progress callback is invoked during processing."""
         cards = {f"Card {i}": _mock_card(f"Card {i}") for i in range(5)}
         mock_bulk.get_cards = AsyncMock(return_value=cards)
@@ -623,13 +671,14 @@ class TestCompleteDeck:
             list(cards.keys()),
             "commander",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             on_progress=on_progress,
         )
 
         assert len(progress_calls) >= 1
         assert result.markdown is not None
 
-    async def test_budget_filter(self, mock_bulk: AsyncMock) -> None:
+    async def test_budget_filter(self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock) -> None:
         """Budget filter is passed to suggestion search."""
         cards = {"Card A": _mock_card("Card A")}
         mock_bulk.get_cards = AsyncMock(return_value=cards)
@@ -639,12 +688,13 @@ class TestCompleteDeck:
             ["Card A"],
             "commander",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             budget=5.0,
         )
 
         assert result.markdown is not None
 
-    async def test_concise_format(self, mock_bulk: AsyncMock) -> None:
+    async def test_concise_format(self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock) -> None:
         """Concise format produces shorter output."""
         cards = {"Card A": _mock_card("Card A")}
         mock_bulk.get_cards = AsyncMock(return_value=cards)
@@ -654,12 +704,13 @@ class TestCompleteDeck:
             ["Card A"],
             "commander",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             response_format="concise",
         )
 
         assert result.markdown is not None
 
-    async def test_unresolved_cards(self, mock_bulk: AsyncMock) -> None:
+    async def test_unresolved_cards(self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock) -> None:
         """Cards that cannot be resolved are noted."""
         mock_bulk.get_cards = AsyncMock(return_value={"Nonexistent": None})
         mock_bulk.filter_cards = AsyncMock(return_value=[])
@@ -668,6 +719,7 @@ class TestCompleteDeck:
             ["Nonexistent"],
             "commander",
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
         )
 
         assert result.data["unresolved"] is not None
