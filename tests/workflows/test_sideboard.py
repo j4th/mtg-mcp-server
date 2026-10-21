@@ -844,6 +844,19 @@ class TestInferMatchupColors:
     def test_unknown_returns_empty(self) -> None:
         assert _infer_matchup_colors("Eldrazi Aggro") == frozenset()
 
+    def test_unions_all_color_tokens(self) -> None:
+        """Multiple color words union instead of returning the first parseable token."""
+        assert _infer_matchup_colors("White Blue Fish") == frozenset({"W", "U"})
+        assert _infer_matchup_colors("Black Green Rock") == frozenset({"B", "G"})
+
+    def test_colorless_token_does_not_short_circuit(self) -> None:
+        """A leading colorless token must not hide real colors later in the name."""
+        assert _infer_matchup_colors("Colorless G Stompy") == frozenset({"G"})
+        assert _infer_matchup_colors("c r eureka") == frozenset({"R"})
+
+    def test_colorless_only_stays_empty(self) -> None:
+        assert _infer_matchup_colors("Colorless Eldrazi") == frozenset()
+
 
 class TestClassifyMatrixCell:
     """_classify_matrix_cell with strategy and matchup colors."""

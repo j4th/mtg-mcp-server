@@ -266,9 +266,11 @@ def _classify_archetype_strategy(matchup: str) -> str:
 def _infer_matchup_colors(name: str) -> frozenset[str]:
     """Infer color identity from a matchup name like 'Mono-Blue' or 'Izzet'.
 
-    Tries mono-<color> normalization first, then tokenizes and attempts
-    ``parse_color_identity`` on each token. Returns empty frozenset when
-    nothing is recognized.
+    Tries mono-<color> normalization first, then tokenizes and unions
+    ``parse_color_identity`` results across ALL tokens — colorless tokens
+    ("c"/"colorless") parse to an empty set without short-circuiting, so
+    real colors later in the name are still seen. Returns empty frozenset
+    when nothing is recognized.
     """
     name_lower = name.lower()
 
@@ -284,14 +286,14 @@ def _infer_matchup_colors(name: str) -> frozenset[str]:
         if f"mono-{word}" in name_lower or f"mono {word}" in name_lower:
             return frozenset({letter})
 
-    tokens = name_lower.replace("-", " ").split()
-    for token in tokens:
+    colors: set[str] = set()
+    for token in name_lower.replace("-", " ").split():
         try:
-            return parse_color_identity(token)
+            colors.update(parse_color_identity(token))
         except ValueError:
-            pass
+            continue
 
-    return frozenset()
+    return frozenset(colors)
 
 
 def _card_addresses_matchup(card: Card | None, matchup_strategy: str) -> str:
