@@ -743,7 +743,11 @@ class TestMetadataValidation:
                     ScryfallBulkError, match=r"Available keys: .*(object|type)"
                 ) as exc_info:
                     await client.ensure_loaded()
-                assert "bulk_data" in str(exc_info.value) or "object" in str(exc_info.value)
+                # Assert on key names only — 'bulk_data' is a metadata
+                # *value* (of the 'object' key), not a key itself
+                message = str(exc_info.value)
+                assert "'object'" in message
+                assert "'type'" in message
 
     async def test_non_json_metadata_raises(self):
         """Non-JSON metadata response raises ScryfallBulkDownloadError."""
