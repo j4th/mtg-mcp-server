@@ -528,7 +528,7 @@ class TestCompleteDeck:
 
         result = await complete_deck(
             ["Lightning Bolt"],
-            "modern",
+            "commander",
             bulk=mock_bulk,
             scryfall=mock_scryfall,
         )
@@ -536,6 +536,9 @@ class TestCompleteDeck:
         # Deck resolved entirely from Scryfall despite bulk being down
         assert result.data["deck_size_current"] == 1
         mock_scryfall.get_card_by_name.assert_awaited_once_with("Lightning Bolt")
+        # Suggestion searches failed per-category — the analysis must say so
+        # instead of silently omitting the Suggestions section
+        assert "Suggestions unavailable" in result.markdown
 
     async def test_basic_gap_analysis(self, mock_bulk: AsyncMock, mock_scryfall: AsyncMock) -> None:
         """Identifies missing card categories in a partial decklist."""

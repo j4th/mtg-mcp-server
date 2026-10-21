@@ -698,6 +698,7 @@ async def complete_deck(
 
     # Search for suggestions in underrepresented categories
     suggestions: dict[str, list[Card]] = {}
+    suggestions_degraded = False
     for cat, needed in gaps.items():
         cat_limit = min(needed + 3, 10)  # A few extra for variety
         fmt = format.lower()
@@ -726,6 +727,7 @@ async def complete_deck(
                 limit=cat_limit,
             )
         except ServiceError as exc:
+            suggestions_degraded = True
             log.warning(
                 "complete_deck.suggestions_unavailable",
                 category=cat,
@@ -751,6 +753,11 @@ async def complete_deck(
             lines.append(f"Gaps: {', '.join(gap_parts)}")
         if unresolved:
             lines.append(f"Unresolved: {', '.join(unresolved)}")
+        if suggestions_degraded and not suggestions:
+            lines.append(
+                "*Suggestions unavailable — bulk data offline; "
+                "card resolution fell back to Scryfall.*"
+            )
     else:
         lines.append("# Deck Completion Analysis")
         lines.append(f"*Format: {format} | Target: {target_size} cards*")
@@ -792,6 +799,12 @@ async def complete_deck(
                 for card in cat_cards[:5]:
                     lines.append(_fmt_card_line(card))
                 lines.append("")
+        elif suggestions_degraded:
+            lines.append(
+                "*Suggestions unavailable — bulk data offline; "
+                "card resolution fell back to Scryfall.*"
+            )
+            lines.append("")
 
         if unresolved:
             lines.append("## Unresolved Cards")
