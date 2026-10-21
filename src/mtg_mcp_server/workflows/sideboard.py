@@ -307,19 +307,30 @@ def _infer_matchup_colors(name: str) -> frozenset[str]:
     return frozenset(colors)
 
 
-def _explain_in(card: Card | None, strategy: str) -> str:
+def _hated_colors(oracle: str) -> frozenset[str]:
+    """Colors a card's oracle text hates on, evaluating every color's patterns."""
+    return frozenset(
+        color
+        for color, patterns in _COLOR_HATE_PATTERNS.items()
+        if any(pattern in oracle for pattern in patterns)
+    )
+
+
+def _explain_in(
+    card: Card | None, strategy: str, matchup_colors: frozenset[str] = frozenset()
+) -> str:
     """Build a reasoning string for bringing a sideboard card in.
 
     Mirrors the classifier's decision order: color hate first, then
-    sideboard-category role.
+    sideboard-category role. ``matchup_colors`` gates the color-hoser
+    explanation so a card that is IN via category (because the matchup's
+    colors are unknown) is explained by the category that drove the IN.
     """
     if card is None:
         return "Unknown card"
     oracle = (card.oracle_text or "").lower()
 
-    if any(
-        any(pattern in oracle for pattern in patterns) for patterns in _COLOR_HATE_PATTERNS.values()
-    ):
+    if matchup_colors and _hated_colors(oracle) & matchup_colors:
         return f"Color hoser -- effective against {strategy}"
 
     for cat_name, cat_def in SIDEBOARD_CATEGORIES.items():
@@ -358,11 +369,7 @@ def _classify_sideboard_card(
     cut_types = strategy_info.get("cut_types", [])
 
     # 1. Color hate detection — check every color's patterns before deciding
-    hated_colors = {
-        color
-        for color, patterns in _COLOR_HATE_PATTERNS.items()
-        if any(pattern in oracle for pattern in patterns)
-    }
+    hated_colors = _hated_colors(oracle)
     if hated_colors and matchup_colors:
         return "IN" if hated_colors & matchup_colors else "OUT"
     # Unknown matchup colors — fall through to role/strategy logic
@@ -801,7 +808,7 @@ async def sideboard_guide(
                     "name": name,
                     "quantity": sb_qty.get(name, 1),
                     "verdict": verdict,
-                    "reasoning": _explain_in(card, strategy),
+                    "reasoning": _explain_in(card, strategy, matchup_colors),
                 }
             )
         elif verdict == "FLEX":

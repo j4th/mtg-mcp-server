@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Matchup color inference no longer stops at the first parseable token: colorless
   tokens ("c"/"colorless") can't hide real colors later in a matchup name, and
   multi-word names like "White Blue Fish" keep all their colors.
+- `sideboard_guide` reasoning no longer claims "Color hoser" when the matchup's
+  colors are unknown and the card was actually brought in for its sideboard
+  category (e.g. direct damage).
 
 ## [3.0.0] - 2026-04-03
 

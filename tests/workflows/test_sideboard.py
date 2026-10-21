@@ -205,6 +205,15 @@ AURIOK = _mock_card(
     mana_cost="{W}{W}",
     cmc=2.0,
 )
+PRO_WHITE_BURN = _mock_card(
+    "Pro-White Bolt",
+    oracle_text="Protection from white. Pro-White Bolt deals 2 damage to any target.",
+    type_line="Instant",
+    colors=["R"],
+    color_identity=["R"],
+    mana_cost="{1}{R}",
+    cmc=2.0,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -859,6 +868,16 @@ class TestInferMatchupColors:
         assert _infer_matchup_colors("White Blue Fish") == frozenset({"W", "U"})
         assert _infer_matchup_colors("Black Green Rock") == frozenset({"B", "G"})
 
+    def test_stray_word_tokens_add_no_colors(self) -> None:
+        """Non-color words must not pollute inference (review note on token union).
+
+        "burn"/"shadow" are not parseable color tokens, so they contribute
+        nothing -- only explicit color words do.
+        """
+        assert _infer_matchup_colors("Burn") == frozenset()
+        assert _infer_matchup_colors("Death Shadow") == frozenset()
+        assert _infer_matchup_colors("Mono-Red Burn") == frozenset({"R"})
+
     def test_colorless_token_does_not_short_circuit(self) -> None:
         """A leading colorless token must not hide real colors later in the name."""
         assert _infer_matchup_colors("Colorless G Stompy") == frozenset({"G"})
@@ -1087,6 +1106,30 @@ class TestSideboardGuideColorAware:
         )
 
         assert all(i["name"] != "Pyroblast" for i in result.data["ins"])
+
+    async def test_color_hate_reasoning_not_claimed_when_colors_unknown(
+        self, mock_bulk: AsyncMock
+    ) -> None:
+        """A color-hate card that is IN via category must not be called a color hoser.
+
+        Vs a matchup with unknown colors the classifier falls through to the
+        role/strategy logic; the reasoning string must reflect the category
+        that actually drove the IN, not the card's color-hate text.
+        """
+        mock_bulk.get_cards = AsyncMock(return_value={"Pro-White Bolt": PRO_WHITE_BURN})
+
+        result = await sideboard_guide(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Pro-White Bolt"],
+            format="modern",
+            matchup="Eldrazi Aggro",
+            bulk=mock_bulk,
+        )
+
+        entry = next(i for i in result.data["ins"] if i["name"] == "Pro-White Bolt")
+        assert entry["verdict"] == "IN"
+        assert "direct damage" in entry["reasoning"].lower()
+        assert "color hoser" not in entry["reasoning"].lower()
 
 
 class TestGuideMatrixAgreement:
