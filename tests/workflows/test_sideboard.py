@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
 from unittest.mock import AsyncMock
 
 import pytest
@@ -16,7 +17,7 @@ from mtg_mcp_server.types import (
 )
 from mtg_mcp_server.workflows.sideboard import (
     _classify_archetype_strategy,
-    _classify_matrix_cell,
+    _classify_sideboard_card,
     _extract_deck_colors,
     _infer_matchup_colors,
     _match_archetype_name,
@@ -190,6 +191,24 @@ PYROCLASM = _mock_card(
     "Pyroclasm",
     oracle_text="Pyroclasm deals 2 damage to each creature.",
     type_line="Sorcery",
+    colors=["R"],
+    color_identity=["R"],
+    mana_cost="{1}{R}",
+    cmc=2.0,
+)
+AURIOK = _mock_card(
+    "Auriok Champion",
+    oracle_text="Protection from black and from green.",
+    type_line="Creature -- Human Cleric",
+    colors=["W"],
+    color_identity=["W"],
+    mana_cost="{W}{W}",
+    cmc=2.0,
+)
+PRO_WHITE_BURN = _mock_card(
+    "Pro-White Bolt",
+    oracle_text="Protection from white. Pro-White Bolt deals 2 damage to any target.",
+    type_line="Instant",
     colors=["R"],
     color_identity=["R"],
     mana_cost="{1}{R}",
@@ -844,44 +863,99 @@ class TestInferMatchupColors:
     def test_unknown_returns_empty(self) -> None:
         assert _infer_matchup_colors("Eldrazi Aggro") == frozenset()
 
+    def test_unions_all_color_tokens(self) -> None:
+        """Multiple color words union instead of returning the first parseable token."""
+        assert _infer_matchup_colors("White Blue Fish") == frozenset({"W", "U"})
+        assert _infer_matchup_colors("Black Green Rock") == frozenset({"B", "G"})
 
-class TestClassifyMatrixCell:
-    """_classify_matrix_cell with strategy and matchup colors."""
+    def test_stray_word_tokens_add_no_colors(self) -> None:
+        """Non-color words must not pollute inference (review note on token union).
+
+        "burn"/"shadow" are not parseable color tokens, so they contribute
+        nothing -- only explicit color words do.
+        """
+        assert _infer_matchup_colors("Burn") == frozenset()
+        assert _infer_matchup_colors("Death Shadow") == frozenset()
+        assert _infer_matchup_colors("Mono-Red Burn") == frozenset({"R"})
+
+    def test_colorless_token_does_not_short_circuit(self) -> None:
+        """A leading colorless token must not hide real colors later in the name."""
+        assert _infer_matchup_colors("Colorless G Stompy") == frozenset({"G"})
+        assert _infer_matchup_colors("c r eureka") == frozenset({"R"})
+
+    def test_colorless_only_stays_empty(self) -> None:
+        assert _infer_matchup_colors("Colorless Eldrazi") == frozenset()
+
+
+class TestClassifySideboardCard:
+    """Unified classifier with strategy and matchup colors."""
 
     def test_color_hate_in_when_color_in_matchup(self) -> None:
-        verdict = _classify_matrix_cell(
+        verdict = _classify_sideboard_card(
             PYROBLAST, strategy="combo", matchup_colors=frozenset({"U", "R"})
         )
         assert verdict == "IN"
 
     def test_color_hate_out_when_color_not_in_matchup(self) -> None:
-        verdict = _classify_matrix_cell(
+        verdict = _classify_sideboard_card(
             PYROBLAST, strategy="combo", matchup_colors=frozenset({"G"})
         )
         assert verdict == "OUT"
 
     def test_color_hate_flex_when_unknown_colors(self) -> None:
         """Unknown matchup colors fall through to role/strategy."""
-        verdict = _classify_matrix_cell(PYROBLAST, strategy="combo", matchup_colors=frozenset())
+        verdict = _classify_sideboard_card(PYROBLAST, strategy="combo", matchup_colors=frozenset())
         # Falls through to role/strategy: counterspell vs combo = IN
         assert verdict == "IN"
 
+    def test_multi_color_hate_in_when_second_color_in_matchup(self) -> None:
+        """Auriok Champion (pro black + pro green) is IN vs a green-only matchup.
+
+        The first-match loop used to hit the black pattern first and mark it
+        OUT because black is not in the matchup -- wrong, it also hates green.
+        """
+        verdict = _classify_sideboard_card(
+            AURIOK, strategy="midrange", matchup_colors=frozenset({"G"})
+        )
+        assert verdict == "IN"
+
+    def test_multi_color_hate_in_when_first_color_in_matchup(self) -> None:
+        verdict = _classify_sideboard_card(
+            AURIOK, strategy="midrange", matchup_colors=frozenset({"B"})
+        )
+        assert verdict == "IN"
+
+    def test_multi_color_hate_out_when_no_hated_color_in_matchup(self) -> None:
+        verdict = _classify_sideboard_card(
+            AURIOK, strategy="midrange", matchup_colors=frozenset({"U", "R"})
+        )
+        assert verdict == "OUT"
+
+    def test_multi_color_hate_falls_through_when_colors_unknown(self) -> None:
+        """Unknown matchup colors skip color hate and fall through to role/strategy."""
+        verdict = _classify_sideboard_card(AURIOK, strategy="midrange", matchup_colors=frozenset())
+        assert verdict == "FLEX"
+
     def test_graveyard_hate_in_vs_combo(self) -> None:
-        verdict = _classify_matrix_cell(SURGICAL, strategy="combo", matchup_colors=frozenset({"U"}))
+        verdict = _classify_sideboard_card(
+            SURGICAL, strategy="combo", matchup_colors=frozenset({"U"})
+        )
         assert verdict == "IN"
 
     def test_board_wipe_in_vs_midrange(self) -> None:
-        verdict = _classify_matrix_cell(
+        verdict = _classify_sideboard_card(
             PYROCLASM, strategy="midrange", matchup_colors=frozenset({"G"})
         )
         assert verdict == "IN"
 
     def test_counterspell_in_vs_combo_regression(self) -> None:
-        verdict = _classify_matrix_cell(COUNTERSPELL, strategy="combo", matchup_colors=frozenset())
+        verdict = _classify_sideboard_card(
+            COUNTERSPELL, strategy="combo", matchup_colors=frozenset()
+        )
         assert verdict == "IN"
 
     def test_none_card_returns_flex(self) -> None:
-        verdict = _classify_matrix_cell(None, strategy="aggro", matchup_colors=frozenset())
+        verdict = _classify_sideboard_card(None, strategy="aggro", matchup_colors=frozenset())
         assert verdict == "FLEX"
 
 
@@ -992,3 +1066,122 @@ class TestSideboardMatrixColorAware:
 
         assert len(result.data["matchups"]) == 6
         assert "Boros Energy" in result.data["matchups"]
+
+
+# ===========================================================================
+# Part C — unification: sideboard_guide and sideboard_matrix share one
+# classifier (PR #67 review follow-ups)
+# ===========================================================================
+
+
+class TestSideboardGuideColorAware:
+    """sideboard_guide uses the shared color-aware classifier."""
+
+    async def test_color_hate_in_vs_matching_color(self, mock_bulk: AsyncMock) -> None:
+        """Hydroblast is IN vs Mono-Red Aggro, with color-hate reasoning."""
+        mock_bulk.get_cards = AsyncMock(return_value={"Hydroblast": HYDROBLAST})
+
+        result = await sideboard_guide(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Hydroblast"],
+            format="modern",
+            matchup="Mono-Red Aggro",
+            bulk=mock_bulk,
+        )
+
+        entry = next(i for i in result.data["ins"] if i["name"] == "Hydroblast")
+        assert entry["verdict"] == "IN"
+        assert "color" in entry["reasoning"].lower()
+
+    async def test_color_hate_out_vs_non_matching_color(self, mock_bulk: AsyncMock) -> None:
+        """Pyroblast vs Mono-Red Aggro is OUT -- absent from ins entirely."""
+        mock_bulk.get_cards = AsyncMock(return_value={"Pyroblast": PYROBLAST})
+
+        result = await sideboard_guide(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Pyroblast"],
+            format="modern",
+            matchup="Mono-Red Aggro",
+            bulk=mock_bulk,
+        )
+
+        assert all(i["name"] != "Pyroblast" for i in result.data["ins"])
+
+    async def test_color_hate_reasoning_not_claimed_when_colors_unknown(
+        self, mock_bulk: AsyncMock
+    ) -> None:
+        """A color-hate card that is IN via category must not be called a color hoser.
+
+        Vs a matchup with unknown colors the classifier falls through to the
+        role/strategy logic; the reasoning string must reflect the category
+        that actually drove the IN, not the card's color-hate text.
+        """
+        mock_bulk.get_cards = AsyncMock(return_value={"Pro-White Bolt": PRO_WHITE_BURN})
+
+        result = await sideboard_guide(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Pro-White Bolt"],
+            format="modern",
+            matchup="Eldrazi Aggro",
+            bulk=mock_bulk,
+        )
+
+        entry = next(i for i in result.data["ins"] if i["name"] == "Pro-White Bolt")
+        assert entry["verdict"] == "IN"
+        assert "direct damage" in entry["reasoning"].lower()
+        assert "color hoser" not in entry["reasoning"].lower()
+
+
+class TestGuideMatrixAgreement:
+    """sideboard_guide and sideboard_matrix must render identical verdicts.
+
+    Pins the unified classifier: for the same card vs the same matchup, the
+    verdict in guide's structured ``ins`` entries (IN/FLEX) or its absence
+    (OUT) must equal the corresponding matrix cell.
+    """
+
+    PIN_CARDS: ClassVar[list[Card]] = [
+        PYROBLAST,
+        HYDROBLAST,
+        SURGICAL,
+        PYROCLASM,
+        COUNTERSPELL,
+        RIP,
+        AURIOK,
+    ]
+    PIN_MATCHUPS: ClassVar[list[str]] = [
+        "Izzet Phoenix",
+        "Mono-Red Aggro",
+        "Eldrazi Aggro",
+        "Storm Combo",
+    ]
+
+    async def test_both_tools_agree_on_fixture_set(self, mock_bulk: AsyncMock) -> None:
+        resolved = {c.name: c for c in self.PIN_CARDS}
+        mock_bulk.get_cards = AsyncMock(return_value=resolved)
+        decklist = ["4x Lightning Bolt", "4x Goblin Guide", "4x Primeval Titan"]
+
+        matrix_result = await sideboard_matrix(
+            decklist=decklist,
+            sideboard=[f"2x {c.name}" for c in self.PIN_CARDS],
+            format="modern",
+            bulk=mock_bulk,
+            matchups=self.PIN_MATCHUPS,
+        )
+        matrix = matrix_result.data["matrix"]
+
+        for mu in self.PIN_MATCHUPS:
+            for card in self.PIN_CARDS:
+                guide = await sideboard_guide(
+                    decklist=decklist,
+                    sideboard=[f"2x {card.name}"],
+                    format="modern",
+                    matchup=mu,
+                    bulk=mock_bulk,
+                )
+                entry = next((i for i in guide.data["ins"] if i["name"] == card.name), None)
+                guide_verdict = entry["verdict"] if entry is not None else "OUT"
+                matrix_verdict = matrix[card.name][mu]
+                assert guide_verdict == matrix_verdict, (
+                    f"{card.name} vs {mu}: guide={guide_verdict} matrix={matrix_verdict}"
+                )

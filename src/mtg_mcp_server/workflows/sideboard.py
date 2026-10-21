@@ -106,6 +106,17 @@ _BROADENED_PATTERNS: dict[str, list[str]] = {
     ],
 }
 
+# Oracle text patterns that mark a card as hating a specific enemy color.
+# The "and from X" form catches multi-color protection ("protection from
+# black and from green" -- Auriok Champion, Mirran Crusader, the Swords).
+_COLOR_HATE_PATTERNS: dict[str, list[str]] = {
+    "W": ["protection from white", "if it's white", "and from white"],
+    "U": ["protection from blue", "if it's blue", "and from blue"],
+    "B": ["protection from black", "if it's black", "and from black"],
+    "R": ["protection from red", "if it's red", "and from red"],
+    "G": ["protection from green", "if it's green", "and from green"],
+}
+
 # ---------------------------------------------------------------------------
 # Archetype strategy mapping for sideboard guide
 # ---------------------------------------------------------------------------
@@ -266,9 +277,11 @@ def _classify_archetype_strategy(matchup: str) -> str:
 def _infer_matchup_colors(name: str) -> frozenset[str]:
     """Infer color identity from a matchup name like 'Mono-Blue' or 'Izzet'.
 
-    Tries mono-<color> normalization first, then tokenizes and attempts
-    ``parse_color_identity`` on each token. Returns empty frozenset when
-    nothing is recognized.
+    Tries mono-<color> normalization first, then tokenizes and unions
+    ``parse_color_identity`` results across ALL tokens — colorless tokens
+    ("c"/"colorless") parse to an empty set without short-circuiting, so
+    real colors later in the name are still seen. Returns empty frozenset
+    when nothing is recognized.
     """
     name_lower = name.lower()
 
@@ -284,47 +297,52 @@ def _infer_matchup_colors(name: str) -> frozenset[str]:
         if f"mono-{word}" in name_lower or f"mono {word}" in name_lower:
             return frozenset({letter})
 
-    tokens = name_lower.replace("-", " ").split()
-    for token in tokens:
+    colors: set[str] = set()
+    for token in name_lower.replace("-", " ").split():
         try:
-            return parse_color_identity(token)
+            colors.update(parse_color_identity(token))
         except ValueError:
-            pass
+            continue
 
-    return frozenset()
+    return frozenset(colors)
 
 
-def _card_addresses_matchup(card: Card | None, matchup_strategy: str) -> str:
-    """Determine if a sideboard card addresses a given matchup strategy.
+def _hated_colors(oracle: str) -> frozenset[str]:
+    """Colors a card's oracle text hates on, evaluating every color's patterns."""
+    return frozenset(
+        color
+        for color, patterns in _COLOR_HATE_PATTERNS.items()
+        if any(pattern in oracle for pattern in patterns)
+    )
 
-    Returns "IN", "OUT", or "FLEX".
+
+def _explain_in(
+    card: Card | None, strategy: str, matchup_colors: frozenset[str] = frozenset()
+) -> str:
+    """Build a reasoning string for bringing a sideboard card in.
+
+    Mirrors the classifier's decision order: color hate first, then
+    sideboard-category role. ``matchup_colors`` gates the color-hoser
+    explanation so a card that is IN via category (because the matchup's
+    colors are unknown) is explained by the category that drove the IN.
     """
     if card is None:
-        return "FLEX"
-
+        return "Unknown card"
     oracle = (card.oracle_text or "").lower()
-    type_line = card.type_line.lower()
-    strategy = _ARCHETYPE_STRATEGIES.get(matchup_strategy, {})
-    bring_categories = strategy.get("bring_categories", [])
 
-    # Check if the card's text matches any of the bring categories
-    for category_name in bring_categories:
-        category_def = SIDEBOARD_CATEGORIES.get(category_name, {})
-        text_patterns = category_def.get("text_any", [])
+    if matchup_colors and _hated_colors(oracle) & matchup_colors:
+        return f"Color hoser -- effective against {strategy}"
+
+    for cat_name, cat_def in SIDEBOARD_CATEGORIES.items():
+        text_patterns = cat_def.get("text_any", [])
         for pattern in text_patterns:
             if pattern.lower() in oracle:
-                return "IN"
+                return f"{cat_name} -- effective against {strategy}"
 
-    # Check cut types -- if the card IS one of the types to cut, it's OUT
-    cut_types = strategy.get("cut_types", [])
-    for ct in cut_types:
-        if ct in type_line:
-            return "OUT"
-
-    return "FLEX"
+    return f"General utility against {strategy}"
 
 
-def _classify_matrix_cell(
+def _classify_sideboard_card(
     card: Card | None,
     *,
     strategy: str,
@@ -332,8 +350,14 @@ def _classify_matrix_cell(
 ) -> str:
     """Classify a sideboard card's effectiveness against a specific matchup.
 
-    Returns "IN", "OUT", or "FLEX". Color-aware: uses matchup color identity
-    to distinguish hate cards that hit the target from those that don't.
+    Returns "IN", "OUT", or "FLEX". This is the single classifier shared by
+    ``sideboard_guide`` and ``sideboard_matrix`` so both tools render the
+    same verdict for the same card vs the same matchup.
+
+    Color-aware: evaluates ALL color-hate patterns and aggregates the hated
+    colors before deciding, so multi-color hate cards (e.g. "protection from
+    black and from green") are IN whenever ANY hated color is in the matchup
+    — instead of being judged (and mis-marked OUT) by the first pattern hit.
     """
     if card is None:
         return "FLEX"
@@ -344,22 +368,11 @@ def _classify_matrix_cell(
     bring_categories = strategy_info.get("bring_categories", [])
     cut_types = strategy_info.get("cut_types", [])
 
-    # 1. Color hate detection
-    color_hate_patterns: dict[str, list[str]] = {
-        "W": ["protection from white", "if it's white"],
-        "U": ["protection from blue", "if it's blue"],
-        "B": ["protection from black", "if it's black"],
-        "R": ["protection from red", "if it's red"],
-        "G": ["protection from green", "if it's green"],
-    }
-
-    for color_letter, patterns in color_hate_patterns.items():
-        if any(p in oracle for p in patterns):
-            if matchup_colors and color_letter in matchup_colors:
-                return "IN"
-            if matchup_colors:
-                return "OUT"
-            # Unknown colors — fall through to role/strategy logic
+    # 1. Color hate detection — check every color's patterns before deciding
+    hated_colors = _hated_colors(oracle)
+    if hated_colors and matchup_colors:
+        return "IN" if hated_colors & matchup_colors else "OUT"
+    # Unknown matchup colors — fall through to role/strategy logic
 
     # 2. Role vs strategy (broadened oracle detection)
     for category_name in bring_categories:
@@ -753,38 +766,49 @@ async def sideboard_guide(
 
     # Match the archetype
     known_archetypes = list(_DEFAULT_ARCHETYPES)
+    archetype_colors: dict[str, frozenset[str]] = {}
     if mtggoldfish is not None:
         try:
             meta = await mtggoldfish.get_metagame(format.lower())
-            known_archetypes = (
-                [a.name for a in meta.archetypes] if meta.archetypes else known_archetypes
-            )
+            if meta.archetypes:
+                known_archetypes = [a.name for a in meta.archetypes]
+                archetype_colors = {a.name: frozenset(a.colors) for a in meta.archetypes}
         except ServiceError:
             log.warning("sideboard_guide.mtggoldfish_failed", exc_info=True)
 
     matched_name = _match_archetype_name(matchup, known_archetypes) or matchup
-    strategy = _classify_archetype_strategy(matched_name)
+    # Derive strategy and colors from the RAW matchup string — the same
+    # inputs sideboard_matrix feeds the classifier for explicit matchups —
+    # so both tools render identical verdicts for the same matchup name.
+    # Prefer goldfish archetype colors when the match carries them.
+    strategy = _classify_archetype_strategy(matchup)
+    matchup_colors = archetype_colors.get(matched_name, frozenset()) or _infer_matchup_colors(
+        matchup
+    )
 
     log.debug(
         "sideboard_guide.classified",
         matchup=matchup,
         matched=matched_name,
         strategy=strategy,
+        matchup_colors=sorted(matchup_colors),
     )
 
     strategy_info = _ARCHETYPE_STRATEGIES.get(strategy, _ARCHETYPE_STRATEGIES["midrange"])
 
-    # Determine INs -- which sideboard cards address the matchup
+    # Determine INs -- which sideboard cards address the matchup.
+    # Same classifier as sideboard_matrix, so both tools agree on verdicts.
     ins: list[dict[str, str | int]] = []
     for name in sb_names:
         card = resolved.get(name)
-        verdict = _card_addresses_matchup(card, strategy)
+        verdict = _classify_sideboard_card(card, strategy=strategy, matchup_colors=matchup_colors)
         if verdict == "IN":
             ins.append(
                 {
                     "name": name,
                     "quantity": sb_qty.get(name, 1),
-                    "reasoning": _explain_in(card, strategy),
+                    "verdict": verdict,
+                    "reasoning": _explain_in(card, strategy, matchup_colors),
                 }
             )
         elif verdict == "FLEX":
@@ -792,6 +816,7 @@ async def sideboard_guide(
                 {
                     "name": name,
                     "quantity": sb_qty.get(name, 1),
+                    "verdict": verdict,
                     "reasoning": "Flexible option -- may be useful depending on opponent's build",
                 }
             )
@@ -883,27 +908,20 @@ async def sideboard_guide(
     data: dict[str, object] = {
         "matchup": matched_name,
         "strategy": strategy,
-        "ins": [{"name": i["name"], "quantity": i["quantity"]} for i in ins],
+        "ins": [
+            {
+                "name": i["name"],
+                "quantity": i["quantity"],
+                "verdict": i["verdict"],
+                "reasoning": i["reasoning"],
+            }
+            for i in ins
+        ],
         "outs": [{"name": o["name"], "quantity": o["quantity"]} for o in outs],
         "reasoning": combined_reasoning,
     }
 
     return WorkflowResult(markdown=markdown, data=data)
-
-
-def _explain_in(card: Card | None, strategy: str) -> str:
-    """Build a reasoning string for bringing a sideboard card in."""
-    if card is None:
-        return "Unknown card"
-    oracle = (card.oracle_text or "").lower()
-
-    for cat_name, cat_def in SIDEBOARD_CATEGORIES.items():
-        text_patterns = cat_def.get("text_any", [])
-        for pattern in text_patterns:
-            if pattern.lower() in oracle:
-                return f"{cat_name} -- effective against {strategy}"
-
-    return f"General utility against {strategy}"
 
 
 def _format_sideboard_guide(
@@ -1030,7 +1048,9 @@ async def sideboard_matrix(
         for mu in matchup_names:
             strategy = _classify_archetype_strategy(mu)
             matchup_colors = matchup_colors_map.get(mu, frozenset())
-            verdict = _classify_matrix_cell(card, strategy=strategy, matchup_colors=matchup_colors)
+            verdict = _classify_sideboard_card(
+                card, strategy=strategy, matchup_colors=matchup_colors
+            )
             row[mu] = verdict
         matrix[name] = row
 

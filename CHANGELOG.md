@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correctly marked IN when they hit the matchup's colors and OUT when they don't.
   Role/strategy detection is broadened for real-world card text (graveyard hate,
   sweepers, counterspells). ([#63](https://github.com/j4th/mtg-mcp/issues/63))
+- `sideboard_guide` and `sideboard_matrix` now share one classifier, so both tools
+  render the same IN/OUT/FLEX verdict for the same card against the same matchup.
+  `sideboard_guide` is color-aware as a result, exposes `verdict` and `reasoning` in
+  its structured `ins` entries, and uses MTGGoldfish archetype colors when available.
+  Pinned by a fixture-set agreement test.
+- The shared sideboard classifier evaluates all color-hate patterns instead of
+  returning on the first match, so multi-color hate cards (e.g. "protection from
+  black and from green") are IN whenever any hated color is in the matchup.
+- Matchup color inference no longer stops at the first parseable token: colorless
+  tokens ("c"/"colorless") can't hide real colors later in a matchup name, and
+  multi-word names like "White Blue Fish" keep all their colors.
+- `sideboard_guide` reasoning no longer claims "Color hoser" when the matchup's
+  colors are unknown and the card was actually brought in for its sideboard
+  category (e.g. direct damage).
 
 ## [3.0.0] - 2026-04-03
 
