@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- `suggest_sideboard` now filters sideboard candidates by the deck's color identity,
+  preventing off-color recommendations. Colorless cards still pass the filter.
+  Empty categories after filtering are reported in `data["empty_categories"]` and
+  as notes in the markdown output. ([#64](https://github.com/j4th/mtg-mcp/issues/64))
+- `sideboard_matrix` now uses a color-aware cell classifier. Color hate cards are
+  correctly marked IN when they hit the matchup's colors and OUT when they don't.
+  Role/strategy detection is broadened for real-world card text (graveyard hate,
+  sweepers, counterspells). ([#63](https://github.com/j4th/mtg-mcp/issues/63))
+
 ## [3.0.0] - 2026-04-03
 
 v3.0.0 marks the constructed metagame milestone. The server now covers all major

@@ -658,7 +658,7 @@ Suggest a 15-card sideboard for a competitive deck.
 | Field | Detail |
 |-------|--------|
 | Input | `decklist: list[str]`, `format: str`, `meta_context: str | None = None`, `response_format: "detailed" \| "concise" = "detailed"` |
-| Output | Markdown with: categorized sideboard suggestions (graveyard hate, removal, counterspells, board wipes, etc.), format staple markers |
+| Output | Markdown with: categorized sideboard suggestions (graveyard hate, removal, counterspells, board wipes, etc.), format staple markers; candidates filtered to deck color identity; empty categories reported as notes |
 | Backends | Bulk data (required) + MTGGoldfish (optional, format staples) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 
@@ -678,7 +678,7 @@ Generate a sideboard matrix for a deck across common matchups.
 | Field | Detail |
 |-------|--------|
 | Input | `decklist: list[str]`, `sideboard: list[str]`, `format: str`, `matchups: list[str] | None = None`, `response_format: "detailed" \| "concise" = "detailed"` |
-| Output | Markdown matrix: rows = sideboard cards, columns = matchups, cells = IN/OUT/FLEX |
+| Output | Markdown matrix: rows = sideboard cards, columns = matchups, cells = IN/OUT/FLEX; color-aware classifier marks color hate IN/OUT based on matchup colors |
 | Backends | Bulk data (required) + MTGGoldfish (optional, metagame for auto matchups) |
 | Annotations | readOnly=true, idempotent=true, openWorld=true |
 

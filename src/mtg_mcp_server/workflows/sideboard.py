@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Literal
 import structlog
 
 from mtg_mcp_server.services.base import ServiceError
+from mtg_mcp_server.utils.color_identity import parse_color_identity
 from mtg_mcp_server.utils.decklist import parse_decklist
 from mtg_mcp_server.utils.fuzzy import match_archetype
 from mtg_mcp_server.workflows import WorkflowResult
@@ -94,6 +95,17 @@ SIDEBOARD_CATEGORIES: dict[str, dict[str, list[str]]] = {
     },
 }
 
+# Broadened oracle text patterns for real-world card matching.
+_BROADENED_PATTERNS: dict[str, list[str]] = {
+    "Graveyard Hate": [
+        "exile target player's graveyard",
+    ],
+    "Board Wipes": [
+        "damage to each creature",
+        "each creature gets",
+    ],
+}
+
 # ---------------------------------------------------------------------------
 # Archetype strategy mapping for sideboard guide
 # ---------------------------------------------------------------------------
@@ -102,7 +114,7 @@ SIDEBOARD_CATEGORIES: dict[str, dict[str, list[str]]] = {
 _ARCHETYPE_STRATEGIES: dict[str, dict[str, list[str] | str]] = {
     "aggro": {
         "cut_types": ["sorcery", "enchantment"],
-        "cut_cmc_above": [],  # Handled via cmc heuristic
+        "cut_cmc_above": [],
         "bring_categories": ["Board Wipes", "Lifegain Hate", "Direct Damage"],
         "cut_reasoning": "Slow/expensive cards are liabilities against aggressive strategies",
         "bring_reasoning": "Sweepers and lifegain stabilize against fast creature decks",
@@ -152,6 +164,15 @@ def _extract_deck_colors(resolved: dict[str, Card | None]) -> set[str]:
     return colors
 
 
+def _deck_color_identity(resolved: dict[str, Card | None]) -> frozenset[str]:
+    """Return the union of color_identity across resolved (non-None) cards."""
+    ci: set[str] = set()
+    for card in resolved.values():
+        if card is not None:
+            ci.update(card.color_identity)
+    return frozenset(ci)
+
+
 def _opposing_colors(deck_colors: set[str]) -> frozenset[str] | set[str]:
     """Return colors not in the deck's color set."""
     return ALL_COLORS - deck_colors
@@ -188,11 +209,49 @@ def _classify_archetype_strategy(matchup: str) -> str:
     matchup_lower = matchup.lower()
 
     strategy_keywords: dict[str, list[str]] = {
-        "aggro": ["aggro", "burn", "red deck", "mono-red", "mono red", "sligh", "zoo", "prowess"],
+        "aggro": [
+            "aggro",
+            "burn",
+            "red deck",
+            "mono-red",
+            "mono red",
+            "sligh",
+            "zoo",
+            "prowess",
+            "ocelot pride",
+            "goblins",
+            "merfolk",
+            "initiative",
+        ],
         "control": ["control", "draw-go", "uw", "azorius", "esper"],
-        "combo": ["combo", "storm", "through the breach", "scapeshift", "living end", "tron"],
+        "combo": [
+            "combo",
+            "storm",
+            "through the breach",
+            "scapeshift",
+            "living end",
+            "tron",
+            "sneak and show",
+            "oops",
+            "all spells",
+            "doomsday",
+            "painter",
+            "epic storm",
+            "show and tell",
+            # Lands is combo-control in Legacy; classify as combo so
+            # counterspell/graveyard-hate recommendations are appropriate.
+            "lands",
+        ],
         "tempo": ["tempo", "delver", "murktide", "faeries"],
-        "midrange": ["midrange", "jund", "energy", "rock", "abzan", "shadow"],
+        "midrange": [
+            "midrange",
+            "jund",
+            "energy",
+            "rock",
+            "abzan",
+            "shadow",
+            "eldrazi",
+        ],
     }
 
     for strategy, keywords in strategy_keywords.items():
@@ -202,6 +261,37 @@ def _classify_archetype_strategy(matchup: str) -> str:
 
     log.debug("classify_strategy.default", matchup=matchup, using="midrange")
     return "midrange"
+
+
+def _infer_matchup_colors(name: str) -> frozenset[str]:
+    """Infer color identity from a matchup name like 'Mono-Blue' or 'Izzet'.
+
+    Tries mono-<color> normalization first, then tokenizes and attempts
+    ``parse_color_identity`` on each token. Returns empty frozenset when
+    nothing is recognized.
+    """
+    name_lower = name.lower()
+
+    color_words = {
+        "white": "W",
+        "blue": "U",
+        "black": "B",
+        "red": "R",
+        "green": "G",
+    }
+
+    for word, letter in color_words.items():
+        if f"mono-{word}" in name_lower or f"mono {word}" in name_lower:
+            return frozenset({letter})
+
+    tokens = name_lower.replace("-", " ").split()
+    for token in tokens:
+        try:
+            return parse_color_identity(token)
+        except ValueError:
+            pass
+
+    return frozenset()
 
 
 def _card_addresses_matchup(card: Card | None, matchup_strategy: str) -> str:
@@ -231,6 +321,60 @@ def _card_addresses_matchup(card: Card | None, matchup_strategy: str) -> str:
         if ct in type_line:
             return "OUT"
 
+    return "FLEX"
+
+
+def _classify_matrix_cell(
+    card: Card | None,
+    *,
+    strategy: str,
+    matchup_colors: frozenset[str],
+) -> str:
+    """Classify a sideboard card's effectiveness against a specific matchup.
+
+    Returns "IN", "OUT", or "FLEX". Color-aware: uses matchup color identity
+    to distinguish hate cards that hit the target from those that don't.
+    """
+    if card is None:
+        return "FLEX"
+
+    oracle = (card.oracle_text or "").lower()
+    type_line = card.type_line.lower()
+    strategy_info = _ARCHETYPE_STRATEGIES.get(strategy, {})
+    bring_categories = strategy_info.get("bring_categories", [])
+    cut_types = strategy_info.get("cut_types", [])
+
+    # 1. Color hate detection
+    color_hate_patterns: dict[str, list[str]] = {
+        "W": ["protection from white", "if it's white"],
+        "U": ["protection from blue", "if it's blue"],
+        "B": ["protection from black", "if it's black"],
+        "R": ["protection from red", "if it's red"],
+        "G": ["protection from green", "if it's green"],
+    }
+
+    for color_letter, patterns in color_hate_patterns.items():
+        if any(p in oracle for p in patterns):
+            if matchup_colors and color_letter in matchup_colors:
+                return "IN"
+            if matchup_colors:
+                return "OUT"
+            # Unknown colors — fall through to role/strategy logic
+
+    # 2. Role vs strategy (broadened oracle detection)
+    for category_name in bring_categories:
+        base_patterns = SIDEBOARD_CATEGORIES.get(category_name, {}).get("text_any", [])
+        broadened = base_patterns + _BROADENED_PATTERNS.get(category_name, [])
+        for pattern in broadened:
+            if pattern.lower() in oracle:
+                return "IN"
+
+    # 3. Cut: card type in strategy cut_types -> OUT
+    for ct in cut_types:
+        if ct in type_line:
+            return "OUT"
+
+    # 4. Else FLEX
     return "FLEX"
 
 
@@ -292,12 +436,21 @@ async def suggest_sideboard(
     # Resolve main deck cards
     resolved = await bulk.get_cards(card_names)
     deck_colors = _extract_deck_colors(resolved)
+    deck_ci = _deck_color_identity(resolved)
     main_deck_lower = {name.lower() for name in card_names}
+
+    resolved_count = sum(1 for v in resolved.values() if v is not None)
+    if resolved_count == 0:
+        log.warning(
+            "suggest_sideboard.no_cards_resolved",
+            deck_colors=sorted(deck_colors),
+        )
 
     log.debug(
         "suggest_sideboard.resolved",
         deck_colors=sorted(deck_colors),
-        resolved_count=sum(1 for v in resolved.values() if v is not None),
+        deck_ci=sorted(deck_ci),
+        resolved_count=resolved_count,
     )
 
     # Fetch format staples if MTGGoldfish available
@@ -315,11 +468,9 @@ async def suggest_sideboard(
     if meta_context:
         meta_lower = meta_context.lower()
         for cat_name in SIDEBOARD_CATEGORIES:
-            # Boost categories mentioned in context
             if any(word in meta_lower for word in cat_name.lower().split()):
                 priority_categories.append(cat_name)
 
-        # Check for strategy hints
         if any(kw in meta_lower for kw in ["aggro", "burn", "mono-red", "red deck"]):
             if "Board Wipes" not in priority_categories:
                 priority_categories.append("Board Wipes")
@@ -339,7 +490,8 @@ async def suggest_sideboard(
     # Build candidates per category
     categories_result: dict[str, list[dict[str, str]]] = {}
     all_suggested: list[dict[str, str]] = []
-    seen_names: set[str] = set()  # Deduplicate across categories
+    seen_names: set[str] = set()
+    empty_categories: list[str] = []
 
     # Process categories -- priority ones first, then the rest
     ordered_categories = list(SIDEBOARD_CATEGORIES.keys())
@@ -359,15 +511,27 @@ async def suggest_sideboard(
         if not cat_def:
             continue
 
-        # Build filter args
-        text_any: list[str] | None = cat_def.get("text_any")  # type: ignore[assignment]
+        text_any: list[str] | None = cat_def.get("text_any")
 
         try:
-            candidates = await bulk.filter_cards(
-                format=format.lower(),
-                limit=10,
-                text_any=text_any,
-            )
+            if resolved_count > 0:
+                candidates = await bulk.filter_cards(
+                    format=format.lower(),
+                    limit=10,
+                    text_any=text_any,
+                    color_identity=deck_ci,
+                )
+            else:
+                log.warning(
+                    "suggest_sideboard.skip_color_filter",
+                    category=cat_name,
+                    reason="no_cards_resolved",
+                )
+                candidates = await bulk.filter_cards(
+                    format=format.lower(),
+                    limit=10,
+                    text_any=text_any,
+                )
         except ServiceError:
             log.warning("suggest_sideboard.filter_failed", category=cat_name, exc_info=True)
             continue
@@ -404,12 +568,13 @@ async def suggest_sideboard(
         if cat_cards:
             categories_result[cat_name] = cat_cards
             all_suggested.extend(cat_cards)
+        elif resolved_count > 0:
+            empty_categories.append(cat_name)
 
     # Add Color Hosers dynamically based on opposing colors
     if len(all_suggested) < _MAX_SIDEBOARD:
         opposing = _opposing_colors(deck_colors)
         if opposing:
-            # Search for "protection from {color}" or anti-color effects
             color_names = {"W": "white", "U": "blue", "B": "black", "R": "red", "G": "green"}
             hoser_patterns = []
             for c in opposing:
@@ -419,11 +584,24 @@ async def suggest_sideboard(
 
             if hoser_patterns:
                 try:
-                    hosers = await bulk.filter_cards(
-                        format=format.lower(),
-                        text_any=hoser_patterns,
-                        limit=5,
-                    )
+                    if resolved_count > 0:
+                        hosers = await bulk.filter_cards(
+                            format=format.lower(),
+                            text_any=hoser_patterns,
+                            limit=5,
+                            color_identity=deck_ci,
+                        )
+                    else:
+                        log.warning(
+                            "suggest_sideboard.skip_color_filter",
+                            category="Color Hosers",
+                            reason="no_cards_resolved",
+                        )
+                        hosers = await bulk.filter_cards(
+                            format=format.lower(),
+                            text_any=hoser_patterns,
+                            limit=5,
+                        )
                     hoser_cards: list[dict[str, str]] = []
                     for card in hosers:
                         if card.name.lower() in main_deck_lower:
@@ -451,7 +629,12 @@ async def suggest_sideboard(
 
     # Format output
     markdown = _format_suggest_sideboard(
-        format, categories_result, all_suggested, staple_names, response_format
+        format,
+        categories_result,
+        all_suggested,
+        empty_categories,
+        staple_names,
+        response_format,
     )
     data: dict[str, object] = {
         "format": format,
@@ -459,6 +642,8 @@ async def suggest_sideboard(
         "suggested_cards": all_suggested,
         "total_cards": len(all_suggested),
     }
+    if empty_categories:
+        data["empty_categories"] = empty_categories
 
     return WorkflowResult(markdown=markdown, data=data)
 
@@ -467,6 +652,7 @@ def _format_suggest_sideboard(
     format: str,
     categories: dict[str, list[dict[str, str]]],
     all_suggested: list[dict[str, str]],
+    empty_categories: list[str],
     staple_names: set[str],
     response_format: Literal["detailed", "concise"],
 ) -> str:
@@ -487,6 +673,14 @@ def _format_suggest_sideboard(
                 lines.append(
                     f"- **{card['name']}** ({card['mana_cost']}) -- {card['reasoning']}{marker}"
                 )
+        lines.append("")
+
+    if empty_categories:
+        for cat_name in empty_categories:
+            lines.append(
+                f"> No strong on-color answers for {cat_name.lower()} in {format}; "
+                "consider colorless options."
+            )
         lines.append("")
 
     if response_format != "concise" and staple_names:
@@ -594,7 +788,6 @@ async def sideboard_guide(
                 }
             )
         elif verdict == "FLEX":
-            # Include FLEX cards if we have room
             ins.append(
                 {
                     "name": name,
@@ -617,19 +810,16 @@ async def sideboard_guide(
         should_cut = False
         cut_reason = ""
 
-        # Check if card type is weak against this matchup
         for ct in cut_types:
             if ct in type_line_lower:
                 should_cut = True
                 cut_reason = f"{card.type_line} -- weak against {strategy}"
                 break
 
-        # Against aggro: cut expensive cards (cmc >= 5)
         if not should_cut and strategy == "aggro" and cmc >= 5:
             should_cut = True
             cut_reason = f"CMC {cmc:.0f} -- too slow against aggro"
 
-        # Against control: cut creature removal
         if not should_cut and strategy == "control":
             oracle = (card.oracle_text or "").lower()
             if any(
@@ -656,7 +846,6 @@ async def sideboard_guide(
     total_in = sum(int(i.get("quantity", 1)) for i in ins)
     total_out = sum(int(o.get("quantity", 1)) for o in outs)
 
-    # If more INs than OUTs, trim INs to match
     if total_in > total_out and outs:
         trimmed_ins: list[dict[str, str | int]] = []
         running = 0
@@ -690,7 +879,6 @@ async def sideboard_guide(
     cut_reasoning = strategy_info.get("cut_reasoning", "Trim underperformers")
     combined_reasoning = f"IN: {overall_reasoning}. OUT: {cut_reasoning}."
 
-    # Format
     markdown = _format_sideboard_guide(matched_name, ins, outs, combined_reasoning, response_format)
     data: dict[str, object] = {
         "matchup": matched_name,
@@ -789,15 +977,19 @@ async def sideboard_matrix(
     Returns:
         WorkflowResult with matrix table and structured data.
     """
-    # Determine matchup list
     matchup_names: list[str] = []
+    matchup_colors_map: dict[str, frozenset[str]] = {}
+
     if matchups:
         matchup_names = matchups
+        matchup_colors_map = {name: _infer_matchup_colors(name) for name in matchups}
     elif mtggoldfish is not None:
         try:
             meta = await mtggoldfish.get_metagame(format.lower())
             if meta.archetypes:
-                matchup_names = [a.name for a in meta.archetypes[:6]]
+                matchup_archetypes = meta.archetypes[:6]
+                matchup_names = [a.name for a in matchup_archetypes]
+                matchup_colors_map = {a.name: frozenset(a.colors) for a in matchup_archetypes}
         except ServiceError:
             log.warning("sideboard_matrix.mtggoldfish_failed", exc_info=True)
 
@@ -837,7 +1029,8 @@ async def sideboard_matrix(
         row: dict[str, str] = {}
         for mu in matchup_names:
             strategy = _classify_archetype_strategy(mu)
-            verdict = _card_addresses_matchup(card, strategy)
+            matchup_colors = matchup_colors_map.get(mu, frozenset())
+            verdict = _classify_matrix_cell(card, strategy=strategy, matchup_colors=matchup_colors)
             row[mu] = verdict
         matrix[name] = row
 
@@ -866,19 +1059,16 @@ def _format_sideboard_matrix(
     headers = []
     for mu in matchup_names:
         if len(mu) > 15:
-            # Take first two words
             parts = mu.split()
             headers.append(" ".join(parts[:2]) if len(parts) > 1 else parts[0])
         else:
             headers.append(mu)
 
-    # Table header
     header_row = "| Card | " + " | ".join(headers) + " |"
     separator = "|------|" + "|".join(["------" for _ in headers]) + "|"
     lines.append(header_row)
     lines.append(separator)
 
-    # Table rows
     for name in sb_names:
         row_cells = []
         for mu in matchup_names:
