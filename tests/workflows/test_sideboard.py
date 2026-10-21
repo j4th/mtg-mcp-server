@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
 from unittest.mock import AsyncMock
 
 import pytest
@@ -917,7 +918,9 @@ class TestClassifySideboardCard:
         assert verdict == "FLEX"
 
     def test_graveyard_hate_in_vs_combo(self) -> None:
-        verdict = _classify_sideboard_card(SURGICAL, strategy="combo", matchup_colors=frozenset({"U"}))
+        verdict = _classify_sideboard_card(
+            SURGICAL, strategy="combo", matchup_colors=frozenset({"U"})
+        )
         assert verdict == "IN"
 
     def test_board_wipe_in_vs_midrange(self) -> None:
@@ -927,7 +930,9 @@ class TestClassifySideboardCard:
         assert verdict == "IN"
 
     def test_counterspell_in_vs_combo_regression(self) -> None:
-        verdict = _classify_sideboard_card(COUNTERSPELL, strategy="combo", matchup_colors=frozenset())
+        verdict = _classify_sideboard_card(
+            COUNTERSPELL, strategy="combo", matchup_colors=frozenset()
+        )
         assert verdict == "IN"
 
     def test_none_card_returns_flex(self) -> None:
@@ -1042,3 +1047,98 @@ class TestSideboardMatrixColorAware:
 
         assert len(result.data["matchups"]) == 6
         assert "Boros Energy" in result.data["matchups"]
+
+
+# ===========================================================================
+# Part C — unification: sideboard_guide and sideboard_matrix share one
+# classifier (PR #67 review follow-ups)
+# ===========================================================================
+
+
+class TestSideboardGuideColorAware:
+    """sideboard_guide uses the shared color-aware classifier."""
+
+    async def test_color_hate_in_vs_matching_color(self, mock_bulk: AsyncMock) -> None:
+        """Hydroblast is IN vs Mono-Red Aggro, with color-hate reasoning."""
+        mock_bulk.get_cards = AsyncMock(return_value={"Hydroblast": HYDROBLAST})
+
+        result = await sideboard_guide(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Hydroblast"],
+            format="modern",
+            matchup="Mono-Red Aggro",
+            bulk=mock_bulk,
+        )
+
+        entry = next(i for i in result.data["ins"] if i["name"] == "Hydroblast")
+        assert entry["verdict"] == "IN"
+        assert "color" in entry["reasoning"].lower()
+
+    async def test_color_hate_out_vs_non_matching_color(self, mock_bulk: AsyncMock) -> None:
+        """Pyroblast vs Mono-Red Aggro is OUT -- absent from ins entirely."""
+        mock_bulk.get_cards = AsyncMock(return_value={"Pyroblast": PYROBLAST})
+
+        result = await sideboard_guide(
+            decklist=["4x Lightning Bolt"],
+            sideboard=["2x Pyroblast"],
+            format="modern",
+            matchup="Mono-Red Aggro",
+            bulk=mock_bulk,
+        )
+
+        assert all(i["name"] != "Pyroblast" for i in result.data["ins"])
+
+
+class TestGuideMatrixAgreement:
+    """sideboard_guide and sideboard_matrix must render identical verdicts.
+
+    Pins the unified classifier: for the same card vs the same matchup, the
+    verdict in guide's structured ``ins`` entries (IN/FLEX) or its absence
+    (OUT) must equal the corresponding matrix cell.
+    """
+
+    PIN_CARDS: ClassVar[list[Card]] = [
+        PYROBLAST,
+        HYDROBLAST,
+        SURGICAL,
+        PYROCLASM,
+        COUNTERSPELL,
+        RIP,
+        AURIOK,
+    ]
+    PIN_MATCHUPS: ClassVar[list[str]] = [
+        "Izzet Phoenix",
+        "Mono-Red Aggro",
+        "Eldrazi Aggro",
+        "Storm Combo",
+    ]
+
+    async def test_both_tools_agree_on_fixture_set(self, mock_bulk: AsyncMock) -> None:
+        resolved = {c.name: c for c in self.PIN_CARDS}
+        mock_bulk.get_cards = AsyncMock(return_value=resolved)
+        decklist = ["4x Lightning Bolt", "4x Goblin Guide", "4x Primeval Titan"]
+
+        matrix_result = await sideboard_matrix(
+            decklist=decklist,
+            sideboard=[f"2x {c.name}" for c in self.PIN_CARDS],
+            format="modern",
+            bulk=mock_bulk,
+            matchups=self.PIN_MATCHUPS,
+        )
+        matrix = matrix_result.data["matrix"]
+
+        for mu in self.PIN_MATCHUPS:
+            for card in self.PIN_CARDS:
+                guide = await sideboard_guide(
+                    decklist=decklist,
+                    sideboard=[f"2x {card.name}"],
+                    format="modern",
+                    matchup=mu,
+                    bulk=mock_bulk,
+                )
+                entry = next((i for i in guide.data["ins"] if i["name"] == card.name), None)
+                guide_verdict = entry["verdict"] if entry is not None else "OUT"
+                matrix_verdict = matrix[card.name][mu]
+                assert guide_verdict == matrix_verdict, (
+                    f"{card.name} vs {mu}: guide={guide_verdict} matrix={matrix_verdict}"
+                )
