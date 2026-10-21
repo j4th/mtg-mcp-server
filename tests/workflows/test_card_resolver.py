@@ -128,6 +128,31 @@ class TestResolveCards:
         assert result == {"Sol Ring": bulk_card, "New Card": scryfall_card}
         mock_scryfall.get_card_by_name.assert_awaited_once_with("New Card")
 
+    async def test_duplicate_names_fetch_fallback_once(self, mock_bulk, mock_scryfall):
+        """Duplicate input names collapse to one Scryfall fallback fetch.
+
+        Decklists repeat card names; each distinct name must hit Scryfall
+        at most once regardless of how many times it appears.
+        """
+        mock_bulk.get_cards.side_effect = ScryfallBulkError("Download failed")
+        scryfall_card = AsyncMock(name="Sol Ring")
+        bolt_card = AsyncMock(name="Lightning Bolt")
+
+        def _by_name(name: str):
+            return bolt_card if name == "Lightning Bolt" else scryfall_card
+
+        mock_scryfall.get_card_by_name.side_effect = _by_name
+
+        result = await resolve_cards(
+            ["Sol Ring", "Lightning Bolt", "Sol Ring"],
+            bulk=mock_bulk,
+            scryfall=mock_scryfall,
+        )
+
+        assert result["Sol Ring"] is scryfall_card
+        assert result["Lightning Bolt"] is bolt_card
+        assert mock_scryfall.get_card_by_name.await_count == 2
+
     async def test_not_found_anywhere_maps_to_none(self, mock_bulk, mock_scryfall):
         """CardNotFoundError from Scryfall maps to None instead of raising."""
         mock_bulk.get_cards.return_value = {"Ghost": None}

@@ -84,24 +84,31 @@ async def resolve_cards(
         Dict mapping each input name (original casing preserved) to its
         Card, or None if not found in any source.
     """
-    resolved: dict[str, Card | None] = {name: None for name in names}
-    missing: list[str] = names
+    # Dedupe input names (decklists repeat cards) so the bulk batch and
+    # each fallback path fetch every distinct name at most once.
+    unique_names = list(dict.fromkeys(names))
+    resolved: dict[str, Card | None] = {name: None for name in unique_names}
+    missing: list[str] = unique_names
 
     if bulk is not None:
         try:
-            bulk_map = await bulk.get_cards(names)
+            bulk_map = await bulk.get_cards(unique_names)
         except Exception:
-            log.warning("resolve_cards.bulk_error", count=len(names), exc_info=True)
+            log.warning("resolve_cards.bulk_error", count=len(unique_names), exc_info=True)
         else:
             missing = []
-            for name in names:
+            for name in unique_names:
                 card = bulk_map.get(name)
                 if card is not None:
                     resolved[name] = card
                 else:
                     missing.append(name)
             if missing:
-                log.debug("resolve_cards.bulk_miss", total=len(names), missing=len(missing))
+                log.debug(
+                    "resolve_cards.bulk_miss",
+                    total=len(unique_names),
+                    missing=len(missing),
+                )
 
     if not missing:
         return resolved
