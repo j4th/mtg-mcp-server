@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import json
 import time
 from pathlib import Path
@@ -838,16 +839,67 @@ class TestParseFailures:
                 with pytest.raises(ScryfallBulkError, match="Failed to parse"):
                     await client.ensure_loaded()
 
-    async def test_json_object_instead_of_array_raises(self):
-        """JSON object (not array) raises ScryfallBulkError."""
+    async def test_truncated_gzip_raises_corrupt_gzip(self):
+        """Gzip magic bytes present but payload truncated raises corrupt gzip."""
+        corrupt = gzip.compress(b'{"object": "card"}')[:-4]  # strip CRC/ISIZE trailer
+        assert corrupt[:2] == b"\x1f\x8b"  # magic bytes still present
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(
+                respx, content=corrupt, headers={"Content-Type": "application/gzip"}
+            )
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkError, match="corrupt gzip"):
+                    await client.ensure_loaded()
+
+    async def test_malformed_jsonl_line_reports_line_number(self):
+        """A malformed line inside a JSONL payload raises with the line number."""
+        payload = b'{"object": "card"}\nnot valid json\n'
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(
+                respx, content=payload, headers={"Content-Type": "application/json"}
+            )
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                with pytest.raises(ScryfallBulkError, match=r"JSONL line 2"):
+                    await client.ensure_loaded()
+
+    async def test_non_card_json_object_raises_zero_parsed(self):
+        """A lone JSON object that is not a card parses as one entry, then
+        fails with zero cards parsed (not the misleading 'not a JSON array')."""
         with respx.mock:
             _mock_metadata_route(respx)
             _mock_download_route(respx, content=b'{"error": "not found"}')
 
             client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
             async with client:
-                with pytest.raises(ScryfallBulkError, match="not a JSON array"):
+                with pytest.raises(ScryfallBulkError, match="Parsed 0 cards"):
                     await client.ensure_loaded()
+
+    async def test_single_json_object_parses_as_one_entry(self):
+        """A lone JSON object (single-entry JSONL shape) parses as one card.
+
+        Regression: _extract_entries rejected dict payloads with the
+        misleading 'not a JSON array' error even though a one-line JSONL
+        file is a valid (if degenerate) payload.
+        """
+        sample = json.loads(_load_oracle_cards())
+        single = json.dumps(sample[0]).encode()
+        with respx.mock:
+            _mock_metadata_route(respx)
+            _mock_download_route(
+                respx, content=single, headers={"Content-Type": "application/json"}
+            )
+
+            client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+            async with client:
+                await client.ensure_loaded()
+                assert len(client._unique_cards) == 1
+                assert await client.get_card(sample[0]["name"]) is not None
 
     async def test_all_invalid_cards_raises_zero_parsed(self):
         """Array of all-invalid entries raises ScryfallBulkError (zero cards)."""

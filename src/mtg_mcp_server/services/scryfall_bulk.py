@@ -589,7 +589,8 @@ class ScryfallBulkClient:
 
         Legacy shape (``download_uri``): a single JSON document that is a
         JSON array of card objects. Current shape (``jsonl_download_uri``):
-        JSONL — one card object per line.
+        JSONL — one card object per line. A lone JSON object is accepted as
+        a single-entry payload (a degenerate one-line JSONL file).
 
         Raises:
             ScryfallBulkError: If the payload is neither shape.
@@ -599,6 +600,8 @@ class ScryfallBulkClient:
         except (json.JSONDecodeError, UnicodeDecodeError):
             return ScryfallBulkClient._parse_jsonl(payload)
 
+        if isinstance(raw, dict):
+            return [raw]
         if not isinstance(raw, list):
             raise ScryfallBulkError("Bulk data is not a JSON array")
         return raw
