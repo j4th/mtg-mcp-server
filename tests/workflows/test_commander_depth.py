@@ -179,6 +179,7 @@ class TestCommanderComparison:
     async def test_two_commanders_all_sources(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         mock_edhrec: AsyncMock,
         muldrotha: Card,
@@ -186,7 +187,12 @@ class TestCommanderComparison:
         mock_combos: list[Combo],
     ) -> None:
         """Two commanders with all sources succeeding."""
-        mock_bulk.get_card = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Muldrotha, the Gravetide": muldrotha,
+                "Atraxa, Praetors' Voice": atraxa,
+            }
+        )
         mock_spellbook.find_combos = AsyncMock(side_effect=[mock_combos, []])
         mock_edhrec.commander_top_cards = AsyncMock(
             side_effect=[
@@ -218,6 +224,7 @@ class TestCommanderComparison:
         result = await commander_comparison(
             ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             edhrec=mock_edhrec,
         )
@@ -231,32 +238,41 @@ class TestCommanderComparison:
     async def test_commander_not_found(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
     ) -> None:
-        """Commander not found in bulk data raises error."""
-        mock_bulk.get_card = AsyncMock(return_value=None)
+        """Commander not found in either source raises error."""
+        mock_bulk.get_cards = AsyncMock(return_value={"Nonexistent Commander": None})
 
         with pytest.raises(ValueError, match="not found"):
             await commander_comparison(
                 ["Nonexistent Commander"],
                 bulk=mock_bulk,
+                scryfall=mock_scryfall,
                 spellbook=mock_spellbook,
             )
 
     async def test_edhrec_disabled(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         muldrotha: Card,
         atraxa: Card,
     ) -> None:
         """Works without EDHREC."""
-        mock_bulk.get_card = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Muldrotha, the Gravetide": muldrotha,
+                "Atraxa, Praetors' Voice": atraxa,
+            }
+        )
         mock_spellbook.find_combos = AsyncMock(return_value=[])
 
         result = await commander_comparison(
             ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             edhrec=None,
         )
@@ -267,12 +283,18 @@ class TestCommanderComparison:
     async def test_spellbook_failure_partial(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         muldrotha: Card,
         atraxa: Card,
     ) -> None:
         """Spellbook failure degrades gracefully."""
-        mock_bulk.get_card = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Muldrotha, the Gravetide": muldrotha,
+                "Atraxa, Praetors' Voice": atraxa,
+            }
+        )
         mock_spellbook.find_combos = AsyncMock(
             side_effect=SpellbookError("timeout", status_code=503)
         )
@@ -280,6 +302,7 @@ class TestCommanderComparison:
         result = await commander_comparison(
             ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
         )
 
@@ -290,12 +313,18 @@ class TestCommanderComparison:
     async def test_progress_callback(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         muldrotha: Card,
         atraxa: Card,
     ) -> None:
         """Progress callback is invoked at each step."""
-        mock_bulk.get_card = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Muldrotha, the Gravetide": muldrotha,
+                "Atraxa, Praetors' Voice": atraxa,
+            }
+        )
         mock_spellbook.find_combos = AsyncMock(return_value=[])
 
         progress_calls: list[tuple[int, int]] = []
@@ -306,6 +335,7 @@ class TestCommanderComparison:
         await commander_comparison(
             ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             on_progress=on_progress,
         )
@@ -317,27 +347,40 @@ class TestCommanderComparison:
     async def test_concise_format(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         muldrotha: Card,
         atraxa: Card,
     ) -> None:
         """Concise format is shorter than detailed."""
-        mock_bulk.get_card = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Muldrotha, the Gravetide": muldrotha,
+                "Atraxa, Praetors' Voice": atraxa,
+            }
+        )
         mock_spellbook.find_combos = AsyncMock(return_value=[])
 
         detailed = await commander_comparison(
             ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             response_format="detailed",
         )
 
-        mock_bulk.get_card = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Muldrotha, the Gravetide": muldrotha,
+                "Atraxa, Praetors' Voice": atraxa,
+            }
+        )
         mock_spellbook.find_combos = AsyncMock(return_value=[])
 
         concise = await commander_comparison(
             ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             response_format="concise",
         )
@@ -347,13 +390,19 @@ class TestCommanderComparison:
     async def test_shared_and_unique_staples(
         self,
         mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
         mock_spellbook: AsyncMock,
         mock_edhrec: AsyncMock,
         muldrotha: Card,
         atraxa: Card,
     ) -> None:
         """EDHREC data shows shared and unique staples."""
-        mock_bulk.get_card = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_bulk.get_cards = AsyncMock(
+            return_value={
+                "Muldrotha, the Gravetide": muldrotha,
+                "Atraxa, Praetors' Voice": atraxa,
+            }
+        )
         mock_spellbook.find_combos = AsyncMock(return_value=[])
         mock_edhrec.commander_top_cards = AsyncMock(
             side_effect=[
@@ -379,12 +428,38 @@ class TestCommanderComparison:
         result = await commander_comparison(
             ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
             bulk=mock_bulk,
+            scryfall=mock_scryfall,
             spellbook=mock_spellbook,
             edhrec=mock_edhrec,
         )
 
         # Sol Ring is shared, Spore Frog / Deepglow Skate are unique
         assert "Sol Ring" in result.markdown
+
+    async def test_bulk_error_falls_back_to_scryfall(
+        self,
+        mock_bulk: AsyncMock,
+        mock_scryfall: AsyncMock,
+        mock_spellbook: AsyncMock,
+        muldrotha: Card,
+        atraxa: Card,
+    ) -> None:
+        """Bulk batch failure degrades to per-commander Scryfall fallback."""
+        mock_bulk.get_cards = AsyncMock(side_effect=ScryfallBulkError("bulk data unavailable"))
+        mock_scryfall.get_card_by_name = AsyncMock(side_effect=[muldrotha, atraxa])
+        mock_spellbook.find_combos = AsyncMock(return_value=[])
+
+        result = await commander_comparison(
+            ["Muldrotha, the Gravetide", "Atraxa, Praetors' Voice"],
+            bulk=mock_bulk,
+            scryfall=mock_scryfall,
+            spellbook=mock_spellbook,
+        )
+
+        # Comparison completed via Scryfall-sourced cards despite bulk being down
+        assert "Muldrotha" in result.markdown
+        assert "Atraxa" in result.markdown
+        assert mock_scryfall.get_card_by_name.await_count == 2
 
 
 # ===========================================================================

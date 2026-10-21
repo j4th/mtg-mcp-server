@@ -133,6 +133,7 @@ async def commander_comparison(
     commanders: list[str],
     *,
     bulk: ScryfallBulkClient,
+    scryfall: ScryfallClient,
     spellbook: SpellbookClient,
     edhrec: EDHRECClient | None = None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
@@ -140,9 +141,15 @@ async def commander_comparison(
 ) -> WorkflowResult:
     """Compare 2-5 commanders head-to-head.
 
+    Commander resolution is bulk-data-first with per-card Scryfall fallback
+    (see :func:`~mtg_mcp_server.workflows.card_resolver.resolve_cards`), so
+    a bulk-data outage degrades resolution to Scryfall instead of failing
+    the comparison.
+
     Args:
         commanders: Commander names to compare (2-5).
         bulk: Initialized ScryfallBulkClient.
+        scryfall: Initialized ScryfallClient (fallback source).
         spellbook: Initialized SpellbookClient.
         edhrec: Initialized EDHRECClient, or None if disabled.
         on_progress: Optional callback for progress reporting.
@@ -156,17 +163,19 @@ async def commander_comparison(
     """
     log.info("commander_comparison.start", commanders=commanders)
 
-    # Step 1/3: Resolve all commanders via bulk data
+    # Step 1/3: Resolve all commanders (bulk-data-first, Scryfall fallback)
     if on_progress is not None:
         await on_progress(1, 3)
 
-    resolve_tasks = [bulk.get_card(name) for name in commanders]
-    resolved = await asyncio.gather(*resolve_tasks)
+    from mtg_mcp_server.workflows.card_resolver import resolve_cards
+
+    resolved_map = await resolve_cards(commanders, bulk=bulk, scryfall=scryfall)
 
     stats_list: list[_CommanderStats] = []
-    for i, card in enumerate(resolved):
+    for name in commanders:
+        card = resolved_map.get(name)
         if card is None:
-            raise ValueError(f"Commander not found: '{commanders[i]}'")
+            raise ValueError(f"Commander not found: '{name}'")
         stats_list.append(_CommanderStats(name=card.name, card=card))
 
     # Step 2/3: Fetch combo counts and EDHREC data

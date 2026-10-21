@@ -701,6 +701,7 @@ async def commander_comparison(
         result = await impl(
             commanders,
             bulk=_require_bulk(),
+            scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             on_progress=lambda step, total: _progress(ctx, step, total),
