@@ -11,7 +11,10 @@ import sys
 
 import structlog
 
-_VALID_LEVELS = frozenset(logging.getLevelNamesMapping())
+# Mapping of valid level names -> int levels (py3.11+). Kept as a dict so
+# the int is available directly — logging.getLevelName() returns str | int,
+# which structlog's filter factory does not accept.
+_VALID_LEVELS = logging.getLevelNamesMapping()
 
 
 def configure_logging(level: str = "INFO") -> None:
@@ -36,7 +39,7 @@ def configure_logging(level: str = "INFO") -> None:
         ],
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         wrapper_class=structlog.make_filtering_bound_logger(
-            logging.getLevelName(level_upper),
+            _VALID_LEVELS[level_upper],
         ),
     )
 
