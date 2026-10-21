@@ -106,6 +106,17 @@ _BROADENED_PATTERNS: dict[str, list[str]] = {
     ],
 }
 
+# Oracle text patterns that mark a card as hating a specific enemy color.
+# The "and from X" form catches multi-color protection ("protection from
+# black and from green" -- Auriok Champion, Mirran Crusader, the Swords).
+_COLOR_HATE_PATTERNS: dict[str, list[str]] = {
+    "W": ["protection from white", "if it's white", "and from white"],
+    "U": ["protection from blue", "if it's blue", "and from blue"],
+    "B": ["protection from black", "if it's black", "and from black"],
+    "R": ["protection from red", "if it's red", "and from red"],
+    "G": ["protection from green", "if it's green", "and from green"],
+}
+
 # ---------------------------------------------------------------------------
 # Archetype strategy mapping for sideboard guide
 # ---------------------------------------------------------------------------
@@ -326,7 +337,7 @@ def _card_addresses_matchup(card: Card | None, matchup_strategy: str) -> str:
     return "FLEX"
 
 
-def _classify_matrix_cell(
+def _classify_sideboard_card(
     card: Card | None,
     *,
     strategy: str,
@@ -334,8 +345,14 @@ def _classify_matrix_cell(
 ) -> str:
     """Classify a sideboard card's effectiveness against a specific matchup.
 
-    Returns "IN", "OUT", or "FLEX". Color-aware: uses matchup color identity
-    to distinguish hate cards that hit the target from those that don't.
+    Returns "IN", "OUT", or "FLEX". This is the single classifier shared by
+    ``sideboard_guide`` and ``sideboard_matrix`` so both tools render the
+    same verdict for the same card vs the same matchup.
+
+    Color-aware: evaluates ALL color-hate patterns and aggregates the hated
+    colors before deciding, so multi-color hate cards (e.g. "protection from
+    black and from green") are IN whenever ANY hated color is in the matchup
+    — instead of being judged (and mis-marked OUT) by the first pattern hit.
     """
     if card is None:
         return "FLEX"
@@ -346,22 +363,15 @@ def _classify_matrix_cell(
     bring_categories = strategy_info.get("bring_categories", [])
     cut_types = strategy_info.get("cut_types", [])
 
-    # 1. Color hate detection
-    color_hate_patterns: dict[str, list[str]] = {
-        "W": ["protection from white", "if it's white"],
-        "U": ["protection from blue", "if it's blue"],
-        "B": ["protection from black", "if it's black"],
-        "R": ["protection from red", "if it's red"],
-        "G": ["protection from green", "if it's green"],
+    # 1. Color hate detection — check every color's patterns before deciding
+    hated_colors = {
+        color
+        for color, patterns in _COLOR_HATE_PATTERNS.items()
+        if any(pattern in oracle for pattern in patterns)
     }
-
-    for color_letter, patterns in color_hate_patterns.items():
-        if any(p in oracle for p in patterns):
-            if matchup_colors and color_letter in matchup_colors:
-                return "IN"
-            if matchup_colors:
-                return "OUT"
-            # Unknown colors — fall through to role/strategy logic
+    if hated_colors and matchup_colors:
+        return "IN" if hated_colors & matchup_colors else "OUT"
+    # Unknown matchup colors — fall through to role/strategy logic
 
     # 2. Role vs strategy (broadened oracle detection)
     for category_name in bring_categories:
@@ -1032,7 +1042,7 @@ async def sideboard_matrix(
         for mu in matchup_names:
             strategy = _classify_archetype_strategy(mu)
             matchup_colors = matchup_colors_map.get(mu, frozenset())
-            verdict = _classify_matrix_cell(card, strategy=strategy, matchup_colors=matchup_colors)
+            verdict = _classify_sideboard_card(card, strategy=strategy, matchup_colors=matchup_colors)
             row[mu] = verdict
         matrix[name] = row
 

@@ -16,7 +16,7 @@ from mtg_mcp_server.types import (
 )
 from mtg_mcp_server.workflows.sideboard import (
     _classify_archetype_strategy,
-    _classify_matrix_cell,
+    _classify_sideboard_card,
     _extract_deck_colors,
     _infer_matchup_colors,
     _match_archetype_name,
@@ -193,6 +193,15 @@ PYROCLASM = _mock_card(
     colors=["R"],
     color_identity=["R"],
     mana_cost="{1}{R}",
+    cmc=2.0,
+)
+AURIOK = _mock_card(
+    "Auriok Champion",
+    oracle_text="Protection from black and from green.",
+    type_line="Creature -- Human Cleric",
+    colors=["W"],
+    color_identity=["W"],
+    mana_cost="{W}{W}",
     cmc=2.0,
 )
 
@@ -858,43 +867,71 @@ class TestInferMatchupColors:
         assert _infer_matchup_colors("Colorless Eldrazi") == frozenset()
 
 
-class TestClassifyMatrixCell:
-    """_classify_matrix_cell with strategy and matchup colors."""
+class TestClassifySideboardCard:
+    """Unified classifier with strategy and matchup colors."""
 
     def test_color_hate_in_when_color_in_matchup(self) -> None:
-        verdict = _classify_matrix_cell(
+        verdict = _classify_sideboard_card(
             PYROBLAST, strategy="combo", matchup_colors=frozenset({"U", "R"})
         )
         assert verdict == "IN"
 
     def test_color_hate_out_when_color_not_in_matchup(self) -> None:
-        verdict = _classify_matrix_cell(
+        verdict = _classify_sideboard_card(
             PYROBLAST, strategy="combo", matchup_colors=frozenset({"G"})
         )
         assert verdict == "OUT"
 
     def test_color_hate_flex_when_unknown_colors(self) -> None:
         """Unknown matchup colors fall through to role/strategy."""
-        verdict = _classify_matrix_cell(PYROBLAST, strategy="combo", matchup_colors=frozenset())
+        verdict = _classify_sideboard_card(PYROBLAST, strategy="combo", matchup_colors=frozenset())
         # Falls through to role/strategy: counterspell vs combo = IN
         assert verdict == "IN"
 
+    def test_multi_color_hate_in_when_second_color_in_matchup(self) -> None:
+        """Auriok Champion (pro black + pro green) is IN vs a green-only matchup.
+
+        The first-match loop used to hit the black pattern first and mark it
+        OUT because black is not in the matchup -- wrong, it also hates green.
+        """
+        verdict = _classify_sideboard_card(
+            AURIOK, strategy="midrange", matchup_colors=frozenset({"G"})
+        )
+        assert verdict == "IN"
+
+    def test_multi_color_hate_in_when_first_color_in_matchup(self) -> None:
+        verdict = _classify_sideboard_card(
+            AURIOK, strategy="midrange", matchup_colors=frozenset({"B"})
+        )
+        assert verdict == "IN"
+
+    def test_multi_color_hate_out_when_no_hated_color_in_matchup(self) -> None:
+        verdict = _classify_sideboard_card(
+            AURIOK, strategy="midrange", matchup_colors=frozenset({"U", "R"})
+        )
+        assert verdict == "OUT"
+
+    def test_multi_color_hate_falls_through_when_colors_unknown(self) -> None:
+        """Unknown matchup colors skip color hate and fall through to role/strategy."""
+        verdict = _classify_sideboard_card(AURIOK, strategy="midrange", matchup_colors=frozenset())
+        assert verdict == "FLEX"
+
     def test_graveyard_hate_in_vs_combo(self) -> None:
-        verdict = _classify_matrix_cell(SURGICAL, strategy="combo", matchup_colors=frozenset({"U"}))
+        verdict = _classify_sideboard_card(SURGICAL, strategy="combo", matchup_colors=frozenset({"U"}))
         assert verdict == "IN"
 
     def test_board_wipe_in_vs_midrange(self) -> None:
-        verdict = _classify_matrix_cell(
+        verdict = _classify_sideboard_card(
             PYROCLASM, strategy="midrange", matchup_colors=frozenset({"G"})
         )
         assert verdict == "IN"
 
     def test_counterspell_in_vs_combo_regression(self) -> None:
-        verdict = _classify_matrix_cell(COUNTERSPELL, strategy="combo", matchup_colors=frozenset())
+        verdict = _classify_sideboard_card(COUNTERSPELL, strategy="combo", matchup_colors=frozenset())
         assert verdict == "IN"
 
     def test_none_card_returns_flex(self) -> None:
-        verdict = _classify_matrix_cell(None, strategy="aggro", matchup_colors=frozenset())
+        verdict = _classify_sideboard_card(None, strategy="aggro", matchup_colors=frozenset())
         assert verdict == "FLEX"
 
 
