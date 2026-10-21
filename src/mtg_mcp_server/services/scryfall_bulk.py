@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import json
 import random
 import time
-from typing import Self
+import zlib
+from typing import TYPE_CHECKING, Self
 
 import httpx
 import structlog
@@ -32,6 +34,9 @@ from pydantic import ValidationError
 
 from mtg_mcp_server.services.base import DEFAULT_USER_AGENT, ServiceError
 from mtg_mcp_server.types import Card
+
+if TYPE_CHECKING:
+    from typing import Any as JSONValue
 
 __all__ = ["ScryfallBulkClient", "ScryfallBulkDownloadError", "ScryfallBulkError"]
 
@@ -168,13 +173,11 @@ class ScryfallBulkClient:
             log.info("scryfall_bulk.loading", base_url=self._base_url, is_refresh=is_refresh)
 
             try:
-                # Step 1: Fetch metadata to get the current download URL
+                # Step 1: Fetch metadata to get the current download URL.
+                # Scryfall renamed download_uri → jsonl_download_uri (2026);
+                # prefer the new field, fall back to the legacy name.
                 metadata = await self._fetch_metadata()
-                download_url = metadata.get("download_uri")
-                if not download_url or not isinstance(download_url, str):
-                    raise ScryfallBulkError(
-                        f"Bulk metadata missing 'download_uri'. Keys: {list(metadata.keys())}"
-                    )
+                download_url = self._resolve_download_url(metadata)
 
                 # Step 2: Download the bulk data (with ETag if URL matches)
                 result = await self._download(download_url)
@@ -532,32 +535,122 @@ class ScryfallBulkClient:
         except httpx.RequestError as exc:
             raise ScryfallBulkDownloadError(f"Network error downloading bulk data: {exc}") from exc
 
-    def _parse(self, raw_bytes: bytes) -> None:
-        """Parse Oracle Cards JSON array into the in-memory card dicts.
+    @staticmethod
+    def _resolve_download_url(metadata: dict) -> str:
+        """Extract the download URL from bulk metadata across the field rename.
 
-        The bulk data is a JSON array of Scryfall card objects. Each is
-        validated through ``Card.model_validate()``.
+        Prefers ``jsonl_download_uri`` (current field); falls back to the
+        legacy ``download_uri`` for older-shaped responses, with a log line
+        so the fallback is never silent.
+
+        Raises:
+            ScryfallBulkError: If neither field carries a usable string.
+        """
+        jsonl_uri = metadata.get("jsonl_download_uri")
+        if isinstance(jsonl_uri, str) and jsonl_uri:
+            return jsonl_uri
+
+        legacy_uri = metadata.get("download_uri")
+        if isinstance(legacy_uri, str) and legacy_uri:
+            log.info(
+                "scryfall_bulk.legacy_download_uri_fallback",
+                hint="metadata lacks jsonl_download_uri; using download_uri",
+                metadata_keys=sorted(metadata.keys()),
+            )
+            return legacy_uri
+
+        raise ScryfallBulkError(
+            "Bulk metadata missing both 'jsonl_download_uri' and 'download_uri'. "
+            f"Available keys: {list(metadata.keys())}"
+        )
+
+    @staticmethod
+    def _decompress_if_gzip(raw: bytes) -> bytes:
+        """Decompress the payload when it starts with gzip magic bytes.
+
+        Scryfall's current bulk files are served as ``.jsonl.gz`` with
+        ``Content-Type: application/gzip`` (no ``Content-Encoding``), so httpx
+        does not auto-decompress them. Detection is content-based (magic
+        bytes), never URL-based, so either field's download works.
+
+        Raises:
+            ScryfallBulkError: If the payload is corrupt gzip.
+        """
+        if raw[:2] != b"\x1f\x8b":
+            return raw
+        try:
+            return gzip.decompress(raw)
+        except (OSError, EOFError, zlib.error) as exc:
+            raise ScryfallBulkError(f"Failed to parse bulk data: corrupt gzip: {exc}") from exc
+
+    @staticmethod
+    def _extract_entries(payload: bytes) -> list[JSONValue]:
+        """Extract card entries from either payload shape.
+
+        Legacy shape (``download_uri``): a single JSON document that is a
+        JSON array of card objects. Current shape (``jsonl_download_uri``):
+        JSONL — one card object per line.
+
+        Raises:
+            ScryfallBulkError: If the payload is neither shape.
+        """
+        try:
+            raw = json.loads(payload)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return ScryfallBulkClient._parse_jsonl(payload)
+
+        if not isinstance(raw, list):
+            raise ScryfallBulkError("Bulk data is not a JSON array")
+        return raw
+
+    @staticmethod
+    def _parse_jsonl(payload: bytes) -> list[JSONValue]:
+        """Parse a JSONL payload: one JSON object per line, blank lines skipped.
+
+        Raises:
+            ScryfallBulkError: On undecodable bytes or a malformed line.
+        """
+        try:
+            text = payload.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ScryfallBulkError(f"Failed to parse bulk data: {exc}") from exc
+
+        entries: list[JSONValue] = []
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError as exc:
+                raise ScryfallBulkError(
+                    f"Failed to parse bulk data (JSONL line {lineno}): {exc}"
+                ) from exc
+        return entries
+
+    def _parse(self, raw_bytes: bytes) -> None:
+        """Parse Oracle Cards bulk data into the in-memory card dicts.
+
+        Accepts both payload shapes across Scryfall's field rename: the
+        legacy JSON array (``download_uri``) and the current gzipped JSONL
+        (``jsonl_download_uri``). Shape is detected from content (gzip magic
+        bytes), not from the URL. Each entry is validated through
+        ``Card.model_validate()``.
 
         For DFCs, ``card.name`` contains the full ``"Front // Back"`` name.
         We key lookups by both the full name and the front face name
         (``name.split(" // ")[0]``).
 
         Raises:
-            ScryfallBulkError: If JSON is malformed.
+            ScryfallBulkError: If the payload is malformed or yields no cards.
         """
-        try:
-            raw = json.loads(raw_bytes)
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ScryfallBulkError(f"Failed to parse bulk data: {exc}") from exc
-
-        if not isinstance(raw, list):
-            raise ScryfallBulkError("Bulk data is not a JSON array")
+        entries = self._extract_entries(self._decompress_if_gzip(raw_bytes))
 
         cards: dict[str, Card] = {}
         unique: list[Card] = []
         skipped = 0
 
-        for entry in raw:
+        for entry in entries:
             if not isinstance(entry, dict):
                 skipped += 1
                 continue
@@ -596,7 +689,7 @@ class ScryfallBulkClient:
 
         if not unique:
             raise ScryfallBulkError(
-                f"Parsed 0 cards from {len(raw)} entries ({skipped} skipped). "
+                f"Parsed 0 cards from {len(entries)} entries ({skipped} skipped). "
                 "Scryfall bulk data schema may have changed."
             )
 
