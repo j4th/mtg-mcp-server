@@ -36,7 +36,7 @@ def configure_logging(level: str = "INFO") -> None:
         ],
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         wrapper_class=structlog.make_filtering_bound_logger(
-            logging.getLevelName(level_upper),
+            logging.getLevelNamesMapping()[level_upper],
         ),
     )
 

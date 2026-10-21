@@ -356,6 +356,7 @@ from mtg_mcp_server.services.scryfall import ScryfallClient
 
 _client: ScryfallClient | None = None
 
+
 @lifespan
 async def scryfall_lifespan(server: FastMCP):
     global _client
@@ -366,12 +367,15 @@ async def scryfall_lifespan(server: FastMCP):
         yield {}
     _client = None
 
+
 scryfall_mcp = FastMCP("Scryfall", lifespan=scryfall_lifespan)
+
 
 def _get_client() -> ScryfallClient:
     if _client is None:
         raise RuntimeError("ScryfallClient not initialized — server lifespan not running")
     return _client
+
 
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def search_cards(query: str, page: int = 1) -> str:
@@ -399,6 +403,7 @@ _seventeen_lands: SeventeenLandsClient | None = None
 _edhrec: EDHRECClient | None = None
 _bulk: ScryfallBulkClient | None = None
 _rules: RulesService | None = None
+
 
 @lifespan
 async def workflow_lifespan(server: FastMCP):
@@ -435,6 +440,7 @@ async def workflow_lifespan(server: FastMCP):
         yield {}
     _scryfall = _spellbook = _seventeen_lands = _edhrec = _bulk = _rules = None
 
+
 workflow_mcp = FastMCP("Workflows", lifespan=workflow_lifespan)
 ```
 
@@ -449,6 +455,7 @@ Workflow tools wrap pure functions from the workflow modules. All tools return
 async def commander_overview(commander_name: str, response_format: str = "detailed") -> ToolResult:
     """Comprehensive commander profile from all available sources."""
     from mtg_mcp_server.workflows.commander import commander_overview as impl
+
     result = await impl(
         commander_name,
         scryfall=_require_scryfall(),
@@ -483,6 +490,7 @@ async def get_card(name: str) -> dict:
     """Card data as JSON by exact name."""
     ...
 
+
 @scryfall_mcp.resource("mtg://set/{code}")
 async def get_set(code: str) -> dict: ...
 ```
@@ -509,6 +517,7 @@ def evaluate_commander_swap(commander: str, adding: str, cutting: str) -> str:
 ```python
 if __name__ == "__main__":
     import sys
+
     transport = sys.argv[1] if len(sys.argv) > 1 else "stdio"
     if transport == "http":
         mcp.run(transport="streamable-http", host="127.0.0.1", port=8000)
@@ -538,15 +547,18 @@ import pytest
 from fastmcp import Client
 from mtg_mcp_server.providers.scryfall import scryfall_mcp
 
+
 @pytest.fixture
 async def client():
     async with Client(transport=scryfall_mcp) as c:
         yield c
 
+
 async def test_search_cards(client):
     result = await client.call_tool("search_cards", {"query": "t:creature id:sultai"})
     text = result.content[0].text
     assert "Found" in text
+
 
 async def test_card_not_found(client):
     result = await client.call_tool("card_details", {"name": "Nonexistent"}, raise_on_error=False)
@@ -585,6 +597,7 @@ All API clients inherit from BaseClient:
 ```python
 from fastmcp.exceptions import ToolError
 
+
 @scryfall_mcp.tool(annotations=TOOL_ANNOTATIONS)
 async def card_details(name: str) -> str:
     """Get full details for a card by exact name."""
@@ -605,6 +618,7 @@ async def card_details(name: str) -> str:
 ```python
 log = structlog.get_logger(service="scryfall")
 
+
 async def search(self, query: str, limit: int) -> list[Card]:
     log.debug("search", query=query, limit=limit)
     result = await self._get("/cards/search", params={"q": query})
@@ -621,6 +635,7 @@ All logging to stderr (stdout is MCP transport in stdio mode).
 ```python
 # src/mtg_mcp_server/config.py
 from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     transport: Literal["stdio", "http"] = "stdio"

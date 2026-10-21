@@ -13,7 +13,8 @@ from typing import Self
 
 import structlog
 from cachetools import TTLCache
-from selectolax.parser import HTMLParser, Node
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
+from selectolax.lexbor import LexborNode as Node
 
 from mtg_mcp_server.services.base import BaseClient, ServiceError
 from mtg_mcp_server.services.cache import _method_key, async_cached

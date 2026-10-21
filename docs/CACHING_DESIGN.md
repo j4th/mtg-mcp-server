@@ -84,9 +84,11 @@ A thin wrapper in `services/cache.py`:
 import functools
 from cachetools import TTLCache, keys
 
+
 def _method_key(*args, **kwargs):
     """Cache key that skips `self` (first arg) for instance methods."""
     return keys.hashkey(*args[1:], **kwargs)
+
 
 def async_cached(cache: TTLCache, key=_method_key):
     """Decorator for caching async method results in a TTLCache.
@@ -94,6 +96,7 @@ def async_cached(cache: TTLCache, key=_method_key):
     By default uses ``_method_key`` which skips ``self`` so that the cache
     is keyed only on the method arguments, not the instance identity.
     """
+
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -105,8 +108,10 @@ def async_cached(cache: TTLCache, key=_method_key):
             result = await func(*args, **kwargs)
             cache[k] = result
             return result
+
         wrapper.cache = cache
         return wrapper
+
     return decorator
 ```
 
@@ -135,8 +140,7 @@ class ScryfallClient(BaseClient):
     _card_cache = TTLCache(maxsize=500, ttl=86400)
 
     @async_cached(_card_cache)
-    async def get_card_by_name(self, name: str, fuzzy: bool = False) -> Card:
-        ...
+    async def get_card_by_name(self, name: str, fuzzy: bool = False) -> Card: ...
 ```
 
 ### Cache observability
