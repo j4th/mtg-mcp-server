@@ -13,6 +13,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 import respx
+from structlog.testing import capture_logs
 
 from mtg_mcp_server.services.scryfall_bulk import (
     ScryfallBulkClient,
@@ -827,6 +828,33 @@ class TestDownloadUriResolution:
                 card = await client.get_card("Sol Ring")
                 assert card is not None
                 assert card.name == "Sol Ring"
+
+    async def test_legacy_download_uri_fallback_is_logged(self):
+        """The legacy-field fallback is never silent: a log line fires.
+
+        Plan-level constraint: the download_uri fallback must be
+        observable in logs when Scryfall metadata changes shape again.
+        """
+        with respx.mock:
+            _mock_metadata_route(respx, metadata=_load_legacy_metadata())
+            _mock_download_route(
+                respx,
+                url=_LEGACY_DOWNLOAD_URL,
+                content=_load_oracle_cards_bytes(),
+                headers={"Content-Type": "application/json"},
+            )
+
+            with capture_logs() as logs:
+                client = ScryfallBulkClient(base_url=_BASE_URL, refresh_hours=24)
+                async with client:
+                    await client.ensure_loaded()
+
+        fallback = [
+            e for e in logs if e.get("event") == "scryfall_bulk.legacy_download_uri_fallback"
+        ]
+        assert fallback, "legacy download_uri fallback must log — never silent"
+        assert "download_uri" in fallback[0].get("hint", "")
+        assert "object" in fallback[0].get("metadata_keys", [])
 
 
 class TestParseFailures:
