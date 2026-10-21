@@ -69,11 +69,10 @@ This project follows test-driven development (TDD):
 import respx
 from httpx import Response
 
+
 @respx.mock
 async def test_get_card(scryfall_client):
-    respx.get("/cards/named").mock(
-        return_value=Response(200, json=fixture_data)
-    )
+    respx.get("/cards/named").mock(return_value=Response(200, json=fixture_data))
     card = await scryfall_client.get_card_by_name("Sol Ring")
     assert card.name == "Sol Ring"
 ```
@@ -83,6 +82,7 @@ async def test_get_card(scryfall_client):
 ```python
 # tests/workflows/test_example.py
 from unittest.mock import AsyncMock
+
 
 async def test_commander_overview():
     scryfall = AsyncMock()
