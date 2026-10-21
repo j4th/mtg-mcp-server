@@ -395,13 +395,15 @@ These are undocumented internal endpoints. They WILL break eventually. Design th
 
 The Oracle Cards bulk data is discovered via the `/bulk-data` endpoint, which returns a JSON list of available bulk data types. The `oracle_cards` type contains one JSON object per unique card name.
 
+Scryfall renamed the download field and payload format in 2026: metadata now carries `jsonl_download_uri` pointing to a gzipped JSONL file (one card object per line, `Content-Type: application/gzip` — no `Content-Encoding`, so httpx does not auto-decompress). The legacy shape (`download_uri` → plain JSON array) is still supported as a fallback for older responses. Payload shape is detected from gzip magic bytes, never from the URL.
+
 Card objects in the bulk data use the **same shape** as Scryfall API responses — no field mapping needed. The `Card` Pydantic model parses both API and bulk data responses identically.
 
 ### Service Architecture
 
 `ScryfallBulkClient` is **not** a `BaseClient` subclass. It's a file-based service that:
-1. Discovers the download URL via Scryfall's `/bulk-data` endpoint
-2. Downloads the Oracle Cards JSON file lazily on first access (not at startup)
+1. Discovers the download URL via Scryfall's `/bulk-data` endpoint (prefers `jsonl_download_uri`, falls back to legacy `download_uri` with a log line)
+2. Downloads the Oracle Cards file lazily on first access (not at startup)
 3. Parses into `dict[str, Card]` keyed by lowercase name for O(1) lookups
 4. Filters out non-playable layouts (art_series, token, double_faced_token, emblem, vanguard, planar, scheme, augment, host) to prevent overwriting real cards
 5. Runs background refresh via `start_background_refresh()` every `MTG_MCP_BULK_DATA_REFRESH_HOURS` (default 12h)

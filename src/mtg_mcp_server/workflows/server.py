@@ -657,6 +657,7 @@ async def complete_deck(
             decklist,
             format,
             bulk=_require_bulk(),
+            scryfall=_require_scryfall(),
             commander=commander,
             budget=budget,
             on_progress=lambda step, total: _progress(ctx, step, total),
@@ -700,6 +701,7 @@ async def commander_comparison(
         result = await impl(
             commanders,
             bulk=_require_bulk(),
+            scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             on_progress=lambda step, total: _progress(ctx, step, total),
@@ -781,6 +783,7 @@ async def precon_upgrade(
             decklist,
             commander,
             bulk=_require_bulk(),
+            scryfall=_require_scryfall(),
             spellbook=_require_spellbook(),
             edhrec=_edhrec,
             budget=budget,

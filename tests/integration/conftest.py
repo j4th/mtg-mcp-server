@@ -51,12 +51,17 @@ def _load_bulk_metadata() -> dict:
 
 def _bulk_download_url() -> str:
     """Derive the bulk download URL from the metadata fixture."""
-    return _load_bulk_metadata()["download_uri"]
+    return _load_bulk_metadata()["jsonl_download_uri"]
 
 
 def _load_oracle_cards_bytes() -> bytes:
-    """Load the oracle cards sample fixture as bytes."""
-    return (SCRYFALL_BULK_FIXTURES / "oracle_cards_sample.json").read_bytes()
+    """Load the oracle cards JSONL.gz sample fixture as bytes.
+
+    Mirrors the live download: gzipped JSONL served with
+    ``Content-Type: application/gzip`` (no ``Content-Encoding``, so httpx
+    does not auto-decompress).
+    """
+    return (SCRYFALL_BULK_FIXTURES / "oracle_cards_sample.jsonl.gz").read_bytes()
 
 
 @pytest.fixture
@@ -72,7 +77,12 @@ async def bulk_client():
         )
         respx.get(_bulk_download_url()).mock(
             return_value=httpx.Response(
-                200, content=_load_oracle_cards_bytes(), headers={"ETag": '"integration-test"'}
+                200,
+                content=_load_oracle_cards_bytes(),
+                headers={
+                    "Content-Type": "application/gzip",
+                    "ETag": '"integration-test"',
+                },
             )
         )
 
@@ -152,7 +162,12 @@ async def mcp_client():
         )
         respx.get(_bulk_download_url()).mock(
             return_value=httpx.Response(
-                200, content=_load_oracle_cards_bytes(), headers={"ETag": '"integration-test"'}
+                200,
+                content=_load_oracle_cards_bytes(),
+                headers={
+                    "Content-Type": "application/gzip",
+                    "ETag": '"integration-test"',
+                },
             )
         )
 

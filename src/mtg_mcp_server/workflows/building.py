@@ -13,12 +13,14 @@ from typing import TYPE_CHECKING, Literal
 
 import structlog
 
+from mtg_mcp_server.services.base import ServiceError
 from mtg_mcp_server.utils.color_identity import parse_color_identity
 from mtg_mcp_server.workflows import WorkflowResult
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from mtg_mcp_server.services.scryfall import ScryfallClient
     from mtg_mcp_server.services.scryfall_bulk import ScryfallBulkClient
     from mtg_mcp_server.services.spellbook import SpellbookClient
     from mtg_mcp_server.types import Card, Combo
@@ -621,6 +623,7 @@ async def complete_deck(
     format: str,
     *,
     bulk: ScryfallBulkClient,
+    scryfall: ScryfallClient,
     commander: str | None = None,
     budget: float | None = None,
     on_progress: Callable[[int, int], Awaitable[None]] | None = None,
@@ -631,10 +634,17 @@ async def complete_deck(
     Resolves all cards, categorizes them, compares to format-appropriate ratios,
     and suggests cards for underrepresented categories.
 
+    Card resolution is bulk-data-first with per-card Scryfall fallback (see
+    :func:`~mtg_mcp_server.workflows.card_resolver.resolve_cards`), so a
+    bulk-data outage degrades the deck analysis to Scryfall-sourced data.
+    Category suggestions still require bulk search; if that fails, the
+    analysis is returned without suggestions.
+
     Args:
         decklist: Partial list of card names.
         format: Format for target size and legality.
         bulk: Initialized ScryfallBulkClient.
+        scryfall: Initialized ScryfallClient (fallback source).
         commander: Commander name (unused currently, reserved for future enrichment).
         budget: Optional max price per card.
         on_progress: Optional progress callback.
@@ -649,8 +659,10 @@ async def complete_deck(
     if on_progress is not None:
         await on_progress(1, total_steps)
 
-    # Step 1: Resolve all cards
-    resolved_map = await bulk.get_cards(decklist)
+    # Step 1: Resolve all cards (bulk-data-first, Scryfall fallback per card)
+    from mtg_mcp_server.workflows.card_resolver import resolve_cards
+
+    resolved_map = await resolve_cards(decklist, bulk=bulk, scryfall=scryfall)
     resolved: list[Card] = []
     unresolved: list[str] = []
 
@@ -686,6 +698,7 @@ async def complete_deck(
 
     # Search for suggestions in underrepresented categories
     suggestions: dict[str, list[Card]] = {}
+    suggestions_degraded = False
     for cat, needed in gaps.items():
         cat_limit = min(needed + 3, 10)  # A few extra for variety
         fmt = format.lower()
@@ -704,13 +717,24 @@ async def complete_deck(
         elif cat == "lands":
             cat_type_contains = ["land"]
 
-        cat_suggestions = await bulk.filter_cards(
-            text_any=cat_text_any,
-            type_contains=cat_type_contains,
-            format=fmt,
-            max_price=budget,
-            limit=cat_limit,
-        )
+        cat_suggestions = []
+        try:
+            cat_suggestions = await bulk.filter_cards(
+                text_any=cat_text_any,
+                type_contains=cat_type_contains,
+                format=fmt,
+                max_price=budget,
+                limit=cat_limit,
+            )
+        except ServiceError as exc:
+            suggestions_degraded = True
+            log.warning(
+                "complete_deck.suggestions_unavailable",
+                category=cat,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+            continue
         # Exclude cards already in the deck
         existing_names = {c.name.lower() for c in resolved}
         cat_suggestions = [c for c in cat_suggestions if c.name.lower() not in existing_names]
@@ -729,6 +753,11 @@ async def complete_deck(
             lines.append(f"Gaps: {', '.join(gap_parts)}")
         if unresolved:
             lines.append(f"Unresolved: {', '.join(unresolved)}")
+        if suggestions_degraded and not suggestions:
+            lines.append(
+                "*Suggestions unavailable — bulk data offline; "
+                "card resolution fell back to Scryfall.*"
+            )
     else:
         lines.append("# Deck Completion Analysis")
         lines.append(f"*Format: {format} | Target: {target_size} cards*")
@@ -770,6 +799,12 @@ async def complete_deck(
                 for card in cat_cards[:5]:
                     lines.append(_fmt_card_line(card))
                 lines.append("")
+        elif suggestions_degraded:
+            lines.append(
+                "*Suggestions unavailable — bulk data offline; "
+                "card resolution fell back to Scryfall.*"
+            )
+            lines.append("")
 
         if unresolved:
             lines.append("## Unresolved Cards")
